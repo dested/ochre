@@ -1026,13 +1026,16 @@ export function runOrder(ctx: SimCtx, p: SimPerson, ag: Agent, o: Order, mdt: nu
     p.anim = speed > 2 ? 'run' : 'walk'
   }
   const go = (dest: Vec2, speed: number): Travel => {
-    if (ag.plan?.dest && dist(ag.plan.dest, dest) > 1.5) {
+    // re-aim when the target has moved a fair way, relative to how far off it is (long paths cost a search)
+    if (ag.plan?.dest && dist(ag.plan.dest, dest) > Math.max(1.5, dist(p.position, dest) * 0.3)) {
       ag.path = []
       if (ag.pathReq) ctx.paths.cancel(ag.pathReq)
       ag.pathReq = null
     }
     // the order borrows the plan slot for its destination so travel can re-aim
-    ag.plan = { kind: 'follow', phase: 'go', dest: { ...dest }, targetId: o.targetId, until: null, tick: 0, hunt: null, shuffle: null }
+    if (!ag.plan || (ag.path.length === 0 && !ag.pathReq)) {
+      ag.plan = { kind: 'follow', phase: 'go', dest: { ...dest }, targetId: o.targetId, until: null, tick: 0, hunt: null, shuffle: null }
+    }
     return travel(ctx, p, ag, dest, speed, mdt)
   }
   switch (o.kind) {

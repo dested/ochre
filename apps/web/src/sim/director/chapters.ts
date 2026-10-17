@@ -3,7 +3,7 @@
  * and captions. Each beat is a list of steps (see runtime.ts); people are named by their part in the life
  * (mother, father, grandmother…), so an heir's life plays the same scenes with their own family.
  */
-import type { Choice, LifeStageId, Sex, SimPerson, SkillId, Vec2 } from '../../game/contracts'
+import type { Choice, FieldNoteId, LifeStageId, Sex, SimPerson, SkillId, Vec2 } from '../../game/contracts'
 import { addAnimal, removeAnimal } from '../animals'
 import type { Pose, SimCtx } from '../ctx'
 import { addBond } from '../life'
@@ -881,7 +881,7 @@ const provider: Chapter = {
         wait(3),
         run((d) => order(d, 'child', null)),
         // free days until the whale
-        until((d) => d.ctx.state.clock.day >= 1 && hourNowGE(d, sun(d).rise - 0.25)),
+        until((d) => d.ctx.state.clock.day >= 1 && hourNowGE(d, sun(d).rise + 0.05) && !d.ctx.sleepSkip),
       ],
     },
     {
@@ -922,7 +922,7 @@ const provider: Chapter = {
         }),
         ...fadeIn(2),
         note('whale'),
-        until((d) => d.ctx.state.clock.day >= 2 && hourNowGE(d, 13)),
+        until((d) => d.ctx.state.clock.day >= 2 && hourNowGE(d, 13) && !d.ctx.sleepSkip),
       ],
       talk: (d, id) => {
         if (counter(d, `talk:${id}`) > 0 || talkedTo(d) >= 3) return null
@@ -1048,9 +1048,17 @@ const STORIES: { id: string; skill: SkillId; title: string; telling: string }[] 
   },
 ]
 
+/** where the elder sits: above the high-water line below the shore path, so it holds still through the tide */
 function sitPoint(d: D): Vec2 {
   const bottom = poi(d, 'shore-path-bottom')
-  return dryToward(d, bottom, poi(d, 'shore-mussels'), 2.5)
+  return dryToward(d, bottom, poi(d, 'shore-mussels'), 1, 1.3)
+}
+
+/** the sit is offered wherever the elder stops once they are down on the shore */
+function sitHere(d: D): Vec2 {
+  const at = sitPoint(d)
+  const pl = player(d)
+  return dist(pl.position, at) < 7 ? { x: pl.position.x, z: pl.position.z } : at
 }
 
 const elder: Chapter = {
@@ -1144,12 +1152,21 @@ const elder: Chapter = {
         ...fadeOut(4),
         wait(1),
       ],
-      extras: (d) => [extra('sit', 'sit', 'Sit by the sea', sitPoint(d), () => {}, { targetKind: 'poi', targetId: 'shore' })],
+      extras: (d) => [extra('sit', 'sit', 'Sit by the sea', sitHere(d), () => {}, { targetKind: 'poi', targetId: 'shore' })],
     },
   ],
 }
 
 export const CHAPTERS: Record<LifeStageId, Chapter> = { held, small, youth, provider, elder }
+
+/** the Field Notes each chapter unlocks, so a life started at a later chapter carries the earlier ones */
+export const NOTES_BY_STAGE: Record<LifeStageId, readonly FieldNoteId[]> = {
+  held: ['faces', 'coastal-life', 'shell-beads'],
+  small: ['spring-tides', 'shellfish', 'play', 'corms', 'danger', 'sharing', 'fire'],
+  youth: ['silcrete', 'heat-treatment', 'still-bay', 'adhesives', 'tracking', 'hunting', 'reciprocity', 'networks'],
+  provider: ['cumulative-culture', 'whale', 'burial', 'ochre'],
+  elder: ['engraved-ochre', 'stories'],
+}
 
 /** every beat id in order, for the lab and tests */
 export const BEAT_IDS: readonly string[] = Object.values(CHAPTERS).flatMap((c) => c.beats.map((b: Beat) => b.id))

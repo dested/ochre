@@ -8,7 +8,7 @@ import { setOrder } from '../ai'
 import type { DirectorHooks } from '../ctx'
 import type { DirectorSave } from '../save'
 import { resetStage } from '../setup'
-import { beadsGiven, CHAPTERS, castFor } from './chapters'
+import { beadsGiven, CHAPTERS, castFor, NOTES_BY_STAGE } from './chapters'
 import { emptyLife, heirBand, nextBandFirstLife, nextBandHeir, pickHeir, seededLife } from './history'
 import {
   bump,
@@ -332,6 +332,13 @@ export function createDirector(host: DirectorHost, stage: LifeStageId, saved: Di
     },
   }
 
+  if (!saved) {
+    // a life started at a later chapter has already found the earlier chapters' notes
+    const order: LifeStageId[] = ['held', 'small', 'youth', 'provider', 'elder']
+    for (const s of order.slice(0, order.indexOf(stage))) {
+      for (const n of NOTES_BY_STAGE[s]) if (!ctx.state.notes.includes(n)) ctx.state.notes.push(n)
+    }
+  }
   if (saved) {
     // a loaded life resumes at the start of its beat (orders and positions are re-issued there)
     enteredBeat = -1

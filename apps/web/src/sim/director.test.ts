@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { FIELD_NOTE_IDS, type LifeStageId, type Sim, type SimEvent } from '../game/contracts'
-import { BEAT_IDS } from './director/chapters'
+import { BEAT_IDS, NOTES_BY_STAGE } from './director/chapters'
 import { createSim, debugDirector } from './index'
 import { createTestWorld } from './test-world'
 
@@ -126,6 +126,14 @@ describe('director', () => {
     const ends = all.filter((e) => e.type === 'chapter-end').map((e) => (e.type === 'chapter-end' ? `${e.stage}>${e.next}` : ''))
     expect(ends).toEqual(['held>small', 'small>youth', 'youth>provider', 'provider>elder', 'elder>null'])
     expect([...sim.state.notes].sort()).toEqual([...FIELD_NOTE_IDS].sort())
+    // each chapter unlocks exactly the notes a later-chapter start seeds for it
+    const byStage: Record<string, string[]> = {}
+    let at = 'held'
+    for (const e of all) {
+      if (e.type === 'chapter-start') at = e.stage
+      if (e.type === 'note') (byStage[at] ??= []).push(e.noteId)
+    }
+    for (const [stage, ids] of Object.entries(NOTES_BY_STAGE)) expect([...(byStage[stage] ?? [])].sort()).toEqual([...ids].sort())
     const summary = all.find((e) => e.type === 'life-summary')
     if (!summary || summary.type !== 'life-summary') throw new Error('no summary')
     expect(summary.summary.name).toBe('Teni')
@@ -183,6 +191,7 @@ describe('director', () => {
     expect(kids.length).toBeGreaterThanOrEqual(2)
     expect(kids.every((k) => k.look.ageYears >= 20)).toBe(true)
     expect(elder.state.people.some((p) => kids.some((k) => k.childIds.includes(p.id)))).toBe(true)
+    expect([...elder.state.notes].sort()).toEqual([...NOTES_BY_STAGE.held, ...NOTES_BY_STAGE.small, ...NOTES_BY_STAGE.youth, ...NOTES_BY_STAGE.provider].sort())
   })
 
   test('Coming of age: beads go only to the lagoon youths, and the one who gets them is the partner', () => {

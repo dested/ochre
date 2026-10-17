@@ -136,10 +136,10 @@ export function around(d: D, c: Vec2, r: number, angle: number): Vec2 {
 }
 
 /** the last dry point on the way from `from` to `to` at the current sea level */
-export function dryToward(d: D, from: Vec2, to: Vec2, keep = 1.5): Vec2 {
+export function dryToward(d: D, from: Vec2, to: Vec2, keep = 1.5, seaLevel?: number): Vec2 {
   const n = Math.max(2, Math.ceil(dist(from, to) / 1.5))
   let last = { x: from.x, z: from.z }
-  const sea = d.ctx.state.clock.seaLevel
+  const sea = seaLevel ?? d.ctx.state.clock.seaLevel
   for (let i = 1; i <= n; i++) {
     const k = i / n
     const q = { x: from.x + (to.x - from.x) * k, z: from.z + (to.z - from.z) * k }
