@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { FIELD_NOTE_IDS, type LifeStageId, type Sim, type SimEvent } from '../game/contracts'
 import { BEAT_IDS, NOTES_BY_STAGE } from './director/chapters'
-import { createSim, debugDirector } from './index'
+import { createSim, debugCtx, debugDirector } from './index'
+import { sunTimes } from './time'
 import { createTestWorld } from './test-world'
 
 const world = createTestWorld(1)
@@ -35,6 +36,32 @@ function standAt(sim: Sim, at: { x: number; z: number }, seconds: number, events
     events.push(...sim.step(1 / 30))
   }
   return events
+}
+
+/** play: walk the player straight toward `to` at `speed` m/s until within `near` m (or `max` real seconds); returns the seconds taken */
+function walkTo(sim: Sim, to: { x: number; z: number }, speed: number, events: SimEvent[] = [], near = 1.2, max = 600): number {
+  let t = 0
+  for (; t < max; t += 1 / 30) {
+    const p = player(sim).position
+    const left = Math.hypot(to.x - p.x, to.z - p.z)
+    if (left <= near) break
+    const k = Math.min(1, speed / 30 / left)
+    const at = { x: p.x + (to.x - p.x) * k, z: p.z + (to.z - p.z) * k }
+    sim.command({ type: 'move', position: at, heading: Math.atan2(to.x - p.x, to.z - p.z), speed, anim: 'walk' })
+    events.push(...sim.step(1 / 30))
+  }
+  return t
+}
+
+/** play: hold E on the first enabled interaction with this verb in reach; returns the seconds held, or null if none */
+function holdVerb(sim: Sim, verb: string, events: SimEvent[] = []): number | null {
+  const p = player(sim).position
+  const i = sim.interactionsNear(p, 2.5).find((x) => x.enabled && x.verb === verb)
+  if (!i) return null
+  standAt(sim, p, i.holdSeconds, events)
+  sim.command({ type: 'interact', interactionId: i.id })
+  events.push(...sim.step(1 / 30))
+  return i.holdSeconds + 1 / 30
 }
 
 function steps(sim: Sim, seconds: number, events: SimEvent[] = []): SimEvent[] {
@@ -155,6 +182,8 @@ describe('director', () => {
     expect(sim.state.people.some((p) => p.id === 'oro')).toBe(false)
     expect(sim.state.people.every((p) => [p.position.x, p.position.z].every(Number.isFinite))).toBe(true)
 
+    // the old players' parents are gone, but Kaya is still the player's sister
+    expect(sim.relationOf('kaya')).toBe('Sister')
     // continue as the heir: Small again, as a six-year-old grandchild
     sim.command({ type: 'continue-as-heir' })
     const after = steps(sim, 1.5)
@@ -170,6 +199,8 @@ describe('director', () => {
     const oldPartner = sim.state.people.find((p) => p.id === 'partner')
     if (oldPartner) expect(sim.relationOf(oldPartner.id)).toMatch(/^Grand(father|mother)$/)
     expect(sim.state.people.some((p) => sim.relationOf(p.id) === 'Partner')).toBe(false)
+    // and the old player's sister is the heir's great-aunt
+    expect(sim.relationOf('kaya')).toBe('Great-aunt')
     // the heir's life plays on
     for (let i = 0; i < 40 && sim.state.stage === 'small'; i++) {
       director(sim).completeBeat()
@@ -396,6 +427,71 @@ describe('director', () => {
     expect(sim.state.chapter.objective?.text.startsWith('Tell the others')).toBe(true)
     expect(whaleAt ?? 0).toBeGreaterThan(20)
     expect(sunDegrees(sim)).toBeGreaterThan(20)
+  }, 60_000)
+
+  test('storm firewood: walking at 1.4 m/s to the wood and back finishes with 40% of the time to spare', () => {
+    const sim = newSim('provider')
+    const dir = director(sim)
+    for (let i = 0; i < 20 && sim.state.chapter.beatId !== 'provider.storm'; i++) {
+      dir.completeBeat()
+      steps(sim, 0.2)
+    }
+    expect(sim.state.chapter.beatId).toBe('provider.storm')
+    for (let i = 0; i < 30 * 20 && sim.state.chapter.objective?.text !== 'Bring firewood before dark'; i++) sim.step(1 / 30)
+    const o = sim.state.chapter.objective
+    expect(o?.text).toBe('Bring firewood before dark')
+    // the count is the HUD's (done/total), never in the text
+    expect(o?.total).toBe(5)
+    const ctx = debugCtx(sim)
+    if (!ctx) throw new Error('no ctx')
+    const { set } = sunTimes(ctx, sim.state.clock.dayOfYear)
+    const budget = ((set + 0.75 - sim.state.clock.hour) * 3600) / sim.state.timeScale
+    let spent = 0
+    for (let trip = 0; trip < 4 && (sim.state.chapter.objective?.done ?? 5) < 5; trip++) {
+      const wood = sim.state.chapter.objective?.target
+      if (wood?.kind !== 'point') throw new Error('the wood has no place')
+      spent += walkTo(sim, wood.at, 1.4)
+      for (let n = 0; n < 3; n++) spent += holdVerb(sim, 'fetch-wood') ?? 0
+      expect(sim.state.inventory.firewood).toBeGreaterThanOrEqual(5)
+      const fire = sim.state.chapter.objective?.target
+      if (fire?.kind !== 'point') throw new Error('the hearth has no place')
+      spent += walkTo(sim, fire.at, 1.4, [], 1.5)
+      spent += holdVerb(sim, 'add-wood') ?? 0
+      spent += 2
+      steps(sim, 2)
+    }
+    // the objective is met (cleared), well before dark
+    expect(sim.state.chapter.objective?.text === 'Bring firewood before dark').toBe(false)
+    expect(spent).toBeLessThan(budget * 0.6)
+  }, 60_000)
+
+  test('elder.walk remembers: three memories from this life, in order, on the way down', () => {
+    const sim = newSim('provider')
+    const dir = director(sim)
+    // provider (the whale comes) and on into elder, to the last walk
+    for (let i = 0; i < 40 && sim.state.chapter.beatId !== 'elder.walk'; i++) {
+      dir.completeBeat()
+      steps(sim, 0.2)
+    }
+    expect(sim.state.chapter.beatId).toBe('elder.walk')
+    for (let i = 0; i < 30 * 10 && sim.state.chapter.objective?.text !== 'Walk down to the sea'; i++) sim.step(1 / 30)
+    const sit = sim.state.chapter.objective?.target
+    if (sit?.kind !== 'point') throw new Error('the walk has no place')
+    const events: SimEvent[] = []
+    walkTo(sim, sit.at, 0.8, events, 2)
+    const memories = events.flatMap((e) =>
+      e.type === 'caption' && e.caption.id.startsWith('elder.walk:') && e.caption.speaker === null ? [e.caption.text] : [],
+    )
+    expect(memories.length).toBe(3)
+    for (const m of memories) expect(m.split(/\s+/).length).toBeLessThanOrEqual(12)
+    const kids = player(sim).childIds.flatMap((id) => sim.state.people.find((p) => p.id === id)?.name ?? [])
+    expect(kids.length).toBeGreaterThanOrEqual(2)
+    const kidsAt = memories.findIndex((m) => kids.every((k) => m.includes(k)))
+    const whaleAt = memories.findIndex((m) => m.includes('whale'))
+    expect(kidsAt).toBeGreaterThanOrEqual(0)
+    expect(whaleAt).toBeGreaterThan(kidsAt)
+    // all said before the sit
+    expect(sim.interactionsNear(player(sim).position, 2.5).some((i) => i.verb === 'sit')).toBe(true)
   }, 60_000)
 
   test('elder.walk opens on the elder standing at the path top, not still seated from the story', () => {

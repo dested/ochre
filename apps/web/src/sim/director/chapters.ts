@@ -14,6 +14,7 @@ import { hurryWindow, openWindow, windowOver, type MomentId } from '../moments'
 import { quiet } from '../talk'
 import { hashString, mix32, Rng } from '../../core/rng'
 import { ageBand } from './history'
+import { pickMemories } from './memories'
 import {
   around,
   bump,
@@ -1145,13 +1146,21 @@ const provider: Chapter = {
     },
     {
       id: 'provider.storm',
+      // the gully's dry wood is a long walk; the gale has brought dead branches down close by
+      extras: (d) => [
+        extra('storm-wood', 'fetch-wood', 'Gather fallen branches', stormWood(d), (d) => {
+          d.ctx.state.inventory.firewood += 2
+          emit(d, { type: 'item', item: 'firewood', delta: 2 })
+        }, { targetKind: 'item', hold: 1.5 }),
+      ],
       steps: [
         run((d) => {
           // the wood by the fire is wet; the fire needs dry wood from the gully
           d.ctx.state.hearth.firewood = Math.min(d.ctx.state.hearth.firewood, 3)
         }),
         say('The wind turns cold. A storm is coming in from the sea.', null, 5),
-        objAt('Bring firewood before dark (0/5)', (d) => (d.ctx.state.inventory.firewood > 0 ? atHearth(d) : at('firewood-gully')(d)), 5, (d) => counter(d, 'wood')),
+        say('The gale has torn dead branches from the bushes close by.', null, 5),
+        objAt('Bring firewood before dark', (d) => (d.ctx.state.inventory.firewood > 0 ? atHearth(d) : { kind: 'point', at: stormWood(d) }), 5, (d) => counter(d, 'wood')),
         until((d) => counter(d, 'wood') >= 5 || hourNowGE(d, sun(d).set + 0.75)),
         run((d) => {
           // a fire fed well holds through the night; a starved one sinks to coals and the cold comes in
@@ -1176,6 +1185,7 @@ const provider: Chapter = {
             const at = spot(d, { x: back.x - 2, z: back.z - 2 }, 8)
             g.position = { x: at.x, z: at.z }
             d.st.cast.departed = g.id
+            d.life.lived.push(`buried:${g.name}`)
             emit(d, { type: 'death', personId: g.id })
           }),
           say((d) => `In the night, while the storm beats on the cliff, ${departedName(d)} dies.`, null, 6),
@@ -1229,6 +1239,14 @@ function departedName(d: D): string {
   const g = d.ctx.state.people.find((p) => p.id === d.st.cast.departed)
   if (!g) return 'your grandmother'
   return relationTo(d, g) === 'Grandmother' ? 'your grandmother' : g.name
+}
+
+/** where the storm's fallen branches lie: on walkable ground by the bulb patch nearest the hearth */
+function stormWood(d: D): Vec2 {
+  const h = hearth(d)
+  const patches = d.ctx.world.pois.filter((p) => p.kind === 'corm-patch').sort((a, b) => dist(a, h) - dist(b, h))
+  const near = patches[0]
+  return near ? spot(d, near, 10) : spot(d, poi(d, 'firewood-gully'), 10)
 }
 
 /** the morning the whale comes: three hours after sunrise, the winter sun near 30° */
@@ -1318,6 +1336,18 @@ const STORIES: { id: string; skill: SkillId; title: string; telling: string }[] 
 function sitPoint(d: D): Vec2 {
   const bottom = poi(d, 'shore-path-bottom')
   return dryToward(d, bottom, poi(d, 'shore-mussels'), 1, 1.3)
+}
+
+/** on the way down, the life comes back: a memory at a quarter, half and three quarters of the path */
+function remember(d: D): void {
+  const from = counter(d, 'walk-from')
+  const said = counter(d, 'memories')
+  if (from <= 0 || said >= 3) return
+  const gone = 1 - dist(player(d).position, sitPoint(d)) / from
+  if (gone < (said + 1) * 0.25) return
+  const line = pickMemories(d.life, d.ctx.state.people, d.ctx.state.playerId)[said]
+  if (line) caption(d, line, null)
+  bump(d, 'memories')
 }
 
 /** the sit is offered wherever the elder stops once they are down on the shore */
@@ -1414,10 +1444,11 @@ const elder: Chapter = {
           skipTo(d, sun(d).rise - 0.2, 4)
           const top = poi(d, 'shore-path-top')
           teleport(d, top, face(top, poi(d, 'shore-path-bottom')))
+          d.st.counters['walk-from'] = dist(top, sitPoint(d))
         }),
         ...fadeIn(3),
         objAt('Walk down to the sea', (d) => ({ kind: 'point', at: sitPoint(d) })),
-        until((d) => counter(d, 'sit') > 0),
+        until((d) => counter(d, 'sit') > 0, { tick: remember }),
         clearObj(),
         wait(4),
         ...fadeOut(4),

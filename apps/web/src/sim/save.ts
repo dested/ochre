@@ -150,6 +150,10 @@ export const lifeSchema = z.object({
   shareChoice: z.string().nullable(),
   pointQuality: z.number().nullable(),
   engraving: z.number().nullable(),
+  /** the player's mother, for the last walk's memories */
+  motherName: z.string().nullable().default(null),
+  /** what the life went through, in order: beat ids, `<stage>:<moment id>`, `buried:<name>` */
+  lived: z.array(z.string()).default([]),
 })
 
 /** the director's place in the life: the chapter, the beat, what it counted and remembers */

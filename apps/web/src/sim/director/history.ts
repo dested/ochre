@@ -14,12 +14,25 @@ import type { DirectorSave } from '../save'
 export type LifeRecord = DirectorSave['life']
 
 export function emptyLife(): LifeRecord {
-  return { beadsGivenTo: null, partnerName: null, partnerSex: null, storyTold: null, taught: [], shareChoice: null, pointQuality: null, engraving: null }
+  return {
+    beadsGivenTo: null,
+    partnerName: null,
+    partnerSex: null,
+    storyTold: null,
+    taught: [],
+    shareChoice: null,
+    pointQuality: null,
+    engraving: null,
+    motherName: null,
+    lived: [],
+  }
 }
 
 /** a chapter entered from the title: what the years before it would have left behind */
 export function seededLife(stage: LifeStageId, people: readonly SimPerson[]): LifeRecord {
   const life = emptyLife()
+  // the first life's mother is always the fixed cast's Ama, here or long gone
+  life.motherName = people.find((p) => p.id === 'ama')?.name ?? 'Ama'
   const partner = people.find((p) => p.id === 'partner')
   if ((stage === 'provider' || stage === 'elder') && partner) {
     life.beadsGivenTo = partner.name

@@ -78,6 +78,9 @@ export function createDirector(host: DirectorHost, stage: LifeStageId, saved: Di
     enteredBeat = st.beat
     d.beatId = b.id
     d.forced = false
+    // an answer to a skipped beat's minigame or choice never reaches the next one
+    d.answer = null
+    if (!st.life.lived.includes(b.id)) st.life.lived.push(b.id)
     st.counters = {}
     stepIndex = 0
     entered = false
@@ -107,6 +110,8 @@ export function createDirector(host: DirectorHost, stage: LifeStageId, saved: Di
     st.beat = 0
     enteredBeat = -1
     const pl = player(d)
+    // an heir's life starts with an empty record: its mother is whoever is here
+    if (st.life.motherName === null) st.life.motherName = ctx.state.people.find((p) => p.id === pl.motherId)?.name ?? null
     ctx.state.chapter = { stage: c.stage, beatId: '', objective: null, finished: false }
     d.objective = null
     d.objectiveKey = ''
@@ -235,6 +240,14 @@ export function createDirector(host: DirectorHost, stage: LifeStageId, saved: Di
     }
   }
 
+  /** the unscripted moments the life went through, once each */
+  function collectLived(): void {
+    const m = ctx.moments.active
+    if (!m) return
+    const key = `${st.stage}:${m.id}`
+    if (!st.life.lived.includes(key)) st.life.lived.push(key)
+  }
+
   function collectTaught(): void {
     const pid = ctx.state.playerId
     for (const e of ctx.events) {
@@ -273,6 +286,7 @@ export function createDirector(host: DirectorHost, stage: LifeStageId, saved: Di
     update(realDt) {
       if (!st.begun) beginChapter()
       collectTaught()
+      collectLived()
       advance(realDt)
       syncObjective()
     },

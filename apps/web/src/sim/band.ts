@@ -171,7 +171,8 @@ export function buildBand(seed: number, stage: LifeStageId, playerName: string):
     // elder: the player's children are grown with children of their own; the old generation is gone
     const partnerId = 'partner'
     add({ id: partnerId, name: name(), sex: other(playerSex), age: P - 1, familyId: 'fam-p', partnerId: PLAYER_ID, bond: 0.95 })
-    playerSpec('fam-p', { partnerId })
+    // Ama and Tuk are gone, but the player and Kaya keep their ids as parents, so they still read as sisters
+    playerSpec('fam-p', { partnerId, motherId: 'ama', fatherId: 'tuk' })
     const [m, f] = playerSex === 'female' ? [PLAYER_ID, partnerId] : [partnerId, PLAYER_ID]
     const c1Sex: Sex = rng.chance(0.5) ? 'female' : 'male'
     const c1p = add({ id: 'child-1-partner', name: name(), sex: other(c1Sex), age: 31, familyId: 'fam-c1', partnerId: 'child-1', bond: 0.6 })
@@ -186,7 +187,7 @@ export function buildBand(seed: number, stage: LifeStageId, playerName: string):
     const [hm, hf] = c2Sex === 'female' ? ['child-2', c2p] : [c2p, 'child-2']
     add({ id: 'grandchild-4', name: name(), sex: 'male', age: 3, familyId: 'fam-c2', motherId: hm, fatherId: hf, bond: 0.75 })
     add({ id: 'child-3', name: name(), sex: rng.chance(0.5) ? 'female' : 'male', age: 23, familyId: 'fam-p', motherId: m, fatherId: f, bond: 0.85 })
-    add({ id: 'kaya', name: 'Kaya', sex: 'female', age: P + 4, familyId: 'fam-k', bond: 0.8,
+    add({ id: 'kaya', name: 'Kaya', sex: 'female', age: P + 4, familyId: 'fam-k', motherId: 'ama', fatherId: 'tuk', bond: 0.8,
       skills: ['faces', 'shellfish', 'tides', 'corms', 'beads', 'hides', 'fire', 'medicine', 'stories'] })
     const ks = add({ id: 'kaya-son', name: name(), sex: 'male', age: 36, familyId: 'fam-k', motherId: 'kaya', bond: 0.6 })
     const ksp = add({ id: 'kaya-son-partner', name: name(), sex: 'female', age: 34, familyId: 'fam-k', partnerId: ks, bond: 0.45 })

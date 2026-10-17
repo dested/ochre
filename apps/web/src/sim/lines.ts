@@ -251,3 +251,64 @@ function build(): TalkLine[] {
 }
 
 export const TALK_LINES: readonly TalkLine[] = build()
+
+// ─── the last walk's memories ───────────────────────────────────────────────────────────────────────────────
+
+/**
+ * What the elder sees on the last walk down to the sea (elder.walk), narrated, filled from the life's own record
+ * by `director/memories.ts`. Voice: present tense, plain and sensory, at most 12 words, no moral, never
+ * "you remember". `{name}` is the person the memory is about; `{a}`, `{b}`, `{c}` the children.
+ */
+export type MemoryKind =
+  | 'mother'
+  | 'mother-shell'
+  | 'seal-pup'
+  | 'tide'
+  | 'lion-eyes'
+  | 'rain-dash'
+  | 'honeyguide'
+  | 'hunt'
+  | 'beads'
+  | 'partner'
+  | 'children-1'
+  | 'children-2'
+  | 'children-3'
+  | 'first-steps'
+  | 'taught'
+  | 'whale'
+  | 'moon-dance'
+  | 'buried'
+  | 'engraving'
+  | 'story'
+  | 'heir'
+
+export const MEMORY_LINES: Record<MemoryKind, string> = {
+  mother: "{name}'s face above you, firelight moving in her eyes.",
+  'mother-shell': "{name}'s fingers, a shell cool and wet in your palm.",
+  'seal-pup': 'A seal pup on the warm rocks, blinking at you.',
+  tide: 'Cold water round your ankles, the sea coming in fast.',
+  'lion-eyes': 'Two eyes in the dark past the fire, then gone.',
+  'rain-dash': 'Rain hammering the rocks, everyone running for the cave, laughing.',
+  honeyguide: 'A little bird calling from the bushes, and honey on every chin.',
+  hunt: "The eland's breath steaming, the spear light in your hand.",
+  beads: "Shell beads warm from your neck, in {name}'s open hand.",
+  partner: "{name}'s shoulder against yours, the fire burning low.",
+  'children-1': '{a} asleep against you, small and heavy and warm.',
+  'children-2': '{a} and {b} asleep against you, one on each side.',
+  'children-3': '{a}, {b} and {c} asleep in a heap against you.',
+  'first-steps': '{name} wobbling across the sand toward you, arms out.',
+  taught: "{name}'s small hands copying yours, slow, then sure.",
+  whale: 'The whale on the sand, and everyone shouting, running down.',
+  'moon-dance': 'Feet stamping round the fire under a full white moon.',
+  buried: '{name} under the red ochre, the storm gone quiet.',
+  engraving: 'Red lines cut in the ochre, sharp under your thumb.',
+  story: "Small faces in the firelight, waiting for the story's end.",
+  heir: '{name} asleep by the fire, fists curled tight.',
+}
+
+/** when the record is thin: the sea and the shelter */
+export const MEMORY_FALLBACK: readonly string[] = [
+  'The same sea coming in over the same rocks.',
+  'Smoke climbing the cave wall, the way it always has.',
+  'Wind off the water, salt on your lips.',
+]
