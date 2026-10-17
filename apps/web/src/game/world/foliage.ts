@@ -37,6 +37,23 @@ function hash(i: number, j: number, s: number): number {
   return (h >>> 0) / 4294967296
 }
 
+/** smooth value noise over the ground (0..1, cells about 14 m): which species holds a stand there */
+function standAt(x: number, z: number): number {
+  const gx = x / 14
+  const gz = z / 14
+  const i = Math.floor(gx)
+  const j = Math.floor(gz)
+  const fx = gx - i
+  const fz = gz - j
+  const ux = fx * fx * (3 - 2 * fx)
+  const uz = fz * fz * (3 - 2 * fz)
+  const a = hash(i, j, 913)
+  const b = hash(i + 1, j, 913)
+  const c = hash(i, j + 1, 913)
+  const d = hash(i + 1, j + 1, 913)
+  return Math.min(0.999, a + (b - a) * ux + (c - a) * uz + (a - b - c + d) * ux * uz)
+}
+
 /** a small seeded stream for building geometry */
 function stream(seed: number): () => number {
   let k = 0
@@ -115,21 +132,43 @@ function lump(b: Builder, tris: Float32Array, c: V3, s: V3, seed: number, dome: 
   }
 }
 
-/** a fynbos clump: a dome of small lumps (erica, a little wider than tall) */
-/** `far`: the same clump in two bigger lumps, for the outer ring (a few pixels across out there) */
-function fynbosGeo(seed: number, tall: boolean, far = false): BufferGeometry {
+/**
+ * A fynbos clump: small lumps heaped into a shape. `form` 0 a dome (erica, a little wider than tall), 1 upright and
+ * narrow, 2 a low spreading mat, 3 an open, broken bush with gaps between its parts. The lumps are not all one
+ * colour: new growth bronze, old wood grey, a few flowering tips, so no two clumps read as the same blob.
+ * `far`: the same clump in two bigger lumps, for the outer ring (a few pixels across out there).
+ */
+const FYN_TINTS: readonly V3[] = [
+  [1, 1, 1],
+  [1, 1, 1],
+  [1.12, 0.93, 0.78],
+  [0.9, 0.97, 1.04],
+  [0.82, 0.86, 0.8],
+]
+const FYN_BLOOMS: readonly V3[] = [
+  [1.45, 0.82, 0.95],
+  [1.35, 1.3, 1.12],
+  [1.3, 0.78, 0.55],
+]
+function fynbosGeo(seed: number, form: number, far = false): BufferGeometry {
   const b = new Builder()
   const r = stream(seed)
-  const h = tall ? 0.95 : 0.62
-  const w = tall ? 0.5 : 0.62
+  const h = form === 1 ? 0.95 : form === 2 ? 0.38 : form === 3 ? 0.7 : 0.62
+  const w = form === 1 ? 0.45 : form === 2 ? 0.95 : form === 3 ? 0.75 : 0.62
   const dome: V3 = [0, -h * 0.25, 0]
-  const n = far ? 2 : tall ? 7 : 8
+  const n = far ? 2 : form === 2 ? 9 : form === 3 ? 6 : 8
+  // flowering tips: pink erica, cream, or rust seed heads, on a few lumps of some clumps
+  const bloom: V3 | null = far ? null : r() < 0.35 ? FYN_BLOOMS[Math.floor(r() * FYN_BLOOMS.length)] ?? null : null
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2 + r() * 0.6
-    const rr = i === 0 ? 0 : w * (0.45 + 0.4 * r())
+    const rr = i === 0 ? 0 : w * (form === 3 ? 0.6 + 0.4 * r() : 0.45 + 0.4 * r())
     const y = i === 0 ? h * 0.55 : h * (0.25 + 0.35 * r())
-    const sz = (i === 0 ? 0.42 : 0.3 + 0.14 * r()) * (tall ? 0.9 : 1) * (far ? 1.5 : 1)
-    lump(b, ICO0, [Math.cos(a) * rr, y, Math.sin(a) * rr], [sz * 1.1, sz * (tall ? 1.15 : 0.85), sz * 1.1], seed * 13 + i, dome, h, [1, 1, 1], 0.85 + 0.3 * r())
+    const sz = (i === 0 ? 0.42 : 0.3 + 0.14 * r()) * (form === 1 ? 0.85 : form === 3 ? 0.75 : 1) * (far ? 1.5 : 1)
+    const sy = form === 1 ? 1.25 : form === 2 ? 0.6 : 0.85
+    const tint = FYN_TINTS[Math.floor(r() * FYN_TINTS.length)] ?? [1, 1, 1]
+    const top = y > h * 0.45
+    const base: V3 = bloom && top && r() < 0.55 ? bloom : tint
+    lump(b, ICO0, [Math.cos(a) * rr, y, Math.sin(a) * rr], [sz * 1.1, sz * sy, sz * 1.1], seed * 13 + i, dome, h, base, 0.85 + 0.3 * r(), far ? 0.7 : 0.5)
   }
   return b.geometry()
 }
@@ -442,11 +481,15 @@ const LEAF_ALBEDO = /* glsl */ `
 	{
 		vec3 wp = vOcWorld * uLeaf;
 		float lf = ocNoise( wp.xz * 1.0 + wp.y * 0.7 ) * 0.6 + ocNoise( vec2( wp.x - wp.z, wp.y ) * 2.6 ) * 0.4;
-		diffuseColor.rgb *= mix( 0.58, 1.07, ocEdgeF( 0.4, lf ) );
+		// fine-leaved shrubs (erica) read as a soft speckle, not hard-edged patches (camouflage under the brush), and
+		// have a more ragged edge, twigs against the light
+		float lc = smoothstep( 6.0, 11.0, uLeaf );
+		float leafy = mix( ocEdgeF( 0.4, lf ), smoothstep( 0.2, 0.8, lf ), lc );
+		diffuseColor.rgb *= mix( mix( 0.58, 0.8, lc ), 1.07, leafy );
 		#ifndef FLAT_SHADED
 			float ndv = abs( dot( normalize( vNormal ), normalize( vViewPosition ) ) );
 			float rag = ocNoise( wp.xz * 1.6 + wp.y * 1.3 + 7.0 );
-			if ( ndv < 0.5 && rag > ndv * 1.9 + 0.3 ) discard;
+			if ( ndv < 0.5 + 0.15 * lc && rag > ndv * ( 1.9 - 0.4 * lc ) + 0.3 - 0.08 * lc ) discard;
 		#endif
 	}
 `
@@ -650,9 +693,9 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
   kind({
     name: 'fynbos',
     slots: makeSlots(
-      [fynbosGeo(11, false), fynbosGeo(23, false), fynbosGeo(37, true)],
-      [fynbosGeo(11, false, true), fynbosGeo(23, false, true), fynbosGeo(37, true, true)],
-      foliageMaterial('fyn', 0.35, 0.6, 9),
+      [fynbosGeo(11, 0), fynbosGeo(23, 3), fynbosGeo(37, 1), fynbosGeo(41, 2), fynbosGeo(53, 0)],
+      [fynbosGeo(11, 0, true), fynbosGeo(23, 3, true), fynbosGeo(37, 1, true), fynbosGeo(41, 2, true), fynbosGeo(53, 0, true)],
+      foliageMaterial('fyn', 0.35, 0.6, 11),
       7000,
       true,
       'fynbos',
@@ -677,13 +720,18 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
       if (slopeAt(out.x, out.z) > 0.95 || onPath(out.x, out.z)) return -1
       out.y = world.heightAt(out.x, out.z)
       if (out.y < 2.2) return -1
+      // sizes from knee-high seedlings to old stands, some squat, some drawn up
       const h1 = hash(ix, iz, 104)
-      out.s = (m === MAT.dune ? 0.6 : 0.75) + 0.6 * h1 * h1
+      out.s = (m === MAT.dune ? 0.5 : 0.55) + 0.95 * h1 * h1
+      out.sy = 0.75 + 0.5 * hash(ix, iz, 110)
       out.yaw = hash(ix, iz, 105) * Math.PI * 2
       out.tilt = 0
-      const ci = Math.floor(hash(ix, iz, 106) * FYN.length)
-      setCol(out, FYN[ci] ?? [0.5, 0.5, 0.35], 0.9 + 0.2 * hash(ix, iz, 107))
-      return hash(ix, iz, 108) < 0.25 ? 2 : hash(ix, iz, 109) < 0.5 ? 0 : 1
+      // neighbours tend to share a colour (a stand of one species), broken by the odd stranger
+      const stand = standAt(out.x, out.z)
+      const ci = hash(ix, iz, 106) < 0.7 ? Math.floor(stand * FYN.length) : Math.floor(hash(ix, iz, 111) * FYN.length)
+      setCol(out, FYN[ci] ?? [0.5, 0.5, 0.35], 0.82 + 0.3 * hash(ix, iz, 107))
+      const f = hash(ix, iz, 108)
+      return f < 0.2 ? 2 : f < 0.4 ? 1 : f < 0.58 ? 3 : f < 0.8 ? 0 : 4
     },
   })
 
@@ -1029,6 +1077,7 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
           const cz = (j + 0.5) * k.cell - fz
           const d2 = cx * cx + cz * cz
           if (d2 > R2) continue
+          out.sy = undefined
           const v = k.place(i, j, out)
           if (v < 0) continue
           const d = Math.sqrt(d2)
@@ -1057,7 +1106,7 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
             e[o + 2] = -sn
             e[o + 3] = 0
             e[o + 4] = 0
-            e[o + 5] = s
+            e[o + 5] = s * (out.sy ?? 1)
             e[o + 6] = 0
             e[o + 7] = 0
             e[o + 8] = sn
@@ -1083,7 +1132,7 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
           box[3] = Math.max(box[3] ?? 0, out.x)
           box[4] = Math.max(box[4] ?? 0, out.y)
           box[5] = Math.max(box[5] ?? 0, out.z)
-          box[6] = Math.max(box[6] ?? 0, s)
+          box[6] = Math.max(box[6] ?? 0, s * Math.max(1, out.sy ?? 1))
         }
       }
     }

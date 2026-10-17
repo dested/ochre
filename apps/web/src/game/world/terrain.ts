@@ -365,6 +365,16 @@ vec3 ocBushes( vec2 p, float px, vec3 soil ) {
 	ca = mix( ca, ocLin( vec3( 0.8, 0.5, 0.54 ) ), step( 0.975, a.w ) * smoothstep( 0.45, 0.15, abs( a.y - 0.4 ) ) );
 	vec3 o = mix( ground, cb, b.x );
 	o = mix( o, ca, a.x );
+	// up close the real clumps stand in for the painted ones: the ground between them is sandy soil with pebbles,
+	// only a little darker where a painted bush would be (the shade and leaf litter under the real ones)
+	float close = smoothstep( 0.55, 0.18, px );
+	if ( close > 0.0 ) {
+		vec3 under = mix( ground, ground * vec3( 0.8, 0.8, 0.76 ), max( a.x, b.x ) * 0.4 );
+		float peb = smoothstep( 0.8, 0.88, ocNoise( p * 8.0 + 3.0 ) ) * smoothstep( 0.12, 0.04, px );
+		under = mix( under, ocLin( vec3( 0.62, 0.56, 0.46 ) ), peb * 0.3 );
+		under *= 0.94 + 0.12 * ocNoise( p * 17.0 );
+		o = mix( o, under, close );
+	}
 	// far away: the veld's own patchwork, old dark stands, young pale ones after a fire, restio tan in the damp
 	float v1 = ocNoise( p * 0.035 + 3.0 );
 	float v2 = ocNoise( p * 0.13 + 7.0 );
