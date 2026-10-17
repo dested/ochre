@@ -449,6 +449,11 @@ controller, cameras and verbs that make each stage of life feel different; and t
   (d) Tests: every fixed-cast member has at least 8 lines, no line over 90 characters, and the selection is
   deterministic per seed. Applies to: sim.
 
+- (2026-10-17 02:10, lead) **Arms carry revised:** a natural cradle, not an arm's-length hold. The child lies along
+  the carrier's forearm at chest height, head in the crook of the elbow, tilted up, with the child's eyes 25–30 cm
+  from the carrier's face. play's held camera widens its FOV (about 60°) so the face and shoulders fit. Replaces the
+  01:00 numbers. Applies to: people, play.
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: f48612e (main, 02:05) · Gate: install 0, typecheck 0, test 0, build 0 at f48612e · Deploy: CI run pending
@@ -456,7 +461,7 @@ Board: down · Last pushed: f48612e (main, 02:05) · Gate: install 0, typecheck 
 | Agent | Model | Owns | Item now | Last sha / artifact | Status |
 | --- | --- | --- | --- | --- | --- |
 | world | opus-xhigh | world-gen, game/world, game/render | W1 | 2edee96 wip (lab washed out at 01:20, not yet ready) | working |
-| people | opus-xhigh | game/actors | P1 fix | c66a392 → fix sent 01:35 (budget 7 calls/97k tris per person, 40 cm face, garments, arms) | working |
+| people | opus-xhigh | game/actors | P1 fix (resent 02:10; outranks P3) | c66a392 → fix sent 01:35 (budget 7 calls/97k tris per person, 40 cm face, garments, arms) | working |
 | sim | opus-high | sim | S4 (talk) + seat pose | S3 13c05da done (rings, spacing, hysteresis, meal, labels); S2 071949a passed | working |
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | U6 | U5 1fa2a6b passed; U3 bf4973b passed | working |
 | play | opus-high | game/play, game/audio, app/play.tsx | PL3 (director in; real world + people swapped) | PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
