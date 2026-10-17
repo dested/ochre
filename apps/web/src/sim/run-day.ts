@@ -1,10 +1,11 @@
 /**
- * Headless day log: `bun apps/web/src/sim/run-day.ts --seed 1 --days 2 [--stage small]`
+ * Headless day log: `bun apps/web/src/sim/run-day.ts --seed 1 --days 2 [--stage small] [--fixture]`
  * Prints an hourly line for the whole band and a line whenever someone in the fixed cast changes what they do.
  */
 import type { LifeStageId, SimPerson, TaskKind } from '../game/contracts'
 import { LIFE_STAGES } from '../game/contracts'
 import { createSandboxSim as createSim } from './index'
+import { createWorldData } from '../world-gen'
 import { createTestWorld } from './test-world'
 
 function arg(name: string, fallback: string): string {
@@ -21,7 +22,7 @@ const days = Number(arg('days', '1'))
 const stageArg = arg('stage', 'small')
 const stage: LifeStageId = isStage(stageArg) ? stageArg : 'small'
 
-const world = createTestWorld(seed)
+const world = process.argv.includes('--fixture') ? createTestWorld(seed) : createWorldData(seed)
 const sim = createSim({ seed, world, stage, playerName: 'Teni' })
 const s = sim.state
 const CAST = new Set(['ama', 'tuk', 'oro', 'kaya', 'player', 'nehe'])

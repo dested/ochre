@@ -10,6 +10,7 @@ import { roleOf } from './ai'
 import { SKILL_LABEL } from './ctx'
 import { createSandboxSim, createSim, debugCtx, debugDirector } from './index'
 import { sunTimes } from './time'
+import { createWorldData } from '../world-gen'
 import { createTestWorld } from './test-world'
 
 const TASK_COLOR: Record<TaskKind, string> = {
@@ -77,7 +78,8 @@ export function mount(root: HTMLElement): () => void {
   const params = new URLSearchParams(window.location.search)
   let seed = Number(params.get('seed') ?? '1') || 1
   let stage: LifeStageId = LIFE_STAGES.find((s) => s === params.get('stage')) ?? 'small'
-  const world: WorldData = createTestWorld(seed)
+  // the real coast from world-gen; `?world=fixture` for the analytic test world
+  const world: WorldData = params.get('world') === 'fixture' ? createTestWorld(seed) : createWorldData(seed)
   // story: the director runs the chapter (nobody plays, so the beats wait; "Complete beat" moves them on)
   let story = params.get('mode') !== 'sandbox'
   const make = (): Sim => (story ? createSim : createSandboxSim)({ seed, world, stage, playerName: 'Teni' })
