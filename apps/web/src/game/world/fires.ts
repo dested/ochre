@@ -91,9 +91,9 @@ void main() {
 	vec3 col = vec3( 0.75, 0.12, 0.03 );
 	col = mix( col, vec3( 1.0, 0.42, 0.08 ), step( 0.28, heat ) );
 	col = mix( col, vec3( 1.0, 0.72, 0.28 ), step( 0.52, heat ) );
-	col = mix( col, vec3( 1.0, 0.93, 0.7 ), step( 0.74, heat ) );
+	col = mix( col, vec3( 1.0, 0.9, 0.62 ), step( 0.8, heat ) );
 	float a = smoothstep( 0.02, 0.2, body );
-	gl_FragColor = vec4( col * a * ( 1.6 + vHeat ), 1.0 );
+	gl_FragColor = vec4( col * a * ( 0.55 + 0.45 * vHeat ), 1.0 );
 }
 `
 

@@ -26,18 +26,18 @@ import {
   type WebGLRenderer,
 } from 'three'
 import type { CreateRenderPipeline, Quality, RenderPipeline } from '../contracts'
-import { ATMOS_FRAG, FINISH_FRAG, FS_VERT, GRADE_FRAG, RAYS_FRAG, UP_FRAG, downFrag, paintFrag } from './post'
+import { ATMOS_FRAG, FINISH_FRAG, FS_VERT, GRADE_FRAG, RAYS_FRAG, TBLUR_FRAG, TENSOR_FRAG, UP_FRAG, downFrag, paintFrag } from './post'
 import { LIGHT, POST } from './uniforms'
 
 export { paint, patchPaint } from './paint'
 export { LIGHT, POST } from './uniforms'
 
-type QualitySpec = { samples: number; taps: number; levels: number; maxDpr: number; radius: [number, number] }
+type QualitySpec = { samples: number; taps: number; levels: number; maxDpr: number; radius: [number, number]; stroke: number }
 
 const QUALITY: Record<Quality, QualitySpec> = {
-  high: { samples: 4, taps: 4, levels: 6, maxDpr: 1.5, radius: [0.0, 3.2] },
-  medium: { samples: 2, taps: 3, levels: 5, maxDpr: 1.25, radius: [0.0, 2.6] },
-  low: { samples: 0, taps: 0, levels: 4, maxDpr: 1, radius: [0, 0] },
+  high: { samples: 4, taps: 4, levels: 6, maxDpr: 1.5, radius: [0.0, 2.1], stroke: 7 },
+  medium: { samples: 2, taps: 3, levels: 5, maxDpr: 1.25, radius: [0.0, 1.8], stroke: 6 },
+  low: { samples: 0, taps: 0, levels: 4, maxDpr: 1, radius: [0, 0], stroke: 0 },
 }
 
 /** the extra surface the world view uses (beyond the contract) */
@@ -131,6 +131,8 @@ export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRender
   const ldrRT = rt('oc:ldr')
   const paintRT = rt('oc:paint')
   const raysRT = rt('oc:rays')
+  const flowA = rt('oc:flowA')
+  const flowB = rt('oc:flowB')
   const down: WebGLRenderTarget[] = []
   const up: WebGLRenderTarget[] = []
   for (let i = 0; i < 6; i++) {
@@ -206,6 +208,9 @@ export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRender
     uDream: dreamU,
   }
   let paintMat = mat(paintFrag(Math.max(1, spec.taps)), paintUniforms)
+  const tensor = mat(TENSOR_FRAG, { tSrc: { value: paintRT.texture }, uTexel: { value: new Vector2() } })
+  const tblur = mat(TBLUR_FRAG, { tSrc: { value: null }, uStep: { value: new Vector2() } })
+  const strokeU = { value: new Vector4(9, 0.05, 0.06, 1) }
   const fadeU = { value: 0 }
   const finish = mat(FINISH_FRAG, {
     tSrc: { value: paintRT.texture },
@@ -220,6 +225,8 @@ export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRender
     uDream: dreamU,
     uGrain: { value: 0.025 },
     uPool: { value: 0.35 },
+    tFlow: { value: flowB.texture },
+    uStroke: strokeU,
   })
 
   let debugStage = 0
@@ -248,6 +255,9 @@ export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRender
     ldrRT.setSize(pw, ph)
     paintRT.setSize(pw, ph)
     raysRT.setSize(Math.max(1, pw >> 2), Math.max(1, ph >> 2))
+    flowA.setSize(Math.max(1, pw >> 1), Math.max(1, ph >> 1))
+    flowB.setSize(Math.max(1, pw >> 1), Math.max(1, ph >> 1))
+    setTexel(tensor, 'uTexel', paintRT)
     let dw = pw
     let dh = ph
     for (let i = 0; i < 6; i++) {
@@ -354,7 +364,22 @@ export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRender
         pass(paintMat, paintRT)
       }
 
-      // 7. finish to the canvas
+      // 7. the flow: which way the strokes run
+      strokeU.value.x = spec.stroke
+      strokeU.value.w = spec.stroke > 0 && dream < 0.99 ? 1 : 0
+      if (strokeU.value.w > 0) {
+        pass(tensor, flowA)
+        const st: unknown = tblur.uniforms.uStep?.value
+        setTex(tblur, 'tSrc', flowA)
+        if (st instanceof Vector2) st.set(1 / flowA.width, 0)
+        pass(tblur, flowB)
+        setTex(tblur, 'tSrc', flowB)
+        if (st instanceof Vector2) st.set(0, 1 / flowA.height)
+        pass(tblur, flowA)
+        setTex(finish, 'tFlow', flowA)
+      }
+
+      // 8. finish to the canvas
       fadeU.value = fade
       if (debugStage > 0) {
         const src = [sceneRT, sceneRT, hdrRT, up[0] ?? hdrRT, spec.taps > 0 ? ldrRT : paintRT, sceneRT][debugStage] ?? sceneRT
@@ -398,8 +423,8 @@ export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRender
     dispose() {
       sceneRT.dispose()
       depthTex.dispose()
-      for (const t of [hdrRT, ldrRT, paintRT, raysRT, ...down, ...up]) t.dispose()
-      for (const m of [atmos, downKaris, downPlain, upMat, rays, grade, paintMat, finish]) m.dispose()
+      for (const t of [hdrRT, ldrRT, paintRT, raysRT, flowA, flowB, ...down, ...up]) t.dispose()
+      for (const m of [atmos, downKaris, downPlain, upMat, rays, grade, paintMat, tensor, tblur, finish, debugMat]) m.dispose()
       quad.geometry.dispose()
     },
   }

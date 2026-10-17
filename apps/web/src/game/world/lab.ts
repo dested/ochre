@@ -58,9 +58,10 @@ export function mount(el: HTMLElement): () => void {
 
   // the preset views
   const ground = (x: number, z: number) => world.heightAt(x, z)
-  const caveEye = caveWorld(-7.5, -4.5)
+  // up on the ledge at the back-left of the cave, looking out across the mouth to the west
+  const caveEye = caveWorld(-10, -6)
   const views: Record<(typeof VIEW_NAMES)[number], ViewDef> = {
-    cave: { x: caveEye.x, y: CAVE.floor + 1.55, z: caveEye.z, yaw: -1.2, pitch: -0.1, fov: 62 },
+    cave: { x: caveEye.x, y: CAVE.floor + 5.1, z: caveEye.z, yaw: -1.3, pitch: -0.22, fov: 70 },
     shore: { x: 6, y: ground(6, 168) + 1.6, z: 168, yaw: -0.9, pitch: 0.02, fov: 55 },
     cove: { x: -150, y: ground(-150, 112) + 1.7, z: 112, yaw: -1.75, pitch: 0.0, fov: 55 },
     plateau: { x: -40, y: ground(-40, -420) + 1.7, z: -420, yaw: Math.PI, pitch: 0.03, fov: 50 },

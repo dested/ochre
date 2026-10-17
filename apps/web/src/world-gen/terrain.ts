@@ -598,11 +598,23 @@ export function buildTerrain(seed: number): TerrainGrid {
     if (a < -CAVE.depth - 6 || a > CAVE.terrace + 9) return v
     const hw = caveHalfWidth(Math.min(a, -0.5))
     const inner = (1 - smoothstep(hw + 1.5, hw + 3.5, Math.abs(b))) * smoothstep(-CAVE.depth - 3, -CAVE.depth - 1, a)
-    const front = (1 - smoothstep(CAVE.terrace, CAVE.terrace + 6, a)) * (1 - smoothstep(CAVE.halfWidth + 1, CAVE.halfWidth + 7, Math.abs(b)))
+    const front = (1 - smoothstep(CAVE.terrace, CAVE.terrace + 2.5, a)) * (1 - smoothstep(CAVE.halfWidth + 1, CAVE.halfWidth + 7, Math.abs(b)))
     const k = a < 0.5 ? inner : Math.max(front, inner * (1 - smoothstep(0.5, 3, a)))
     if (k <= 0) return v
     const floor = CAVE.floor + nD.fbm(x / 3, z / 3, 2) * 0.06 + 0.35 * smoothstep(hw - 3, hw + 1, Math.abs(b))
     return lerp(v, floor, k)
+  })
+  // the scarp below the mouth: past the terrace's lip the ground falls away steeply, so from the cave you look
+  // straight down onto the shelf and the cove
+  stampBox(h, CAVE.x - 70, CAVE.z - 70, CAVE.x + 70, CAVE.z + 70, (x, z, v) => {
+    const { a, b } = caveLocal(x, z)
+    if (a < CAVE.terrace || a > CAVE.terrace + 60) return v
+    const side = 1 - smoothstep(CAVE.halfWidth + 2, CAVE.halfWidth + 16 + a * 0.3, Math.abs(b))
+    if (side <= 0) return v
+    const run = a - CAVE.terrace
+    // never deeper than the slope below would run anyway, and gone well before the shore
+    const target = Math.max(CAVE.floor - 0.3 - run * (0.55 + 0.35 * smoothstep(0, 6, run)) + nD.at(x / 6, z / 6) * 0.8, v * 0.45 - 1)
+    return v > target ? lerp(v, target, side * (1 - smoothstep(30, 55, run))) : v
   })
 
   // 10. the paths: bench heights from the terrain, then cut and fill

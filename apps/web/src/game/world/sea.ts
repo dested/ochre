@@ -155,7 +155,8 @@ void main() {
 	N = normalize( mix( N, vec3( 0.0, 1.0, 0.0 ), far * 0.6 ) );
 	float ndv = max( dot( N, V ), 0.0 );
 	float fres = 0.02 + 0.98 * pow( 1.0 - ndv, 5.0 );
-	fres = mix( fres, 0.85, smoothstep( 0.0, 0.08, 1.0 - ndv ) * 0.0 );
+	// a painter's sea keeps its colour at a grazing look: the sky only ever takes part of it
+	fres = min( fres, 0.5 );
 	vec3 R = reflect( - V, N );
 	R.y = abs( R.y );
 	vec3 refl = ocSkyBase( normalize( R ) );
@@ -170,6 +171,7 @@ void main() {
 	body = mix( body, uDeep, b2 );
 	float ndl = max( dot( N, uKeyDir ), 0.0 );
 	vec3 lightIn = uSkyAmb * 0.9 + uKeyColor * ( 0.25 + 0.35 * ndl );
+	lightIn = mix( vec3( dot( lightIn, vec3( 0.3, 0.55, 0.15 ) ) ), lightIn, 0.45 );
 	body *= lightIn;
 	// light through the crest of the swell
 	body += uShallow * uKeyColor * clamp( vWaveH * 1.4, 0.0, 1.0 ) * 0.12 * ( 1.0 - b2 );
@@ -275,8 +277,8 @@ function waterMaterial(height: DataTexture, shore: DataTexture, fresh: boolean):
       uFresh: { value: fresh ? 1 : 0 },
       uFoamK: { value: fresh ? 0.25 : 1 },
       uShallow: { value: fresh ? lin(0.36, 0.5, 0.38) : lin(0.2, 0.74, 0.7) },
-      uMid: { value: fresh ? lin(0.2, 0.32, 0.26) : lin(0.18, 0.47, 0.5) },
-      uDeep: { value: fresh ? lin(0.12, 0.2, 0.18) : lin(0.08, 0.2, 0.31) },
+      uMid: { value: fresh ? lin(0.2, 0.32, 0.26) : lin(0.14, 0.52, 0.55) },
+      uDeep: { value: fresh ? lin(0.12, 0.2, 0.18) : lin(0.09, 0.3, 0.42) },
       uCamPos: LIGHT.uCamPos,
       uKeyDir: LIGHT.uKeyDir,
       uKeyColor: LIGHT.uKeyColor,
@@ -364,7 +366,6 @@ export function createSeaView(world: WorldData, grid: TerrainGrid | null): SeaVi
     river.name = 'river'
     // the ribbon carries its own height: the vertex shader's uLevel is replaced by the position's y
     rMat.vertexShader = rMat.vertexShader.replace('vec3 wp = vec3( position.x + uCenter.x, uLevel, position.z + uCenter.z );', 'vec3 wp = position;')
-    rMat.fragmentShader = rMat.fragmentShader
   }
 
   const cam = new Vector3()
@@ -373,14 +374,13 @@ export function createSeaView(world: WorldData, grid: TerrainGrid | null): SeaVi
     sea,
     lagoon,
     river,
-    update(camera: Camera, seaLevel: number, time: number) {
+    update(camera: Camera, seaLevel: number) {
       cam.setFromMatrixPosition(camera.matrixWorld)
       center.set(Math.round(cam.x / 4) * 4, Math.round(cam.z / 4) * 4)
       const c = seaMat.uniforms.uCenter?.value
       if (c instanceof Vector3) c.set(center.x, 0, center.y)
       const lv = seaMat.uniforms.uLevel
       if (lv) lv.value = seaLevel
-      void time
     },
     dispose() {
       height.dispose()

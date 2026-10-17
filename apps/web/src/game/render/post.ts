@@ -2,7 +2,8 @@
  * The post chain's shaders. Order: scene (HDR, depth) → atmosphere (aerial perspective from depth, using the
  * same sky function as the dome) → a blur pyramid (bloom, the dream) → grade (exposure, filmic tone, split
  * toning, saturation, god rays) → paint (a generalised Kuwahara whose radius grows with distance, so faces stay
- * crisp and the far coast turns to brushwork) → finish (pigment pooling at silhouettes, canvas, grain,
+ * crisp and the far coast turns to brushwork) → flow (the image's structure tensor, smoothed: which way a brush
+ * would run at each pixel) → finish (strokes laid along the flow, pigment pooling at silhouettes, canvas, grain,
  * vignette, fade).
  */
 import { NOISE_GLSL, SKY_GLSL, SKY_UNIFORMS_GLSL } from './glsl'
@@ -254,10 +255,48 @@ void main() {
 		float w = 1.0 / ( 1.0 + pow( 700.0 * sigma2, 4.0 ) );
 		o += vec4( mean * w, w );
 	}
-	gl_FragColor = vec4( o.rgb / max( o.w, 1e-5 ), 1.0 );
+	// highlights stay crisp dabs (glints on the water, the sun, the fire's heart)
+	vec3 c0 = texture2D( tSrc, vUv ).rgb;
+	float hi = smoothstep( 0.8, 0.97, max( c0.r, max( c0.g, c0.b ) ) );
+	gl_FragColor = vec4( mix( o.rgb / max( o.w, 1e-5 ), c0, hi ), 1.0 );
 }
 `
 }
+
+/** the structure tensor of the painted image (colour Sobel), at half resolution: E, F, G in rgb */
+export const TENSOR_FRAG = /* glsl */ `
+uniform sampler2D tSrc;
+uniform vec2 uTexel;
+varying vec2 vUv;
+void main() {
+	vec2 d = uTexel * 1.5;
+	vec3 a = texture2D( tSrc, vUv + vec2( - d.x, - d.y ) ).rgb;
+	vec3 b = texture2D( tSrc, vUv + vec2( 0.0, - d.y ) ).rgb;
+	vec3 c = texture2D( tSrc, vUv + vec2( d.x, - d.y ) ).rgb;
+	vec3 l = texture2D( tSrc, vUv + vec2( - d.x, 0.0 ) ).rgb;
+	vec3 r = texture2D( tSrc, vUv + vec2( d.x, 0.0 ) ).rgb;
+	vec3 e = texture2D( tSrc, vUv + vec2( - d.x, d.y ) ).rgb;
+	vec3 f = texture2D( tSrc, vUv + vec2( 0.0, d.y ) ).rgb;
+	vec3 g = texture2D( tSrc, vUv + vec2( d.x, d.y ) ).rgb;
+	vec3 gx = ( c + 2.0 * r + g - a - 2.0 * l - e ) * 0.25;
+	vec3 gy = ( e + 2.0 * f + g - a - 2.0 * b - c ) * 0.25;
+	gl_FragColor = vec4( dot( gx, gx ), dot( gx, gy ), dot( gy, gy ), 1.0 );
+}
+`
+
+/** one separable Gaussian pass over the tensor (uStep = texel along the pass) */
+export const TBLUR_FRAG = /* glsl */ `
+uniform sampler2D tSrc;
+uniform vec2 uStep;
+varying vec2 vUv;
+void main() {
+	vec3 s = texture2D( tSrc, vUv ).rgb * 0.19;
+	s += ( texture2D( tSrc, vUv + uStep * 1.5 ).rgb + texture2D( tSrc, vUv - uStep * 1.5 ).rgb ) * 0.27;
+	s += ( texture2D( tSrc, vUv + uStep * 3.5 ).rgb + texture2D( tSrc, vUv - uStep * 3.5 ).rgb ) * 0.11;
+	s += ( texture2D( tSrc, vUv + uStep * 5.5 ).rgb + texture2D( tSrc, vUv - uStep * 5.5 ).rgb ) * 0.025;
+	gl_FragColor = vec4( s, 1.0 );
+}
+`
 
 export const FINISH_FRAG = /* glsl */ `
 #include <packing>
@@ -273,8 +312,32 @@ uniform vec4 uVignette;
 uniform float uDream;
 uniform float uGrain;
 uniform float uPool;
+uniform sampler2D tFlow;
+uniform vec4 uStroke;
 varying vec2 vUv;
 ${NOISE_GLSL}
+// the brush's direction here: along the edges where the image has structure, a loose diagonal hatch where it
+// is flat; w = how sure (anisotropy)
+vec3 ocFlow( vec2 uv ) {
+	vec3 t = texture2D( tFlow, uv ).rgb;
+	float E = t.x;
+	float F = t.y;
+	float G = t.z;
+	float disc = sqrt( max( ( E - G ) * ( E - G ) + 4.0 * F * F, 0.0 ) );
+	float l1 = 0.5 * ( E + G + disc );
+	float l2 = 0.5 * ( E + G - disc );
+	vec2 m = vec2( l1 - G, F );
+	if ( dot( m, m ) < 1e-12 ) m = vec2( F, l1 - E );
+	vec2 dir = vec2( 0.8, 0.6 );
+	float sure = 0.0;
+	if ( dot( m, m ) > 1e-12 ) {
+		vec2 tg = normalize( vec2( - m.y, m.x ) );
+		if ( dot( tg, dir ) < 0.0 ) tg = - tg;
+		sure = ( l1 - l2 ) / max( l1 + l2, 1e-6 ) * smoothstep( 0.00002, 0.0004, l1 );
+		dir = normalize( mix( dir, tg, sure ) + 1e-5 );
+	}
+	return vec3( dir, sure );
+}
 float ocDist( vec2 uv ) {
 	float d = texture2D( tDepth, uv ).r;
 	#ifdef USE_REVERSED_DEPTH_BUFFER
@@ -286,6 +349,41 @@ float ocDist( vec2 uv ) {
 }
 void main() {
 	vec3 c = texture2D( tSrc, vUv ).rgb;
+	vec2 fc0 = vUv * uRes;
+	float P0 = uRes.y / 1080.0;
+	// strokes: smear the paint a few pixels along the flow, and drag bristle streaks and broader dabs of warmer
+	// and cooler paint through it (line-integral convolution of noise)
+	if ( uStroke.w > 0.0 ) {
+		vec3 fl = ocFlow( vUv );
+		vec2 dir = fl.xy;
+		float stp = uStroke.x * P0 / 5.0;
+		vec3 acc = c * 0.16;
+		float wsum = 0.16;
+		float br = 0.0;
+		float dab = 0.0;
+		float nsum = 0.0;
+		for ( int i = - 5; i <= 5; i ++ ) {
+			float fi = float( i );
+			vec2 o = dir * fi * stp;
+			float wi = exp( - fi * fi / 14.0 );
+			if ( i != 0 ) {
+				acc += texture2D( tSrc, vUv + o * uTexel ).rgb * wi;
+				wsum += wi;
+			}
+			vec2 q = ( fc0 + o * 1.6 ) / P0;
+			br += ocNoise( q / 1.7 ) * wi;
+			dab += ocNoise( q / 7.0 + 31.0 ) * wi;
+			nsum += wi;
+		}
+		vec3 sm = acc / wsum;
+		c = mix( c, sm, 0.55 );
+		br = br / nsum - 0.5;
+		dab = dab / nsum - 0.5;
+		float lum0 = dot( c, vec3( 0.3, 0.55, 0.15 ) );
+		float body = 0.35 + 0.65 * smoothstep( 0.02, 0.25, lum0 );
+		c *= 1.0 + br * uStroke.y * 2.2 * body;
+		c *= mix( vec3( 1.0 ), mix( vec3( 0.95, 0.99, 1.06 ), vec3( 1.05, 1.0, 0.93 ), clamp( dab * 2.2 + 0.5, 0.0, 1.0 ) ), uStroke.z * body );
+	}
 	// pigment pooled at silhouettes: where depth jumps, the wash darkens a little and deepens in colour
 	if ( uPool > 0.0 ) {
 		// 1/z is linear across a plane in screen space, so its Laplacian is zero on any flat surface however

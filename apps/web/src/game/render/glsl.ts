@@ -88,8 +88,14 @@ export const SKY_GLSL = /* glsl */ `
 vec3 ocSkyBase( vec3 d ) {
 	float y = d.y;
 	float up = clamp( y, 0.0, 1.0 );
-	float t = pow( up, 0.42 );
-	vec3 col = mix( uHorizon, uZenith, t );
+	float t = pow( up, 0.5 );
+	// mixed as a painter would, in display space through a pale band, so gold never meets blue as mauve
+	vec3 hs = sqrt( uHorizon );
+	vec3 zs = sqrt( uZenith );
+	vec3 pale = mix( hs, zs, 0.5 );
+	pale = mix( pale, vec3( dot( pale, vec3( 0.3, 0.55, 0.15 ) ) ) * vec3( 1.04, 1.02, 0.95 ), 0.6 ) * 1.08;
+	vec3 cs = t < 0.3 ? mix( hs, pale, smoothstep( 0.0, 0.3, t ) ) : mix( pale, zs, smoothstep( 0.3, 1.0, t ) );
+	vec3 col = cs * cs;
 	// a brighter band hugging the horizon
 	col = mix( col, uHorizon * 1.08, exp( - up * 18.0 ) * 0.35 );
 	// below the horizon: the haze, a little deeper
@@ -98,7 +104,7 @@ vec3 ocSkyBase( vec3 d ) {
 	float m = max( mu, 0.0 );
 	float band = exp( - abs( y ) * 5.0 );
 	float sunUp = smoothstep( - 0.28, 0.02, uSunDir.y );
-	col += uSunGlow * ( pow( m, 3.0 ) * ( 0.25 + 0.75 * band ) * 0.55 + pow( m, 24.0 ) * 0.9 + pow( m, 400.0 ) * 2.0 ) * sunUp;
+	col += uSunGlow * ( pow( m, 4.0 ) * ( 0.15 + 0.85 * band ) * 0.42 + pow( m, 24.0 ) * 0.8 + pow( m, 400.0 ) * 2.0 ) * sunUp;
 	// the earth's shadow and the pink belt opposite the sun at twilight
 	float twi = smoothstep( 0.18, 0.0, abs( uSunDir.y + 0.02 ) );
 	float anti = max( - mu, 0.0 );
@@ -199,7 +205,8 @@ vec3 ocMoon( vec3 d, out float mask ) {
 		float maria = ocFbm( uv * 2.3 + 4.0 );
 		vec3 alb = mix( vec3( 0.95, 0.92, 0.84 ), vec3( 0.62, 0.62, 0.66 ), smoothstep( 0.45, 0.7, maria ) );
 		col = alb * ( lit * 3.2 + 0.05 );
-		mask = smoothstep( 1.0, 0.92, rr );
+		// by day the unlit part is just sky
+		mask = smoothstep( 1.0, 0.92, rr ) * mix( lit, 1.0, uSkyState.z );
 	}
 	return col;
 }
@@ -246,6 +253,30 @@ float ocCaveSky( vec3 wp ) {
 	inside *= smoothstep( - uCave2.y - 6.0, - uCave2.y + 2.0, a );
 	float deep = smoothstep( 2.0, - uCave2.y * 0.75, a );
 	return mix( 1.0, mix( 0.55, 0.07, deep ), inside );
+}
+// knife-laid rock: Voronoi blocks on the plane the surface mostly faces, wider than tall like bedding; each block
+// is a flat facet with its own tilt (xyz, world space, ±0.5) and tone (w)
+vec4 ocFacet( vec3 wp, vec3 nw, float size ) {
+	vec3 an = abs( nw );
+	vec3 U = vec3( 1.0, 0.0, 0.0 );
+	vec3 V = vec3( 0.0, 1.0, 0.0 );
+	if ( an.y > 0.72 ) V = vec3( 0.0, 0.0, 1.0 );
+	else if ( an.x > an.z ) U = vec3( 0.0, 0.0, 1.0 );
+	vec2 p = vec2( dot( wp, U ) / ( size * 1.6 ), dot( wp, V ) / size );
+	vec2 i = floor( p );
+	vec2 f = fract( p );
+	float d1 = 9.0;
+	vec2 id = vec2( 0.0 );
+	for ( int y = - 1; y <= 1; y ++ ) {
+		for ( int x = - 1; x <= 1; x ++ ) {
+			vec2 o = vec2( float( x ), float( y ) );
+			vec2 r = o + ocHash2( i + o ) - f;
+			float d = dot( r, r );
+			if ( d < d1 ) { d1 = d; id = i + o; }
+		}
+	}
+	vec2 h = ocHash2( id + 17.0 ) - 0.5;
+	return vec4( U * h.x + V * h.y, ocHash( id + 5.3 ) );
 }
 // a soft three-step ramp: shadow, half-tone, light (with a little of the smooth term kept)
 float ocRamp( float ndl ) {

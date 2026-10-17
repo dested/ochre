@@ -86,7 +86,7 @@ export const CAVE = {
   /** ceiling height above the floor near the mouth */
   ceiling: 7.5,
   /** the terrace in front of the mouth runs this far out */
-  terrace: 6,
+  terrace: 3,
 } as const
 
 const CAVE_FX = Math.sin(CAVE.heading)

@@ -161,6 +161,8 @@ export function buildCaveGeometry(grid: TerrainGrid): BufferGeometry {
 
 const ROCK_HEAD = /* glsl */ `
 uniform vec4 uHearthSoot;
+vec4 ocFacetT = vec4( 0.0 );
+vec4 ocFacetS = vec4( 0.0 );
 vec3 ocLinR( vec3 c ) { return pow( c, vec3( 2.2 ) ); }
 `
 
@@ -169,18 +171,18 @@ const ROCK_ALBEDO = /* glsl */ `
 		vec3 wp = vOcWorld;
 		vec3 nW = normalize( vOcNormalW );
 		// blocky facets: quantised 3D noise picks a tone per chunk, like knife-laid paint
-		float facet = floor( ocNoise3( wp * 0.3 ) * 4.0 + 0.5 ) / 4.0;
-		float facet2 = floor( ocNoise3( wp * 0.8 + 7.0 ) * 3.0 ) / 3.0;
+		ocFacetT = ocFacet( wp, nW, 1.5 );
+		ocFacetS = ocFacet( wp + 3.7, nW, 0.55 );
+		float facet = ocFacetT.w * 0.75 + ocFacetS.w * 0.25;
+		float facet2 = ocFacetS.w;
 		vec3 warm = mix( ocLinR( vec3( 0.62, 0.46, 0.33 ) ), ocLinR( vec3( 0.76, 0.62, 0.47 ) ), facet );
 		warm = mix( warm, ocLinR( vec3( 0.52, 0.48, 0.47 ) ), smoothstep( 0.6, 0.9, facet2 ) * 0.5 );
-		// strata: darker bands, iron-red seams
-		float band = sin( wp.y * 1.3 + ocNoise( wp.xz * 0.09 ) * 5.0 );
-		warm = mix( warm, ocLinR( vec3( 0.38, 0.27, 0.19 ) ), smoothstep( 0.82, 0.97, band ) * 0.45 * smoothstep( 0.75, 0.35, abs( nW.y ) ) );
+		// iron-red seams
 		warm = mix( warm, ocLinR( vec3( 0.66, 0.33, 0.17 ) ), smoothstep( 0.6, 0.85, ocNoise( vec2( wp.x + wp.z, wp.y * 3.0 ) * 0.21 ) ) * 0.35 );
 		// lichen on the tops that see the sky
 		float sky = ocCaveSky( wp );
-		float lichen = smoothstep( 0.66, 0.8, ocNoise( wp.xz * 0.4 + wp.y * 0.3 ) ) * smoothstep( 0.1, 0.7, nW.y ) * sky;
-		warm = mix( warm, ocLinR( vec3( 0.80, 0.52, 0.22 ) ), lichen * 0.5 );
+		float lichen = smoothstep( 0.7, 0.82, ocNoise( wp.xz * 0.9 + wp.y * 0.5 ) ) * smoothstep( 0.1, 0.7, nW.y ) * sky;
+		warm = mix( warm, ocLinR( vec3( 0.76, 0.54, 0.3 ) ), lichen * 0.4 );
 		warm = mix( warm, ocLinR( vec3( 0.55, 0.58, 0.48 ) ), smoothstep( 0.7, 0.85, ocNoise( wp.xz * 0.27 + 3.0 ) ) * smoothstep( 0.3, 0.9, nW.y ) * sky * 0.4 );
 		// soot over the hearths, darkest on the ceiling
 		float dh = length( wp.xz - uHearthSoot.xy );
@@ -196,15 +198,9 @@ const ROCK_ALBEDO = /* glsl */ `
 /** a little extra relief: the facets tilt the normal */
 const ROCK_NORMAL = /* glsl */ `
 	{
-		vec3 wp = vOcWorld;
-		vec3 g = vec3(
-			ocNoise3( wp * 0.45 + vec3( 0.0, 3.1, 0.0 ) ),
-			ocNoise3( wp * 0.45 + vec3( 5.7, 0.0, 0.0 ) ),
-			ocNoise3( wp * 0.45 + vec3( 0.0, 0.0, 9.2 ) )
-		) - 0.5;
-		g = floor( g * 4.0 + 0.5 ) / 4.0;
+		vec3 g = ocFacetT.xyz * 0.55 + ocFacetS.xyz * 0.3;
 		vec3 gv = ( viewMatrix * vec4( g, 0.0 ) ).xyz;
-		normal = normalize( normal + gv * 0.3 );
+		normal = normalize( normal + gv );
 	}
 `
 

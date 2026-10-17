@@ -183,6 +183,7 @@ varying vec4 vSplatA;
 varying vec4 vSplatB;
 uniform vec3 uKeyDirT;
 uniform vec4 uOchre;
+vec4 ocFacetT = vec4( 0.0 );
 vec3 ocLin( vec3 c ) { return pow( c, vec3( 2.2 ) ); }
 // fynbos from above: two layers of rounded shrubs (big and small) in greens, rust and blond, each lit on the
 // key light's side with a shadowed crescent opposite, over dry soil speckled with litter
@@ -201,31 +202,34 @@ vec4 ocBushLayer( vec2 p, float cs, float seed ) {
 			if ( d < d1 ) { d1 = d; rel = r; id = i + o; }
 		}
 	}
-	float size = 0.34 + 0.24 * ocHash( id + 9.1 + seed );
+	float size = 0.4 + 0.26 * ocHash( id + 9.1 + seed );
 	float dist = sqrt( d1 );
-	float present = step( 0.18, ocHash( id + 4.4 + seed ) );
-	float bush = ( 1.0 - smoothstep( size * 0.6, size, dist ) ) * present;
+	float present = step( 0.12, ocHash( id + 4.4 + seed ) );
+	// ragged, twiggy outlines instead of discs
+	float ang = atan( rel.y, rel.x );
+	float rag = ( ocNoise( vec2( ang * 2.5, id.x * 3.1 + id.y ) ) - 0.5 ) * 0.35 + ( ocNoise( p * 7.0 ) - 0.5 ) * 0.3;
+	float bush = ( 1.0 - smoothstep( size * 0.75, size, dist + rag * size ) ) * present;
 	vec2 sd = normalize( uKeyDirT.xz + 1e-4 );
 	float side = clamp( dot( - rel / max( dist, 1e-3 ), sd ) * ( dist / size ), - 1.0, 1.0 );
 	return vec4( bush, side, ocHash( id + 3.7 + seed ), ocHash( id + 21.0 + seed ) );
 }
 vec3 ocBushTone( float h ) {
-	if ( h < 0.3 ) return ocLin( vec3( 0.45, 0.52, 0.32 ) );
-	if ( h < 0.5 ) return ocLin( vec3( 0.33, 0.38, 0.22 ) );
-	if ( h < 0.64 ) return ocLin( vec3( 0.58, 0.33, 0.18 ) );
-	if ( h < 0.8 ) return ocLin( vec3( 0.68, 0.6, 0.36 ) );
-	if ( h < 0.9 ) return ocLin( vec3( 0.48, 0.52, 0.46 ) );
-	return ocLin( vec3( 0.52, 0.42, 0.24 ) );
+	if ( h < 0.3 ) return ocLin( vec3( 0.44, 0.5, 0.31 ) );
+	if ( h < 0.5 ) return ocLin( vec3( 0.36, 0.41, 0.25 ) );
+	if ( h < 0.62 ) return ocLin( vec3( 0.55, 0.36, 0.22 ) );
+	if ( h < 0.8 ) return ocLin( vec3( 0.62, 0.56, 0.36 ) );
+	if ( h < 0.9 ) return ocLin( vec3( 0.47, 0.5, 0.44 ) );
+	return ocLin( vec3( 0.52, 0.43, 0.27 ) );
 }
 vec3 ocBushes( vec2 p, float px, vec3 soil ) {
 	vec3 ground = soil * ( 0.85 + 0.3 * ocNoise( p * 3.1 ) );
 	ground = mix( ground, ocLin( vec3( 0.62, 0.55, 0.36 ) ), smoothstep( 0.55, 0.8, ocNoise( p * 1.3 + 2.0 ) ) * 0.5 );
 	vec4 a = ocBushLayer( p, 1.7, 0.0 );
 	vec4 b = ocBushLayer( p + 0.6, 0.95, 17.0 );
-	vec3 ca = ocBushTone( a.z ) * ( 0.72 + 0.4 * a.y );
-	vec3 cb = ocBushTone( b.z ) * ( 0.8 + 0.35 * b.y ) * 1.06;
+	vec3 ca = ocBushTone( a.z ) * ( 0.84 + 0.3 * a.y );
+	vec3 cb = ocBushTone( b.z ) * ( 0.88 + 0.26 * b.y ) * 1.04;
 	// a protea's pink head now and then on the big bushes
-	ca = mix( ca, ocLin( vec3( 0.86, 0.52, 0.58 ) ), step( 0.97, a.w ) * smoothstep( 0.5, 0.2, abs( a.y - 0.4 ) ) );
+	ca = mix( ca, ocLin( vec3( 0.8, 0.5, 0.54 ) ), step( 0.975, a.w ) * smoothstep( 0.45, 0.15, abs( a.y - 0.4 ) ) );
 	vec3 o = mix( ground, cb, b.x );
 	o = mix( o, ca, a.x );
 	// far away: the average
@@ -247,6 +251,11 @@ const TERRAIN_ALBEDO = /* glsl */ `
 		float rr = r1 * 0.65 + r2 * 0.35;
 		wa *= vec4( 0.55 + 0.9 * rr, 0.55 + 0.9 * ( 1.0 - rr ), 0.55 + 0.9 * rr, 0.55 + 0.9 * ( 1.0 - rr ) );
 		wb *= vec4( 0.55 + 0.9 * ( 1.0 - rr ), 0.8 + 0.4 * rr, 0.55 + 0.9 * rr, 0.6 + 0.8 * ( 1.0 - rr ) );
+		// shrubs and grass don't hold on steep ground: it goes to bare rock
+		vec3 nW = normalize( vOcNormalW );
+		float steepF = smoothstep( 0.84, 0.6, nW.y );
+		wb.x += ( wa.z + wa.w ) * steepF;
+		wa.zw *= 1.0 - steepF;
 		wa = pow( max( wa, 0.0 ), vec4( 1.6 ) );
 		wb = pow( max( wb, 0.0 ), vec4( 1.6 ) );
 		float ws = dot( wa, vec4( 1.0 ) ) + dot( wb, vec4( 1.0 ) ) + 1e-4;
@@ -254,7 +263,6 @@ const TERRAIN_ALBEDO = /* glsl */ `
 		wb /= ws;
 		float drift = ocNoise( p * 0.031 );
 		float fine = ocNoise( p * 1.9 );
-		vec3 nW = normalize( vOcNormalW );
 		// sand: warm cream, darker where wet
 		vec3 sand = mix( ocLin( vec3( 0.90, 0.81, 0.63 ) ), ocLin( vec3( 0.84, 0.72, 0.54 ) ), drift );
 		sand *= 0.95 + 0.08 * fine;
@@ -267,12 +275,12 @@ const TERRAIN_ALBEDO = /* glsl */ `
 		grass = mix( grass, ocLin( vec3( 0.78, 0.69, 0.46 ) ), smoothstep( 0.55, 0.8, ocNoise( p * 0.18 + 9.0 ) ) * 0.7 );
 		grass *= 0.9 + 0.18 * ocNoise( vec2( p.x * 3.0, p.y * 0.8 ) + 5.0 );
 		// rock: limestone in blocky facets, ledges along the strata, orange lichen
-		float facet = floor( ocNoise3( vOcWorld * 0.42 ) * 4.0 ) / 4.0;
-		float strata = smoothstep( 0.8, 0.96, sin( y * 1.45 + ocNoise( p * 0.12 ) * 4.0 ) ) * smoothstep( 0.8, 0.45, nW.y );
-		vec3 rock = mix( ocLin( vec3( 0.60, 0.52, 0.41 ) ), ocLin( vec3( 0.74, 0.64, 0.50 ) ), facet );
-		rock = mix( rock, ocLin( vec3( 0.36, 0.30, 0.24 ) ), strata * 0.55 );
-		float lichen = smoothstep( 0.68, 0.8, ocNoise( p * 0.33 + y * 0.21 ) ) * smoothstep( 0.2, 0.7, nW.y + 0.5 );
-		rock = mix( rock, ocLin( vec3( 0.78, 0.46, 0.2 ) ), lichen * 0.55 );
+		ocFacetT = ocFacet( vOcWorld, nW, 2.1 );
+		float facet = ocFacetT.w;
+		vec3 rock = mix( ocLin( vec3( 0.58, 0.5, 0.4 ) ), ocLin( vec3( 0.76, 0.65, 0.5 ) ), facet );
+		rock = mix( rock, ocLin( vec3( 0.55, 0.52, 0.5 ) ), step( 0.8, facet ) * 0.6 );
+		float lichen = smoothstep( 0.7, 0.82, ocNoise( p * 0.9 + y * 0.5 ) ) * smoothstep( 0.2, 0.7, nW.y + 0.5 );
+		rock = mix( rock, ocLin( vec3( 0.74, 0.52, 0.3 ) ), lichen * 0.4 );
 		vec3 cliff = mix( rock, rock * vec3( 0.86, 0.82, 0.8 ), smoothstep( 0.4, 0.8, ocNoise( vec2( p.x + p.y, y * 0.25 ) * 0.4 ) ) );
 		// the intertidal shelf: dark rock, black mussel beds, green weed, pink coralline low down
 		vec3 shelf = mix( ocLin( vec3( 0.30, 0.27, 0.22 ) ), ocLin( vec3( 0.40, 0.35, 0.28 ) ), facet );
@@ -281,7 +289,17 @@ const TERRAIN_ALBEDO = /* glsl */ `
 		shelf = mix( shelf, ocLin( vec3( 0.12, 0.13, 0.12 ) ), mussel * 0.8 );
 		shelf = mix( shelf, ocLin( vec3( 0.26, 0.33, 0.17 ) ), smoothstep( 0.5, 0.75, ocNoise( p * 0.45 + 7.0 ) ) * smoothstep( 1.4, -0.2, y ) * 0.7 );
 		shelf = mix( shelf, ocLin( vec3( 0.55, 0.40, 0.42 ) ), smoothstep( -0.9, -1.5, y ) * 0.5 );
-		vec3 earth = mix( ocLin( vec3( 0.56, 0.44, 0.31 ) ), ocLin( vec3( 0.46, 0.35, 0.25 ) ), drift );
+		// earth, trodden floors and the cave: dust over rubble, each stone its own tone, darker in the cracks
+		vec3 earth = mix( ocLin( vec3( 0.54, 0.43, 0.31 ) ), ocLin( vec3( 0.44, 0.34, 0.25 ) ), drift );
+		if ( wb.w > 0.02 ) {
+			vec4 st = ocFacet( vOcWorld, vec3( 0.0, 1.0, 0.0 ), 0.42 );
+			vec4 bl = ocFacet( vOcWorld + 7.1, vec3( 0.0, 1.0, 0.0 ), 1.3 );
+			float stone = smoothstep( 0.35, 0.75, ocNoise( p * 0.45 + 3.3 ) );
+			vec3 rub = mix( ocLin( vec3( 0.47, 0.38, 0.29 ) ), ocLin( vec3( 0.66, 0.55, 0.42 ) ), st.w );
+			rub = mix( rub, ocLin( vec3( 0.5, 0.48, 0.45 ) ), step( 0.82, st.w ) * 0.7 );
+			earth = mix( earth * ( 0.86 + 0.28 * bl.w ), rub, stone * 0.75 );
+			earth *= 0.92 + 0.16 * fine;
+		}
 		vec3 col = sand * wa.x + dune * wa.y + fyn * wa.z + grass * wa.w + rock * wb.x + cliff * wb.y + shelf * wb.z + earth * wb.w;
 		// the red ochre seam in the gully
 		float od = length( p - uOchre.xy );
@@ -302,12 +320,8 @@ const TERRAIN_NORMAL = /* glsl */ `
 		vec4 wbn = vSplatB;
 		float rk = clamp( wbn.x + wbn.y + wbn.z * 0.6, 0.0, 1.0 );
 		if ( rk > 0.05 ) {
-			vec3 q = vOcWorld * 0.38;
-			float e = 0.35;
-			float n0 = ocNoise3( q );
-			vec3 g = vec3( ocNoise3( q + vec3( e, 0.0, 0.0 ) ) - n0, ocNoise3( q + vec3( 0.0, e, 0.0 ) ) - n0, ocNoise3( q + vec3( 0.0, 0.0, e ) ) - n0 ) / e;
-			vec3 gv = ( viewMatrix * vec4( g, 0.0 ) ).xyz;
-			normal = normalize( normal - gv * 0.55 * rk );
+			vec3 gv = ( viewMatrix * vec4( ocFacetT.xyz, 0.0 ) ).xyz;
+			normal = normalize( normal + gv * 0.5 * rk );
 		}
 	}
 `
