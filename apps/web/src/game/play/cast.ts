@@ -2,7 +2,7 @@
  * Keeps one actor per SimPerson and SimAnimal: created as they appear, disposed when they leave the state,
  * placed on the ground each frame, with anim, held items, carries, gaze and talking mirrored from the sim.
  */
-import { Group, type Object3D } from 'three'
+import { Group, Vector3, type Object3D } from 'three'
 import { hashString } from '../../core/rng'
 import type {
   AnimalActor,
@@ -54,6 +54,7 @@ export function createCast(
   const root = new Group()
   root.name = 'cast'
   const people = new Map<string, PersonEntry>()
+  const lookTmp = new Vector3()
   const animals = new Map<string, AnimalEntry>()
   const seen = new Set<string>()
 
@@ -133,6 +134,14 @@ export function createCast(
           if (child) e.actor.carry(child, slot ?? 'back')
           e.carrying = child ? cid : null
           e.slot = child ? slot : null
+        }
+        // a person cradling a child in their arms looks down at it unless the sim turns their head elsewhere
+        if (slot === 'arms' && cid && !p.lookAt) {
+          const child = people.get(cid)
+          if (child) {
+            child.actor.headPosition(lookTmp)
+            e.actor.setLookAt({ x: lookTmp.x, y: lookTmp.y, z: lookTmp.z })
+          }
         }
       }
       for (const [id, e] of people) {

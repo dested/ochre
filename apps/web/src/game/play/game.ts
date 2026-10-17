@@ -62,7 +62,47 @@ export type Game = {
   /** move the player (third person) to a POI or point */
   teleport(x: number, z: number, heading?: number): void
   player(): SimPerson
+  /** the last events, compact, newest last (QA reads it) */
+  readonly log: readonly string[]
   dispose(): void
+}
+
+const LOG_SIZE = 80
+
+/** one line per event for the QA log */
+function describe(e: SimEvent): string {
+  switch (e.type) {
+    case 'caption':
+      return `caption ${e.caption.speaker ?? '-'}: ${e.caption.text}`
+    case 'objective':
+      return `objective ${e.objective ? `${e.objective.text}` : 'none'}`
+    case 'learned':
+      return `learned ${e.personId} ${e.skill}`
+    case 'face-learned':
+      return `face ${e.personId}`
+    case 'note':
+      return `note ${e.noteId}`
+    case 'chapter-start':
+      return `chapter-start ${e.stage} ${e.title}`
+    case 'chapter-end':
+      return `chapter-end ${e.stage} -> ${e.next ?? 'none'}`
+    case 'minigame':
+      return `minigame ${e.game}`
+    case 'choice':
+      return `choice ${e.choice.id}: ${e.choice.options.map((o) => o.id).join('|')}`
+    case 'camera':
+      return `camera ${e.cue.kind}`
+    case 'teleport':
+      return `teleport ${e.position.x.toFixed(1)},${e.position.z.toFixed(1)}`
+    case 'sfx':
+      return `sfx ${e.name}`
+    case 'bond':
+      return `bond ${e.personId} ${e.value.toFixed(2)}`
+    case 'item':
+      return `item ${e.item} ${e.delta}`
+    default:
+      return e.type
+  }
 }
 
 const INTERACT_RADIUS = 2.5
@@ -181,8 +221,13 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     bridge.set({ prompt: p })
   }
 
+  const log: string[] = []
   const route = (events: SimEvent[]) => {
     for (const e of events) {
+      if (e.type !== 'bond' && e.type !== 'sfx') {
+        log.push(`${sim.state.chapter.beatId} | ${describe(e)}`)
+        if (log.length > LOG_SIZE) log.shift()
+      }
       // UI moments the sim has no position for
       if (
         (e.type === 'learned' &&
@@ -685,6 +730,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       })
     },
     player: findPlayer,
+    log,
     dispose() {
       feed.reset()
       hunt.dispose()

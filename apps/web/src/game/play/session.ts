@@ -6,6 +6,7 @@ import { z } from 'zod'
 import type { LineageEntry, Screen } from '../bridge'
 import { LIFE_STAGES, type LifeStageId, type SaveData, type Sim } from '../contracts'
 import { createRuntime, type Runtime } from './runtime'
+import { debugDirector } from '../../sim'
 
 export const SAVE_KEY = 'ochre.save.v1'
 const SEED = 80_000
@@ -91,6 +92,15 @@ export type QaHandles = {
   qaTeleport(poiId: string): void
   qaStage(stage: LifeStageId): void
   qaSkipBeat(): void
+  /** what the player could do here now */
+  qaInteractions(): unknown
+  /** do an interaction (the nearest when no id) as if E were pressed or held */
+  qaInteract(id?: string): string | null
+  qaLog(n?: number): readonly string[]
+  /** answer the open choice by option index */
+  qaChoose(index: number): void
+  /** finish the open minigame with a quality */
+  qaMinigame(quality: number): void
   runtime: Runtime
 }
 
@@ -344,7 +354,34 @@ export function mount(el: HTMLElement): () => void {
         begin(stage)
       },
       qaSkipBeat: () => {
-        console.warn('[qa] skip beat needs the director (S2)')
+        const g = rt.game
+        if (g) debugDirector(g.sim)?.completeBeat()
+      },
+      qaInteractions: () => {
+        const g = rt.game
+        if (!g) return []
+        return g.sim
+          .interactionsNear(g.player().position, 2.5)
+          .map((i) => ({ id: i.id, label: i.label, enabled: i.enabled, reason: i.reason }))
+      },
+      qaInteract: (id) => {
+        const g = rt.game
+        if (!g) return null
+        const all = g.sim.interactionsNear(g.player().position, 2.5)
+        const i = id ? all.find((x) => x.id === id) : all.find((x) => x.enabled)
+        if (!i) return null
+        g.sim.command({ type: 'interact', interactionId: i.id })
+        return i.id
+      },
+      qaLog: (n = 20) => rt.game?.log.slice(-n) ?? [],
+      qaChoose: (index) => {
+        const c = bridge.get().choice
+        const o = c?.options[index]
+        if (c && o) bridge.actions.choose(c.id, o.id)
+      },
+      qaMinigame: (quality) => {
+        const m = bridge.get().minigame
+        if (m) bridge.actions.minigameDone(m, quality)
       },
     }
   }
