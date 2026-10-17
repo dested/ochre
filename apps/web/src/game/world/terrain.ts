@@ -262,9 +262,11 @@ void ocLedge( inout OcBed b, inout vec2 g, float d, float dh, vec2 n, vec2 s, ve
 		// under a ledge: its face is a steep band (only where it faces the eye: from above the ledge it is hidden
 		// behind the lip), then the bed in its shadow, damp at the foot
 		float w = dh * 0.5 * smoothstep( - 0.1, 0.25, dot( - n, v ) );
-		float face = 1.0 - ocEdge( w, d );
-		g += n * face * 1.9;
-		b.lit = min( b.lit, ocEdge( clamp( dh * cotE * dot( s, n ), 0.0, 2.5 ), d ) );
+		// (the face, the shadow and the crack kept soft: hard, dark bands along every bed read as tiles)
+		float face = 1.0 - smoothstep( w * 0.5, w + 0.03, d );
+		g += n * face * 1.2;
+		float sl = clamp( dh * cotE * dot( s, n ), 0.0, 2.5 );
+		b.lit = min( b.lit, smoothstep( sl * 0.55 - 0.02, sl + 0.08, d ) );
 		b.foot = max( b.foot, ( 1.0 - smoothstep( w, w + 0.5, d ) ) * smoothstep( 0.04, 0.2, dh ) );
 		b.gapD = min( b.gapD, abs( d - w ) );
 	} else {
@@ -454,8 +456,8 @@ const TERRAIN_ALBEDO = /* glsl */ `
 			// broken colour within each bed, and the grain of the bedding along it
 			shelf *= 0.88 + 0.2 * ocNoise( p * 1.4 + bd.id.yz * 7.0 ) + 0.06 * ocNoise( vec2( dot( p, vec2( 0.91, 0.42 ) ) * 0.6, dot( p, vec2( - 0.42, 0.91 ) ) * 6.0 ) );
 			// the lips dry and pale, the feet damp and dark
-			shelf = mix( shelf, shelf * 1.2 + ocLin( vec3( 0.05, 0.045, 0.04 ) ), bd.lip * 0.8 );
-			shelf *= 1.0 - 0.22 * bd.foot;
+			shelf = mix( shelf, shelf * 1.2 + ocLin( vec3( 0.05, 0.045, 0.04 ) ), bd.lip * 0.5 );
+			shelf *= 1.0 - 0.13 * bd.foot;
 			// pits weathered into the high beds, a grey crust of barnacles in the middle zone
 			float pit = ocEdge( 0.78, ocNoise( p * 15.0 + 3.0 ) * 0.7 + ocNoise( p * 37.0 ) * 0.3 ) * hi * near;
 			shelf *= 1.0 - 0.22 * pit;
@@ -473,28 +475,32 @@ const TERRAIN_ALBEDO = /* glsl */ `
 			// the joints: thin cracks in shadow
 			float gapW = 0.011 + 0.012 * bd.id.z;
 			float gap = 1.0 - ocEdge( gapW, bd.gapD + ( ocNoise( p * 3.0 ) - 0.5 ) * 0.03 );
+			// only some of a joint's length is open; the rest is just the change of block
+			gap *= 0.45 + 0.55 * smoothstep( 0.35, 0.65, ocNoise( p * 0.9 + 13.0 ) );
 			vec2 lean = bd.tilt;
 			// mussels in clustered beds, low down, thickest along the joints and at the ledges' feet
 			float mz = smoothstep( 0.55, - 0.25, y );
 			if ( mz > 0.01 ) {
-				mus = ocEdge( 0.62, ocNoise( p * 1.2 + 5.0 ) * 0.55 + ocNoise( p * 4.1 ) * 0.2 + bd.foot * 0.3 + ( 1.0 - smoothstep( 0.0, 0.35, bd.gapD ) ) * 0.25 ) * mz;
+				// (the pull toward the ledges kept light, or every ledge's foot carries an unbroken black band and the
+				// beds read as tile outlines)
+				mus = ocEdge( 0.62, ocNoise( p * 1.2 + 5.0 ) * 0.6 + ocNoise( p * 4.1 ) * 0.2 + bd.foot * 0.16 + ( 1.0 - smoothstep( 0.0, 0.35, bd.gapD ) ) * 0.1 ) * mz;
 				if ( mus > 0.01 ) {
 					float crisp = smoothstep( 0.035, 0.012, px );
 					vec4 ms = ocMussels( p );
 					vec3 shell = mix( ocLin( vec3( 0.07, 0.08, 0.11 ) ), ocLin( vec3( 0.15, 0.17, 0.22 ) ), ms.w );
-					vec3 bed = mix( ocLin( vec3( 0.03, 0.03, 0.035 ) ), shell, mix( 0.8, ms.z, crisp ) );
+					vec3 bed = mix( ocLin( vec3( 0.05, 0.05, 0.06 ) ), shell, mix( 0.8, ms.z, crisp ) );
 					shelf = mix( shelf, bed, mus );
 					lean = mix( lean, ms.xy * ms.z, mus * crisp );
 				}
 			}
-			shelf *= 1.0 - 0.6 * gap * ( 1.0 - mus );
+			shelf *= 1.0 - 0.36 * gap * ( 1.0 - mus );
 			// pools: the hollow beds and a few others hold water, out of the sea, with ragged rims
 			float poolEdge = bd.dj + ( ocNoise( p * 2.2 ) - 0.5 ) * 0.35;
 			pool = ocEdge( 0.3, poolEdge ) * max( bd.hollow * step( bd.id.z, 0.55 ), step( bd.id.z, 0.08 ) ) * step( uSeaLevel + 0.12, y ) * smoothstep( 1.9, 1.0, y );
 			lean *= 1.0 - pool;
 			ocBumpT = vec3( lean.x, 0.0, lean.y ) * wb.z;
 			// light bounced off the sunlit rock round it keeps a ledge's shadow from going black
-			ocKeyOcc = mix( 1.0, 0.35 + 0.65 * bd.lit, wb.z * ( 1.0 - pool ) );
+			ocKeyOcc = mix( 1.0, 0.6 + 0.4 * bd.lit, wb.z * ( 1.0 - pool ) );
 			pool *= wb.z;
 		}
 		// earth, trodden floors and the cave: dust over rubble, each stone its own tone, darker in the cracks
