@@ -3,7 +3,7 @@
  * the bridge feed, drawn through the shared world view and pipeline. The session creates one per life; the
  * lab drives one directly.
  */
-import { Mesh, PerspectiveCamera, Scene, Vector3 } from 'three'
+import { Mesh, type Object3D, PerspectiveCamera, Scene, Vector3 } from 'three'
 import type { Bridge, NameTag, PromptState } from '../bridge'
 import type {
   CameraCue,
@@ -11,6 +11,7 @@ import type {
   GameAudio,
   Interaction,
   LifeStageId,
+  PersonActor,
   PersonAnim,
   RenderPipeline,
   SaveData,
@@ -24,7 +25,7 @@ import type {
 import { createCast, type Cast, type PlayerPose } from './cast'
 import { createController, type ControlSettings, type Controller } from './controller'
 import { createFeed, type Feed } from './feed'
-import { createHeldCamera, type HeldCamera } from './held-camera'
+import { createHeldCamera, HELD_CONE, type HeldCamera } from './held-camera'
 import { createHunt, type Hunt } from './hunt'
 import type { Input } from './input'
 import type { Modules } from './modules'
@@ -120,6 +121,22 @@ const TAG_TALL = 52
 /** samples along the eye→head line for tag occlusion, and how long a person stays hidden before the tag fades */
 const OCC_STEPS = 8
 const OCC_HIDE = 0.2
+/** the held camera hides the carrier's head inside this distance, metres */
+const HEAD_HIDE = 0.3
+/** held.faces opens the look cone this far past the farthest face */
+const FACES_MARGIN = (15 * Math.PI) / 180
+/** an actor's own head bone (people name their bones), not the head of a child it carries */
+function headBone(root: Object3D): Object3D | null {
+  const stack: Object3D[] = [root]
+  while (stack.length > 0) {
+    const o = stack.pop()
+    if (!o) break
+    if (o.name === 'head') return o
+    for (const c of o.children) if (c.name !== 'carry-attach') stack.push(c)
+  }
+  return null
+}
+
 /** poses that sit the body down (the camera pivot sinks with it) */
 const SEATED: ReadonlySet<PersonAnim> = new Set<PersonAnim>([
   'sit',
@@ -346,6 +363,21 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     return poi ? { x: poi.x, z: poi.z } : null
   }
 
+  /** the carrier whose head is hidden, and that head's bone */
+  let coneBeat: string | null = null
+  let hiddenHead: { actor: PersonActor; bone: Object3D } | null = null
+  const hideHead = (actor: PersonActor | null, hide: boolean) => {
+    if (hiddenHead && (!hide || hiddenHead.actor !== actor)) {
+      hiddenHead.bone.scale.setScalar(1)
+      hiddenHead = null
+    }
+    if (!hide || !actor || hiddenHead) return
+    const bone = headBone(actor.object)
+    if (!bone) return
+    bone.scale.setScalar(0.001)
+    hiddenHead = { actor, bone }
+  }
+
   const updateHeld = (dt: number, player: SimPerson, settings: ControlSettings) => {
     const carrier = player.carriedBy
       ? sim.state.people.find((q) => q.id === player.carriedBy)
@@ -357,6 +389,24 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     actor.object.visible = false
     const carrierActor = cast.person(carrier.id)
     const face = carrierActor ? carrierActor.headPosition(tmp2) : null
+    // held.faces: every face around must be reachable, so the cone opens to the farthest bearing (+15°) at its start
+    const beatId = sim.state.chapter.beatId
+    if (beatId !== coneBeat) {
+      coneBeat = beatId
+      held.cone = HELD_CONE
+      if (beatId === 'held.faces') {
+        const facing = carrier.heading + (carrier.carrying?.slot === 'arms' ? Math.PI : 0)
+        for (const q of sim.state.people) {
+          if (q.isPlayer || q.carriedBy || !q.alive) continue
+          const dx = q.position.x - player.position.x
+          const dz = q.position.z - player.position.z
+          if (Math.hypot(dx, dz) > GAZE_RANGE) continue
+          let rel = Math.atan2(dx, dz) - facing
+          rel = Math.abs(Math.atan2(Math.sin(rel), Math.cos(rel)))
+          held.cone = Math.min(Math.PI * 0.95, Math.max(held.cone, rel + FACES_MARGIN))
+        }
+      }
+    }
     held.update(
       dt,
       input,
@@ -369,6 +419,13 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       face
     )
     camera.updateMatrixWorld()
+    // on the back the view sits right beside her head: hide it (and its hair) while the camera is that close
+    hideHead(
+      carrierActor,
+      carrier.carrying?.slot !== 'arms' &&
+        face !== null &&
+        camera.position.distanceTo(face) < HEAD_HIDE
+    )
 
     // gaze: the face nearest the screen centre within 6°
     camera.getWorldDirection(fwd)
@@ -634,9 +691,10 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
         mode = nextMode
         const self = cast.person(player.id)
         if (self) self.object.visible = true
-        if (mode === 'third')
+        if (mode === 'third') {
+          hideHead(null, false)
           controller.teleport(player.position.x, player.position.z, player.heading)
-        else held.reset()
+        } else held.reset()
       }
 
       const feel = STAGE_FEEL[sim.state.stage]
@@ -790,6 +848,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     player: findPlayer,
     log,
     dispose() {
+      hideHead(null, false)
       feed.reset()
       hunt.dispose()
       tracks.dispose()
