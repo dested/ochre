@@ -531,13 +531,13 @@ Board: down · Last pushed: f48612e (main, 02:05) · Gate: install 0, typecheck 
 
 | Agent | Model | Owns | Item now | Last sha / artifact | Status |
 | --- | --- | --- | --- | --- | --- |
-| world | opus-xhigh | world-gen, game/world, game/render | W2 (atmosphere, coast drama, shelf, cave rock first) | W1 82b261e passed 02:20 | working |
+| world | opus-xhigh | world-gen, game/world, game/render | W2 (atmosphere, coast drama, shelf, cave rock first; + night by the fire 02:55) | W2 WIP 2d3be72 (foliage, shelf under cave); W1 82b261e passed 02:20 | working |
 | people | opus-xhigh | game/actors | P1b (written into the brief 02:20; outranks P3; P3 WIP uncommitted) | c66a392 → fix sent 01:35 (budget 7 calls/97k tris per person, 40 cm face, garments, arms) | working |
-| sim | opus-high | sim | S5b rest (a–d in Standing answers 02:45) | S5b part 6aa3225 passed (held 18:20, follow walk); S5 209a09c passed (7 moments); S4 d0549fd passed; S2 071949a passed | working |
+| sim | opus-high | sim | S5c fix (picks, free-wait objective, save window) | S5b rest f683e42 (tests 38/38 rerun by lead); S5b part 6aa3225 passed (held 18:20, follow walk); S5 209a09c passed (7 moments); S4 d0549fd passed; S2 071949a passed | working |
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | on call for PL3 findings | U6 ce615bc passed; U5, U3 passed | idle |
-| play | opus-high | game/play, game/audio, app/play.tsx | PL3 (director in; real world + people swapped) | PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
+| play | opus-high | game/play, game/audio, app/play.tsx | PL3 run 2 on QA 82c6af6 (run 1: held→summary, 20/26 beats self-completed, no errors) | 9a7684d passed (E verb, seated camera); PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
 
-Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); QA server :4090 (prod build of b76f9bc, log /w/junk/sim-80k/qa-server.log); Drydock portal :4400 (Windows bun, log in
+Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); QA server :4090 (prod build of 82c6af6, task bngs4rahp, log /w/junk/sim-80k/qa-server.log); Drydock portal :4400 (Windows bun, log in
 scratchpad drydock-portal.log)
 Images used: 47 / 200 (lead 2, ui 45). OpenAI credit exhausted 01:05; generation stopped (needs-sal Check 2)
 Waiting on Sal: none (needs-sal file: plans/2026-10-17-needs-sal.md)
