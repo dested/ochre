@@ -8,7 +8,7 @@ import { LIFE_STAGES } from '../game/contracts'
 import { DEFAULT_TIME_SCALE } from '../core/clock'
 import { roleOf } from './ai'
 import { SKILL_LABEL } from './ctx'
-import { createSim, debugCtx } from './index'
+import { createSandboxSim, createSim, debugCtx, debugDirector } from './index'
 import { sunTimes } from './time'
 import { createTestWorld } from './test-world'
 
@@ -78,7 +78,10 @@ export function mount(root: HTMLElement): () => void {
   let seed = Number(params.get('seed') ?? '1') || 1
   let stage: LifeStageId = LIFE_STAGES.find((s) => s === params.get('stage')) ?? 'small'
   const world: WorldData = createTestWorld(seed)
-  let sim: Sim = createSim({ seed, world, stage, playerName: 'Teni' })
+  // story: the director runs the chapter (nobody plays, so the beats wait; "Complete beat" moves them on)
+  let story = params.get('mode') !== 'sandbox'
+  const make = (): Sim => (story ? createSim : createSandboxSim)({ seed, world, stage, playerName: 'Teni' })
+  let sim: Sim = make()
   let speed: (typeof SPEEDS)[number] = 1
   let selected: { kind: 'person' | 'animal'; id: string } | null = { kind: 'person', id: 'ama' }
   const log: string[] = []
@@ -117,6 +120,7 @@ export function mount(root: HTMLElement): () => void {
   restartBtn.onclick = () => {
     const s = LIFE_STAGES.find((x) => x === stageSel.value)
     if (s) stage = s
+    story = modeSel.value === 'story'
     seed = Number(seedIn.value) || 1
     restart()
   }
@@ -126,10 +130,22 @@ export function mount(root: HTMLElement): () => void {
     b.onclick = () => setView(name)
     viewRow.appendChild(b)
   }
-  stageRow.append(el('span', {}, 'Stage'), stageSel, el('span', {}, 'Seed'), seedIn, restartBtn)
+  const modeSel = el('select', { background: '#2a221d', color: '#efe3c8', border: '1px solid #4a3c32', font: 'inherit' })
+  for (const m of ['story', 'sandbox']) {
+    const o = el('option', {}, m)
+    o.value = m
+    if ((m === 'story') === story) o.selected = true
+    modeSel.appendChild(o)
+  }
+  stageRow.append(el('span', {}, 'Stage'), stageSel, modeSel, el('span', {}, 'Seed'), seedIn, restartBtn)
+  const directorBox = el('div', { background: '#241c17', padding: '8px', borderRadius: '4px', display: 'flex', flexDirection: 'column', gap: '6px' })
+  const directorText = el('div', { whiteSpace: 'pre-line', color: '#e8d8b4' })
+  const completeBtn = el('button', { padding: '3px 8px', background: '#5a3a22', color: '#efe3c8', border: '1px solid #7a5232', borderRadius: '3px', cursor: 'pointer', font: 'inherit', alignSelf: 'flex-start' }, 'Complete beat')
+  completeBtn.onclick = () => completeBeat()
+  directorBox.append(directorText, completeBtn)
   const inspect = el('div', { whiteSpace: 'pre-line', background: '#201a16', padding: '8px', borderRadius: '4px', minHeight: '150px' })
   const logBox = el('div', { flex: '1', overflowY: 'auto', background: '#1c1713', padding: '6px', borderRadius: '4px', font: '11px/1.45 ui-monospace, monospace', color: '#cbbfa4' })
-  panel.append(title, clockBox, controls, stageRow, viewRow, inspect, el('div', { color: '#a09070' }, 'Events'), logBox)
+  panel.append(title, clockBox, controls, stageRow, viewRow, directorBox, inspect, el('div', { color: '#a09070' }, 'Events'), logBox)
 
   const ctx2d = canvas.getContext('2d')
   if (!ctx2d) throw new Error('no 2d context')
@@ -254,8 +270,17 @@ export function mount(root: HTMLElement): () => void {
     })
   }
 
+  function completeBeat(): void {
+    const d = debugDirector(sim)
+    if (!d) return
+    d.completeBeat()
+    // the beat's events go out with the next step
+    logEvents(sim.step(1 / 60))
+    logDirty = true
+  }
+
   function restart(): void {
-    sim = createSim({ seed, world, stage, playerName: 'Teni' })
+    sim = make()
     log.length = 0
     lastTask.clear()
     setSpeed(speed === 0 ? 1 : speed)
@@ -298,6 +323,33 @@ export function mount(root: HTMLElement): () => void {
           break
         case 'death':
           addLog(`✝ ${person(e.personId)?.name ?? e.personId} died`)
+          break
+        case 'objective':
+          if (e.objective) addLog(`▸ ${e.objective.text}`)
+          break
+        case 'note':
+          addLog(`✎ Field Note: ${e.noteId}`)
+          break
+        case 'chapter-start':
+          addLog(`━━ ${e.title} · ${e.subtitle} (age ${e.ageYears})`)
+          break
+        case 'chapter-end':
+          addLog(`━━ end of ${e.stage}${e.next ? ` → ${e.next}` : ''}`)
+          break
+        case 'minigame':
+          addLog(`◆ minigame: ${e.game}`)
+          break
+        case 'choice':
+          addLog(`◆ choice: ${e.choice.prompt} ${e.choice.options.map((o) => o.label).join(' / ')}`)
+          break
+        case 'camera':
+          if (e.cue.kind === 'fade') addLog(`▒ fade to ${e.cue.to}`)
+          break
+        case 'teleport':
+          addLog(`⇢ player to (${e.position.x.toFixed(0)}, ${e.position.z.toFixed(0)})`)
+          break
+        case 'life-summary':
+          addLog(`☾ life summary: ${e.summary.name}, ${e.summary.years} years, ${e.summary.notesFound} notes, heir ${e.summary.heirName ?? '—'}`)
           break
         default:
           break
@@ -628,6 +680,12 @@ export function mount(root: HTMLElement): () => void {
       }
     }
     inspect.textContent = text
+    const dir = debugDirector(sim)
+    directorBox.style.display = dir ? 'flex' : 'none'
+    if (dir) {
+      const o = s.chapter.objective
+      directorText.textContent = `Beat: ${s.chapter.beatId}${s.chapter.finished ? ' (life finished)' : ''}\nObjective: ${o ? o.text : '—'}\nNotes: ${s.notes.length} · time ×${(s.timeScale / DEFAULT_TIME_SCALE).toFixed(2)}`
+    }
     if (logDirty) {
       logBox.textContent = log.slice(-150).join('\n')
       logBox.style.whiteSpace = 'pre-line'
@@ -688,6 +746,15 @@ export function mount(root: HTMLElement): () => void {
     },
     view: (name: string) => setView(name),
     state: () => sim.state,
+    completeBeat: () => completeBeat(),
+    beat: () => sim.state.chapter.beatId,
+    restart: (st: LifeStageId, mode: 'story' | 'sandbox' = 'story') => {
+      stage = st
+      story = mode === 'story'
+      stageSel.value = st
+      modeSel.value = mode
+      restart()
+    },
   }
   if (import.meta.env.DEV) Object.assign(window, { __lab: api })
 

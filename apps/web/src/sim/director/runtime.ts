@@ -227,6 +227,8 @@ export function learnSkill(d: D, who: SimPerson, skill: SkillId, fromId: string 
 export function skipTo(d: D, hour: number, minAhead = 0): void {
   const now = hourNow(d)
   let ahead = (((hour - now) % 24) + 24) % 24
+  // just past the hour already: no need to go round the clock
+  if (minAhead === 0 && ahead > 23.5) return
   while (ahead < minAhead) ahead += 24
   if (ahead <= 0) return
   const crossesNight = ahead > 6 || (now < 24 && now + ahead > 24) || (now < 5 && now + ahead > 5)

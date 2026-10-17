@@ -312,6 +312,10 @@ export function createDirector(host: DirectorHost, stage: LifeStageId, saved: Di
     },
     completeBeat() {
       if (st.finished) return
+      if (!st.begun) {
+        beginChapter()
+        advance(0)
+      }
       d.forced = true
       const at = st.beat
       const stage = st.stage
