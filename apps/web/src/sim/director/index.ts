@@ -87,8 +87,10 @@ export function createDirector(host: DirectorHost, stage: LifeStageId, saved: Di
   }
 
   function syncObjective(): void {
-    // a moment's optional aside fills in while the beat sets no objective of its own
-    const o = objectiveNow(d) ?? ctx.moments.aside
+    // a moment's aside ("Go with Tuk after the honeyguide") stands in for a free wait's objective while it lasts,
+    // and fills in whenever the beat sets none of its own
+    const aside = ctx.moments.aside
+    const o = (aside && hooks.free() ? aside : null) ?? objectiveNow(d) ?? aside
     const key = o ? `${o.id}|${o.text}|${o.done ?? ''}` : ''
     if (key === d.objectiveKey) return
     d.objectiveKey = key

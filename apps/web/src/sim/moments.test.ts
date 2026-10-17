@@ -173,6 +173,29 @@ describe('days worth living', () => {
     }, 60_000)
   }
 
+  test("in a free wait the honeyguide's aside stands in for the wait's objective, then gives it back", () => {
+    const sim = createSim({ seed: 1, world, stage: 'small', playerName: 'Teni' })
+    const ctx = ctxOf(sim)
+    const dir = debugDirector(sim)
+    if (!dir) throw new Error('no director')
+    for (let i = 0; i < 40 && sim.state.chapter.beatId !== 'small.afternoon'; i++) {
+      dir.completeBeat()
+      for (let k = 0; k < 30 && sim.state.chapter.beatId !== 'small.afternoon'; k++) sim.step(1 / 30)
+    }
+    for (let i = 0; i < 30 * 10 && !sim.state.chapter.objective; i++) sim.step(1 / 30)
+    const wait = sim.state.chapter.objective?.text ?? ''
+    expect(wait).toMatch(/^Spend the /)
+    expect(triggerMoment(ctx, 'honeyguide')).toBe(true)
+    const texts = new Set<string>()
+    for (let i = 0; i < 30 * 400 && activeMoment(ctx) === 'honeyguide' && sim.state.chapter.beatId === 'small.afternoon'; i++) {
+      sim.step(1 / 30)
+      texts.add(sim.state.chapter.objective?.text ?? '')
+    }
+    expect([...texts].some((t) => t.startsWith('Go with ') && t.endsWith(' after the honeyguide'))).toBe(true)
+    for (let i = 0; i < 5; i++) sim.step(1 / 30)
+    expect(sim.state.chapter.objective?.text ?? '').toMatch(/^Spend the /)
+  }, 30_000)
+
   test('a save inside the first-steps wait still brings the first steps after a load', () => {
     const sim = createSim({ seed: 1, world, stage: 'provider', playerName: 'Teni' })
     for (let i = 0; i < 30 * 120 && !ctxOf(sim).moments.window; i++) sim.step(1 / 30)
