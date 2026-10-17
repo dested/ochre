@@ -3,8 +3,8 @@
  * continuing, over one shared runtime. `mount(el)` is loaded by app/play.tsx through ClientMount.
  */
 import { z } from 'zod'
-import type { Screen } from '../bridge'
-import { LIFE_STAGES, type LifeStageId, type SaveData } from '../contracts'
+import type { LineageEntry, Screen } from '../bridge'
+import { LIFE_STAGES, type LifeStageId, type SaveData, type Sim } from '../contracts'
 import { createRuntime, type Runtime } from './runtime'
 
 export const SAVE_KEY = 'ochre.save.v1'
@@ -38,6 +38,51 @@ function writeSave(file: SaveFile): void {
   } catch {
     // storage full or blocked: the life goes on unsaved
   }
+}
+
+/** the band as the family tree sees it: links, and each person's generation relative to the player */
+function buildLineage(sim: Sim): LineageEntry[] {
+  const st = sim.state
+  const byId = new Map(st.people.map((p) => [p.id, p]))
+  const inBand = (id: string | null) => (id && byId.has(id) ? id : null)
+  const gen = new Map<string, number>([[st.playerId, 0]])
+  const queue = [st.playerId]
+  while (queue.length > 0) {
+    const id = queue.shift()
+    const p = id ? byId.get(id) : undefined
+    const g = id ? gen.get(id) : undefined
+    if (!p || g === undefined) continue
+    const links: [string | null, number][] = [
+      [p.motherId, g - 1],
+      [p.fatherId, g - 1],
+      [p.partnerId, g],
+      ...p.childIds.map((c): [string, number] => [c, g + 1]),
+    ]
+    for (const [lid, lg] of links) {
+      const l = inBand(lid)
+      if (l && !gen.has(l)) {
+        gen.set(l, lg)
+        queue.push(l)
+      }
+    }
+  }
+  const player = byId.get(st.playerId)
+  const playerAge = player?.look.ageYears ?? 0
+  return st.people.map((p) => ({
+    id: p.id,
+    name: p.name,
+    relation: p.isPlayer ? 'You' : sim.relationOf(p.id) ?? 'Of the band',
+    ageYears: Math.floor(p.look.ageYears),
+    alive: p.alive,
+    bond: p.bond,
+    skills: [...p.skills],
+    motherId: inBand(p.motherId),
+    fatherId: inBand(p.fatherId),
+    partnerId: inBand(p.partnerId),
+    // outside the family, guess the generation from the age gap
+    generation: gen.get(p.id) ?? Math.max(-2, Math.min(2, Math.round((p.look.ageYears - playerAge) / -25))),
+    isPlayer: p.isPlayer,
+  }))
 }
 
 export type QaHandles = {
@@ -77,6 +122,7 @@ export function mount(el: HTMLElement): () => void {
   }
 
   const begin = (stage: LifeStageId, saved?: SaveData) => {
+    pendingStage = null
     wakeAudio()
     host.setPaused(false)
     bridge.set({ screen: 'loading', loadingProgress: 0.15, summary: null, chapter: null })
@@ -99,9 +145,25 @@ export function mount(el: HTMLElement): () => void {
     }, 60)
   }
 
-  rt.onChapterEnd = () => save()
+  // if the sim doesn't move itself to the next stage within a moment of chapter-end, start that stage fresh
+  let pendingStage: { next: LifeStageId; wait: number } | null = null
+  rt.onChapterEnd = (next) => {
+    save()
+    pendingStage = next ? { next, wait: 2 } : null
+  }
 
   const offFrame = host.onFrame((dt) => {
+    if (pendingStage && rt.game) {
+      if (rt.game.sim.state.stage === pendingStage.next) pendingStage = null
+      else if (bridge.get().screen === 'playing' || bridge.get().screen === 'chapter-card') {
+        pendingStage.wait -= dt
+        if (pendingStage.wait <= 0) {
+          const next = pendingStage.next
+          pendingStage = null
+          begin(next)
+        }
+      }
+    }
     if (!rt.game || bridge.get().screen !== 'playing') return
     saveTimer += dt
     if (saveTimer >= SAVE_EVERY) {
@@ -154,20 +216,7 @@ export function mount(el: HTMLElement): () => void {
       const s = bridge.get().screen
       if (s !== 'notes' && s !== 'lineage') overlayReturn = s
       const g = rt.game
-      if (g) {
-        const st = g.sim.state
-        bridge.set({
-          lineage: st.people.map((p) => ({
-            id: p.id,
-            name: p.name,
-            relation: p.isPlayer ? 'You' : g.sim.relationOf(p.id) ?? 'Of the band',
-            ageYears: Math.floor(p.look.ageYears),
-            alive: p.alive,
-            bond: p.bond,
-            skills: [...p.skills],
-          })),
-        })
-      }
+      if (g) bridge.set({ lineage: buildLineage(g.sim) })
       bridge.set({ screen: 'lineage' })
     },
     closeOverlay() {

@@ -347,7 +347,8 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     bridge.setHud({
       visible: true,
       name: player.name,
-      ageYears: player.look.ageYears,
+      // whole years from one, tenths for an infant
+      ageYears: player.look.ageYears >= 1 ? Math.floor(player.look.ageYears) : Math.round(player.look.ageYears * 10) / 10,
       stage: s.stage,
       needs: s.stage === 'held' ? null : { ...player.needs },
       clock,
