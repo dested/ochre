@@ -519,7 +519,7 @@ Board: down · Last pushed: f48612e (main, 02:05) · Gate: install 0, typecheck 
 | --- | --- | --- | --- | --- | --- |
 | world | opus-xhigh | world-gen, game/world, game/render | W2 (atmosphere, coast drama, shelf, cave rock first) | W1 82b261e passed 02:20 | working |
 | people | opus-xhigh | game/actors | P1b (written into the brief 02:20; outranks P3; P3 WIP uncommitted) | c66a392 → fix sent 01:35 (budget 7 calls/97k tris per person, 40 cm face, garments, arms) | working |
-| sim | opus-high | sim | S5b (free waits per chapter, first steps in provider, honey payoff) | S5 209a09c passed (7 moments); S4 d0549fd passed; S2 071949a passed | working |
+| sim | opus-high | sim | S5b rest (a–d in Standing answers 02:45) | S5b part 6aa3225 passed (held 18:20, follow walk); S5 209a09c passed (7 moments); S4 d0549fd passed; S2 071949a passed | working |
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | on call for PL3 findings | U6 ce615bc passed; U5, U3 passed | idle |
 | play | opus-high | game/play, game/audio, app/play.tsx | PL3 (director in; real world + people swapped) | PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
 
