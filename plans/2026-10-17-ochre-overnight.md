@@ -543,7 +543,7 @@ Board: down · Last pushed: 927056d (main, 03:05) · Gate: install 0, typecheck 
 | Agent | Model | Owns | Item now | Last sha / artifact | Status |
 | --- | --- | --- | --- | --- | --- |
 | world | opus-xhigh | world-gen, game/world, game/render | W2 (atmosphere, coast drama, shelf, cave rock first; + night by the fire 02:55) | W2 WIP 2d3be72 (foliage, shelf under cave); W1 82b261e passed 02:20 | working |
-| people | opus-xhigh | game/actors | P1b (written into the brief 02:20; outranks P3; P3 WIP uncommitted) | c66a392 → fix sent 01:35 (budget 7 calls/97k tris per person, 40 cm face, garments, arms) | working |
+| people | opus-xhigh | game/actors | P1b (acked 02:55, started) | P3 committed unreviewed (43423c3, d679045, 6798b36; ready after P1b); P2 afe56e2 passed | working |
 | sim | opus-high | sim | aside replaces the free-wait objective, then on call for PL3 | S5c 95e8327 passed (42 tests); S5b rest 69428c6 passed (41 tests; covers S5c 1–2); f683e42 superseded; S5b part 6aa3225 passed (held 18:20, follow walk); S5 209a09c passed (7 moments); S4 d0549fd passed; S2 071949a passed | working |
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | U7 fresh eyes on :4090 | chatter 830a7ab; U6 ce615bc passed; U5, U3 passed | working |
 | play | opus-high | game/play, game/audio, app/play.tsx | PL3 run 2 on QA 82c6af6 (run 1: held→summary, 20/26 beats self-completed, no errors) | 9a7684d passed (E verb, seated camera); PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
