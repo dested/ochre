@@ -505,6 +505,12 @@ controller, cameras and verbs that make each stage of life feel different; and t
   already has), sit at the hearth, everyone within 6 m gets a share (the `eat` anim, fed +0.1), and there are two
   captions: one when they return, one when the player takes the share. The player gets a share only if within 6 m.
   Tests: each wait fires its moment on seed 1, and the held→elder playthrough still finishes true. Applies to: sim.
+  **S5c fix (02:50, after f683e42):** (1) the free waits name their moment: small.free `seal-pup`, youth.free
+  `rain-dash`, elder.free `moon-dance` when the window opens after sunset, otherwise `visitor`; keep the "visible from
+  the halfway point" fallback when the pick can't run. (2) Every free wait sets the objective "Spend the afternoon with
+  the band" ("…the evening…" from 17:00), so the HUD never shows a stale one; the honeyguide aside still shows as a
+  second line through `aside`. (3) Save the open window (from, until, pick, got) so a load inside provider.steps
+  still gets first steps.
 
 - (2026-10-17 02:40, lead) **Frozen QA server: http://localhost:4090** is a production build of a fixed sha (see
   `/w/junk/sim-80k/qa-server/SHA`). It never reloads, so use it for playthroughs and shots that need more than a
