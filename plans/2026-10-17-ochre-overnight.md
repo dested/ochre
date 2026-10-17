@@ -623,6 +623,11 @@ controller, cameras and verbs that make each stage of life feel different; and t
   reach their props (fire stick to the hearth, engraving stone in the off hand and point on the stone), no limb passes
   through the body or the hides, and `lie-dead` lies flat on the ground with no limb clipping into it. Fix what fails;
   list what you changed per anim in the ready line, with the sheet paths.
+  **P4 item 0, first (04:45):** in sim's provider.whale shot at 10:03 the beach shows no whale
+  (`/w/junk/sim-80k/sim/f2-dev-beach.png`; the sim spawns it 15 m from the `whale-beach` POI). On :4080 with `?qa`,
+  jump to provider.whale, walk to the whale beach and confirm the stranded whale renders, beached on the sand (not
+  under it, not floating, not in the water), big enough to read from the cliff path. If it's missing, find why; a fix
+  in `game/play/cast.ts` (play's) goes to play as exact lines. Ready line with a shot from the cliff path and one beside it.
 
 ## Ledger (lead, updated 2026-10-17 01:05)
 
