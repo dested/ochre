@@ -27,9 +27,25 @@ export function ObjectiveLine({ objective, dim }: { objective: Objective; dim: b
   )
 }
 
+const MAX_CAPTIONS = 3
+
+/** ambient talk between two other people (sim's "chat-" ids): overheard, not said to you */
+function isChatter(c: Caption): boolean {
+  return c.kind === 'speech' && c.id.startsWith('chat-')
+}
+
+/** the newest three; when more are waiting, overheard chatter goes first, then the oldest of the rest */
+export function pickCaptions(captions: readonly Caption[]): Caption[] {
+  const shown = [...captions]
+  while (shown.length > MAX_CAPTIONS) {
+    const chatter = shown.findIndex(isChatter)
+    shown.splice(chatter >= 0 ? chatter : 0, 1)
+  }
+  return shown
+}
+
 export function Captions({ captions, large }: { captions: readonly Caption[]; large: boolean }) {
-  // the newest three; older ones have already been read
-  const shown = captions.slice(-3)
+  const shown = pickCaptions(captions)
   return (
     <div className="flex w-[min(820px,86vw)] flex-col items-center gap-2 text-center" aria-live="polite">
       {shown.map((c) => (
@@ -41,6 +57,17 @@ export function Captions({ captions, large }: { captions: readonly Caption[]; la
 
 function CaptionLine({ caption, large }: { caption: Caption; large: boolean }) {
   const scale = large ? 1.28 : 1
+  if (isChatter(caption)) {
+    // softer than talk aimed at you: smaller, dimmer, the name in the same muted tone as the words
+    return (
+      <p
+        className="ui-wash ui-wash-tight animate-ui-rise font-sans text-bone ui-halo"
+        style={{ fontSize: 16 * scale, lineHeight: 1.4, opacity: 0.72 }}>
+        {caption.speaker && <span className="mr-2 opacity-75">{caption.speaker}</span>}
+        <span>{caption.text}</span>
+      </p>
+    )
+  }
   if (caption.kind === 'speech') {
     return (
       <p className="ui-wash animate-ui-rise text-bone ui-halo" style={{ fontSize: 19 * scale, lineHeight: 1.4 }}>

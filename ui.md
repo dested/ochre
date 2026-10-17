@@ -55,13 +55,15 @@ headings, the wordmark, narration and names; **Figtree** for UI text and speech.
 | Narration caption | Fraunces italic 22 px, weight 380, `opsz 36, SOFT 100` |
 | Speech caption | speaker in Fraunces semibold amber 17 px, then Figtree 19 px bone |
 | Song caption | Fraunces italic 21 px between two small voice marks |
+| Overheard chatter (`chat-` ids) | Figtree 16 px bone at 72 %, speaker in the same muted tone, tight wash |
 | Objective | Figtree 17 px medium, count in Fraunces amber tabular figures ("3/12") |
 | Prompt | key cap Figtree 14 px semibold, label Figtree 18 px medium, disabled reason Fraunces italic 15 px |
 | Name tag | Fraunces 16 px semibold (bone → amber with the bond), relation Figtree 12 px bone-dim below |
 | Toast | Fraunces 17 px semibold charcoal, body Figtree 13.5 px |
 | Small print | Figtree 12–13 px |
 
-Large captions (setting) scale captions by 1.28.
+Large captions (setting) scale captions by 1.28. At most three captions show; past that, chatter is dropped first, then
+the oldest.
 
 ## Motif: the Blombos band
 

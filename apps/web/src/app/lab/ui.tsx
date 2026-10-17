@@ -103,6 +103,7 @@ const PRESETS: Record<string, () => Preset> = {
     },
     objective: { id: 'small.gather', text: 'Gather shellfish (3/12)', done: 3, total: 12 },
     captions: [
+      { ...cap('speech', 'Leave some for the next tide.', 'Kaya'), id: id('chat') },
       cap('speech', 'Come. The moon was full. The sea is sleeping.', 'Ama'),
       cap('narration', 'The rocks are bare and shining. Things move in the pools.'),
     ],
@@ -359,6 +360,7 @@ export function UiLab() {
           </Group>
           <Group label="Push">
             <Btn on={() => bridge.set({ captions: [...bridge.get().captions, cap('speech', 'Not so far!', 'Ama')] })}>speech</Btn>
+            <Btn on={() => bridge.set({ captions: [...bridge.get().captions, { ...cap('speech', 'Your net is torn again.', 'Ilu'), id: id('chat') }] })}>chatter</Btn>
             <Btn on={() => bridge.set({ captions: [...bridge.get().captions, cap('narration', 'The sea breathes in, and out.')] })}>narration</Btn>
             <Btn on={() => bridge.set({ captions: [...bridge.get().captions, cap('song', 'A low song about the moon and the tide.')] })}>song</Btn>
             <Btn on={() => bridge.set({ toasts: [...bridge.get().toasts, toast('learned', 'You learned Corms')] })}>learned</Btn>
