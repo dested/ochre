@@ -117,6 +117,12 @@ function describe(e: SimEvent): string {
 const INTERACT_RADIUS = 2.5
 const TAG_RANGE = 25
 const GAZE_CONE = (6 * Math.PI) / 180
+/**
+ * a chapter's opening (until the player moves, turns or this many seconds pass): its first objective with a
+ * target turns the view to it, over AIM_SECONDS
+ */
+const OPENING_SECONDS = 8
+const AIM_SECONDS = 1.2
 const GAZE_RANGE = 7
 /** name tags: screen safe margin, approximate box, how many at once, and the held-face cutoff */
 const TAG_MARGIN = 48
@@ -366,6 +372,10 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   /** the old player's name while their heir's first chapter card is on its way */
   let heirOf: string | null = null
   let cardT = 0
+  /** seconds left of the chapter's opening, the objective the view last turned to, and that turn's time left */
+  let opening = 0
+  let aimedAt: string | null = null
+  let aimFor = 0
   /** the chapter's opening asks for black after its card (its last queued fade is to black) */
   const opensBlack = () => {
     let black = false
@@ -380,7 +390,11 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
         afterCard.push(e)
         continue
       }
-      if (e.type === 'chapter-start') carded = true
+      if (e.type === 'chapter-start') {
+        carded = true
+        opening = OPENING_SECONDS
+        aimedAt = null
+      }
       // the end of a life plays out (last line, slow fade, sound) before the summary
       if (e.type === 'life-summary' && e !== released) {
         closing = { event: e, t: 0, sounded: false }
@@ -981,6 +995,41 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     return { left, right, top: up, bottom: down }
   }
 
+  /** a new chapter turns the view to its first objective, not wherever the beat's placing left the heading */
+  const aimOpening = (dt: number, screen: string) => {
+    if (screen === 'playing') {
+      opening = Math.max(0, opening - dt)
+      if (input.mouse.dx !== 0 || controller.speed > 0.2) opening = aimFor = 0
+    }
+    const objective = sim.state.chapter.objective
+    if (opening > 0 && objective?.target && objective.id !== aimedAt) {
+      aimedAt = objective.id
+      aimFor = AIM_SECONDS
+    }
+    if (aimFor <= 0) return
+    const at = objectiveAt()
+    if (!at) return
+    const dx = at.x - controller.position.x
+    const dz = at.z - controller.position.z
+    if (Math.hypot(dx, dz) < 0.5) return
+    let d = Math.atan2(dx, dz) - controller.yaw
+    d = Math.atan2(Math.sin(d), Math.cos(d))
+    // unseen (behind the card or in black) it snaps; in view it turns
+    const unseen = screen !== 'playing' || fadeValue > FADE_HIDE
+    controller.yaw += unseen ? d : d * Math.min(1, dt * 3)
+    if (screen === 'playing') aimFor = Math.max(0, aimFor - dt)
+  }
+
+  /** where the objective is on the ground: its person (or whoever carries them) or its point */
+  const objectiveAt = (): { x: number; z: number } | null => {
+    const t = sim.state.chapter.objective?.target
+    if (!t) return null
+    if (t.kind === 'point') return t.at
+    const q = sim.state.people.find((p) => p.id === t.id)
+    if (!q || !q.alive) return null
+    const carrier = q.carriedBy ? sim.state.people.find((p) => p.id === q.carriedBy) : undefined
+    return (carrier ?? q).position
+  }
   const objectiveMarkNow = (player: SimPerson): ObjectiveMark | null => {
     const t = sim.state.chapter.objective?.target
     if (!t || mode !== 'third' || sim.state.stage === 'held') return null
@@ -1161,6 +1210,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       if (mode === 'held') updateHeld(dt, player, settings)
       else {
         offerShell.show(null, camera.position)
+        aimOpening(dt, screen)
         if (focus && now < focus.until) {
           const p = focusPoint(focus.targetId)
           if (p) {
