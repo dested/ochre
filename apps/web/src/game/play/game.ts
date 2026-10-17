@@ -142,6 +142,8 @@ const HEAD_HIDE = 0.3
 const MARK_LIFT = 10
 /** fade level past which tags and the prompt hide, and how far a face is made out at night */
 const FADE_HIDE = 0.3
+/** a fade this dark counts as black: the HUD steps out */
+const FADE_BLACK = 0.98
 /** name tags anchor this far above the head top, metres */
 const TAG_ABOVE = 0.15
 /** looking within this of what she offers counts as looking at it, radians */
@@ -910,8 +912,8 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     const clock: ClockState = { ...s.clock }
     const lastWalk = s.chapter.beatId === 'elder.walk'
     bridge.setHud({
-      // the death plays without the HUD
-      visible: closing === null,
+      // the death plays without the HUD, and a black fade (its "Four summers pass.") shows only its words
+      visible: closing === null && fadeValue < FADE_BLACK,
       sex: player.look.sex,
       name: player.name,
       // whole years from one, tenths for an infant
