@@ -11,6 +11,9 @@ import type { StageFeel } from './stages'
 const CAM_STEPS = 14
 /** the camera's line to the player stays this far (m) from a lit fire */
 const FIRE_CLEAR = 1.2
+/** while aiming, the orbit pitch that looks level, and how much view pitch each radian of it gives */
+const AIM_LEVEL = 0.15
+const AIM_PITCH = 0.9
 /** how far the orbit pivot sinks for a seated body, as a share of the standing pivot height */
 const SEATED_DROP = 0.3
 /** the seated over-the-shoulder shift, metres */
@@ -277,9 +280,18 @@ export function createController(world: WorldData): Controller {
       cy += Math.sin(swayT * 1.1) * sway * 3
       camera.position.set(cx, cy, cz)
       camera.up.set(0, 1, 0)
-      // look a little ahead of the pivot so the player sits low in frame and the world opens up
+      // look a little ahead of the pivot so the player sits low in frame and the world opens up; while aiming the
+      // view turns with the mouse's pitch itself, so the reticle can drop onto an animal below the player
       const ahead = 1.5 + aim * 8
-      camera.lookAt(px + fx * ahead, py + 0.1 + aim * 0.2, pz + fz * ahead)
+      const ap = (pitch - AIM_LEVEL) * AIM_PITCH
+      const dirX = Math.sin(yaw) * Math.cos(ap)
+      const dirY = -Math.sin(ap)
+      const dirZ = Math.cos(yaw) * Math.cos(ap)
+      camera.lookAt(
+        px + fx * ahead + (cx + dirX * 10 - px - fx * ahead) * aim,
+        py + 0.1 + (cy + dirY * 10 - py - 0.1) * aim,
+        pz + fz * ahead + (cz + dirZ * 10 - pz - fz * ahead) * aim
+      )
       if (sway > 0) camera.rotateZ(Math.sin(swayT * 0.9) * sway)
       const fov = feel.fov - aim * 12
       if (Math.abs(camera.fov - fov) > 0.01) {
