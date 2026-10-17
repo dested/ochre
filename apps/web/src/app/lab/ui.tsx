@@ -212,8 +212,8 @@ function goScreen(screen: Screen) {
       storyTold: 'The night the sea slept',
       beadsGivenTo: 'Hesa',
       notesFound: 19,
-      heirId: 'sela',
-      heirName: 'Sela',
+      heirId: 'nia',
+      heirName: 'Nia',
     }
   }
   bridge.set({ ...extra, screen })

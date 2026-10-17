@@ -1,6 +1,6 @@
 /**
  * The life summary: the years, the children, what you taught and to whom, the bead you gave, the story you told.
- * Then "Continue as <heir>" (the band goes on) or "Return to the title".
+ * Then "Continue as <heir>" (the grandchild nearest six; the band goes on) or "Return to the title".
  */
 import { useEffect, useState, type ReactNode } from 'react'
 import { bridge, useBridge } from '~/game/bridge'
@@ -136,9 +136,12 @@ export function SummaryScreen() {
         </div>
         <nav className="mt-4 flex animate-ui-rise flex-col items-start gap-2" style={{ animationDelay: '1600ms' }}>
           {s.heirName && (
-            <MenuButton primary onClick={() => bridge.actions.summaryContinue(true)}>
-              Continue as {s.heirName}
-            </MenuButton>
+            <div>
+              <MenuButton primary onClick={() => bridge.actions.summaryContinue(true)}>
+                Continue as {s.heirName}
+              </MenuButton>
+              <p className="-mt-0.5 mb-1 font-sans text-[13.5px] text-bone-dim">Your grandchild. The band goes on.</p>
+            </div>
           )}
           <MenuButton onClick={() => bridge.actions.summaryContinue(false)}>Return to the title</MenuButton>
         </nav>
