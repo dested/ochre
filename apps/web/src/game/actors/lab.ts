@@ -2,7 +2,7 @@
  * /lab/people: the fixed cast on a warm ground disc under a golden-hour key and a sky-blue fill. Orbit camera,
  * an anim picker, an age slider for the selected person, close-ups that frame a face at 40 cm, and (DEV)
  * window.__lab = { anim, age, closeup, lineup, select, talk, carry, held, cam, count } for bx. ?crowd=N adds N walkers
- * in circles for the budget test.
+ * in circles for the budget test; ?animals=1 swaps in the animal lab (animal-lab.ts).
  */
 import {
   ACESFilmicToneMapping,
@@ -23,6 +23,7 @@ import type { CarrySlot, HeldItem, PersonActor, PersonAnim } from '../contracts'
 import { createHost } from '../engine/host'
 import { LAB_CAST, LAB_INFANT } from './cast'
 import { createPerson } from './person'
+import { mountAnimals } from './animal-lab'
 import { randomLook } from './looks'
 import { Rng } from '~/core/rng'
 
@@ -59,6 +60,7 @@ const SPACING = 0.82
 type Walker = { actor: PersonActor; home: Vector3; radius: number; angle: number; walkSpeed: number }
 
 export function mount(el: HTMLElement): () => void {
+  if (new URLSearchParams(window.location.search).get('animals')) return mountAnimals(el)
   const host = createHost(el)
   const renderer = host.renderer
   renderer.toneMapping = ACESFilmicToneMapping
