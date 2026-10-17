@@ -68,6 +68,12 @@ const INTERACT_RADIUS = 2.5
 const TAG_RANGE = 25
 const GAZE_CONE = (6 * Math.PI) / 180
 const GAZE_RANGE = 7
+/** name tags: screen safe margin, approximate box, how many at once, and the held-face cutoff */
+const TAG_MARGIN = 48
+const TAG_BOX_W = 120
+const TAG_BOX_H = 40
+const MAX_TAGS = 6
+const HELD_FACE_RANGE = 1.2
 
 function smooth(a: number, b: number, x: number): number {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)))
@@ -310,8 +316,9 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
 
   const updateTags = (player: SimPerson) => {
     const { width, height } = deps.viewport()
-    const tags: NameTag[] = []
     const heldStage = player.carriedBy !== null
+    type Candidate = { tag: NameTag; d: number }
+    const cands: Candidate[] = []
     for (const q of sim.state.people) {
       if (q.isPlayer || q.carriedBy || !q.alive) continue
       if (heldStage && !q.known) continue
@@ -319,22 +326,45 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       if (!a) continue
       a.headPosition(tmp)
       const d = tmp.distanceTo(camera.position)
-      if (d > TAG_RANGE) continue
+      // the face filling an infant's view gets no tag: the face toast carries that moment
+      if (d > TAG_RANGE || (heldStage && d < HELD_FACE_RANGE)) continue
       tmp.y += heldStage ? 0.22 : 0.32
       tmp.project(camera)
       if (tmp.z > 1 || tmp.z < -1 || Math.abs(tmp.x) > 1.1 || Math.abs(tmp.y) > 1.1) continue
       const speaking = q.speech && q.speech.until > sim.state.clock.t ? q.speech.text : null
-      tags.push({
-        id: q.id,
-        name: q.name,
-        relation: relationOf(q.id),
-        x: ((tmp.x + 1) / 2) * width,
-        y: ((1 - tmp.y) / 2) * height,
-        bond: q.bond,
-        opacity: 1 - smooth(heldStage ? 3 : 12, heldStage ? 7 : TAG_RANGE, d),
-        speaking,
+      cands.push({
+        d,
+        tag: {
+          id: q.id,
+          name: q.name,
+          relation: relationOf(q.id),
+          x: Math.min(width - TAG_MARGIN, Math.max(TAG_MARGIN, ((tmp.x + 1) / 2) * width)),
+          y: Math.min(height - TAG_MARGIN, Math.max(TAG_MARGIN, ((1 - tmp.y) / 2) * height)),
+          bond: q.bond,
+          opacity: 1 - smooth(heldStage ? 3 : 12, heldStage ? 7 : TAG_RANGE, d),
+          speaking,
+        },
       })
     }
+    // declutter: nearest first, at most MAX_TAGS plus anyone speaking; an overlapping farther tag nudges up a
+    // line when both are close, otherwise it drops out
+    cands.sort((a, b) => a.d - b.d)
+    const placed: Candidate[] = []
+    const overlaps = (t: NameTag) =>
+      placed.some((p) => Math.abs(p.tag.x - t.x) < TAG_BOX_W && Math.abs(p.tag.y - t.y) < TAG_BOX_H)
+    let quiet = 0
+    for (const c of cands) {
+      if (!c.tag.speaking && quiet >= MAX_TAGS) continue
+      if (overlaps(c.tag)) {
+        const near = c.d < 8 && placed.some((p) => p.d < 8)
+        const up = { ...c.tag, y: Math.max(TAG_MARGIN, c.tag.y - TAG_BOX_H) }
+        if (!near || overlaps(up)) continue
+        c.tag = up
+      }
+      placed.push(c)
+      if (!c.tag.speaking) quiet++
+    }
+    const tags = placed.map((c) => c.tag)
     const prev = bridge.get().nameTags
     if (tags.length === 0 && prev.length === 0) return
     bridge.set({ nameTags: tags })
