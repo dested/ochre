@@ -793,7 +793,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       feed.reset()
       hunt.dispose()
       tracks.dispose()
-      spoor.root.removeFromParent()
+      spoor.dispose()
       cast.dispose()
       pipeline.setDream(0)
       pipeline.setFade(0)
