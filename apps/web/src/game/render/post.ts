@@ -86,11 +86,26 @@ void main() {
 	float fogK = 1.0 + uWeather.z * 9.0 + uWeather.y * 3.0;
 	float od = ocHeightFog( dist, yc, yp, uHaze.x, uHaze.y ) * fogK;
 	od += ocHeightFog( dist, yc, yp, uHaze.z, 9.0 ) * fogK;
-	// lagoon mist at dawn: a low bank over the water and the valley floor
+	// lagoon mist at dawn: a low bank lying on the water and the valley floor, torn into drifting banks, lit from
+	// behind by the low sun
+	float Tm = 1.0;
+	vec3 mistCol = vec3( 0.0 );
 	if ( uHaze.w > 0.001 ) {
-		float ld = length( ( wp.xz - uLagoon.xy ) / vec2( 1.6, 1.0 ) ) / uLagoon.z;
-		float lk = 1.0 - smoothstep( 0.4, 1.3, ld );
-		od += ocHeightFog( dist, yc - 0.5, yp - 0.5, uHaze.w * lk * 0.02, 3.5 );
+		float mc = uCamPos.y - 0.45;
+		float mp = wp.y - 0.45;
+		// where the ray passes through the bank's middle (or halfway, from inside it)
+		float tm = mc > 2.5 ? clamp( ( mc - 2.5 ) / max( mc - mp, 1e-3 ), 0.0, 1.0 ) : 0.5;
+		vec2 mx = uCamPos.xz + d.xz * tm;
+		float ld = length( ( mx - uLagoon.xy ) / vec2( 1.6, 1.0 ) ) / uLagoon.z;
+		float lk = 1.0 - smoothstep( 0.45, 1.5, ld );
+		vec2 drift = uWind.xz * uTime * ( 0.3 + uWind.y * 2.0 ) + vec2( uTime * 0.25, uTime * 0.1 );
+		float n = ocFbm( ( mx - drift ) * 0.016 ) * 0.7 + ocNoise( ( mx - drift * 1.6 ) * 0.05 ) * 0.3;
+		float bank = smoothstep( 0.32, 0.7, n );
+		float mod_ = ocHeightFog( dist, mc, mp, uHaze.w * lk * 0.06 * bank, 3.0 );
+		// never a white-out: far shapes always ghost through
+		Tm = exp( - min( mod_, 2.2 ) );
+		float fwd = pow( max( dot( dir, uSunDir ), 0.0 ), 5.0 );
+		mistCol = ocSkyBase( normalize( vec3( dir.x, 0.04, dir.z ) ) ) * 1.15 + uSunGlow * fwd * 0.6;
 	}
 	float T = exp( - od );
 	// the air takes the colour of the sky: a thin veil is the deep blue overhead (dark land goes blue, as a painter
@@ -98,7 +113,8 @@ void main() {
 	vec3 sdBlue = normalize( vec3( dir.x * 0.6, 0.62, dir.z * 0.6 ) );
 	vec3 sdLow = normalize( vec3( dir.x, max( dir.y, 0.0 ) * 0.6 + 0.06, dir.z ) );
 	vec3 inscatter = mix( ocSkyBase( sdBlue ) * 0.9, ocSkyBase( sdLow ), smoothstep( 0.3, 1.0, 1.0 - T ) );
-	gl_FragColor = vec4( ocRainVeil( sc.rgb * T + inscatter * ( 1.0 - T ), smoothstep( 12.0, 70.0, dist ) ), 1.0 );
+	vec3 c = sc.rgb * Tm + mistCol * ( 1.0 - Tm );
+	gl_FragColor = vec4( ocRainVeil( c * T + inscatter * ( 1.0 - T ), smoothstep( 12.0, 70.0, dist ) ), 1.0 );
 }
 `
 
