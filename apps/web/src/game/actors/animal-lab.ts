@@ -1,13 +1,14 @@
 /**
  * /lab/people?animals=1: every animal kind in a lineup on a warm ground under the golden-hour key, the stranded
- * whale behind, and a herd of 12 eland circling the lineup (walking, grazing, running or a mix). An anim picker
- * drives the lineup; (DEV) window.__lab = { anim, herd, view, focus, cam, perf } for bx.
+ * whale behind, and a herd of 12 eland circling out beyond the whale (walking, grazing, running or a mix). An anim
+ * picker drives the lineup; (DEV) window.__lab = { anim, herd, view, focus, cam, perf } for bx.
  */
 import { ACESFilmicToneMapping, CircleGeometry, Color, DirectionalLight, Fog, HemisphereLight, Mesh, MeshStandardMaterial, PCFShadowMap, PerspectiveCamera, Scene, Vector3 } from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import type { AnimalActor, AnimalAnim, AnimalKind } from '../contracts'
 import { createHost } from '../engine/host'
 import { createAnimal } from './animals'
+import { clamp } from './geo'
 import { Rng } from '~/core/rng'
 
 const ANIMS: AnimalAnim[] = ['idle', 'walk', 'run', 'graze', 'alert', 'lie', 'swim', 'fly', 'fall', 'dead']
@@ -29,7 +30,7 @@ const LINEUP: { kind: AnimalKind; seed: number; room: number; y?: number; fly?: 
 ]
 
 type Member = { actor: AnimalActor; x: number; y: number; fly: boolean; room: number }
-type Grazer = { actor: AnimalActor; radius: number; angle: number; speed: number; mode: AnimalAnim; next: number; dir: number }
+type Grazer = { actor: AnimalActor; lane: number; angle: number; speed: number; mode: AnimalAnim; next: number }
 
 export function mountAnimals(el: HTMLElement): () => void {
   const host = createHost(el)
@@ -53,15 +54,18 @@ export function mountAnimals(el: HTMLElement): () => void {
   const hemi = new HemisphereLight(new Color('#9ec3ea'), new Color('#8a5a36'), 1.15)
   scene.add(hemi)
   const key = new DirectionalLight(new Color('#ffc988'), 3.1)
-  key.position.set(-14, 10, 17)
+  // aimed between the lineup and the herd so one shadow map covers both
+  key.position.set(-14, 10, 3)
+  key.target.position.set(0, 0, -14)
+  scene.add(key.target)
   key.castShadow = true
   key.shadow.mapSize.set(2048, 2048)
-  key.shadow.camera.left = -22
-  key.shadow.camera.right = 22
-  key.shadow.camera.top = 18
-  key.shadow.camera.bottom = -14
+  key.shadow.camera.left = -30
+  key.shadow.camera.right = 30
+  key.shadow.camera.top = 26
+  key.shadow.camera.bottom = -26
   key.shadow.camera.near = 1
-  key.shadow.camera.far = 70
+  key.shadow.camera.far = 90
   key.shadow.bias = -0.0008
   key.shadow.normalBias = 0.09
   scene.add(key)
@@ -97,14 +101,27 @@ export function mountAnimals(el: HTMLElement): () => void {
   whale.object.rotation.y = -Math.PI / 2 + 0.25
   scene.add(whale.object)
 
-  // the herd circles the lineup
+  // the herd drifts as one loose group along a wide circle out beyond the whale, so the lineup stays clear and the
+  // herd reads in depth behind it: four lanes of three, each eland keeping its place by the group's centre
+  const HERD_Z = -32
+  const HERD_R = 16
   const herd: Grazer[] = []
   const rng = new Rng(31)
   for (let i = 0; i < 12; i++) {
     const a = createAnimal('eland', 100 + i * 7)
     scene.add(a.object)
-    herd.push({ actor: a, radius: 13 + rng.range(-2.5, 2.5) + (i % 3) * 1.2, angle: (i / 12) * Math.PI * 1.1 + rng.range(-0.1, 0.1), speed: 0, mode: 'walk', next: rng.range(2, 8), dir: 1 })
+    const lane = ((i % 4) - 1.5) * 1.9 + rng.range(-0.3, 0.3)
+    const angle = Math.PI + ((Math.floor(i / 4) - 1) * 4.5 + (i % 2) * 2 + rng.range(-0.6, 0.6)) / HERD_R
+    herd.push({ actor: a, lane, angle, speed: 0, mode: 'walk', next: rng.range(2, 8) })
   }
+  const herdCentre = (out: Vector3): Vector3 => {
+    out.set(0, 0, 0)
+    for (const h of herd) out.add(h.actor.object.position)
+    return out.multiplyScalar(1 / Math.max(1, herd.length))
+  }
+  const centre = herdCentre(new Vector3())
+  const lastCentre = centre.clone()
+  let follow = false
   let herdMode: HerdMode = 'mixed'
   const setHerd = (mode: HerdMode): void => {
     herdMode = mode
@@ -119,24 +136,37 @@ export function mountAnimals(el: HTMLElement): () => void {
   let anim: AnimalAnim = 'idle'
   const setAnim = (a: AnimalAnim): void => {
     anim = a
-    for (const m of members) m.actor.setAnim(m.fly && (a === 'idle' || a === 'walk' || a === 'run') ? 'fly' : a, 0.3)
+    for (const m of members) {
+      const flying = m.fly && (a === 'idle' || a === 'walk' || a === 'run' || a === 'fly')
+      m.actor.setAnim(flying ? 'fly' : a, 0.3)
+      // the flying gull comes down to the sand for everything else
+      m.actor.object.position.y = flying ? m.y : 0
+    }
     whale.setAnim(a === 'swim' || a === 'dead' || a === 'fall' || a === 'alert' ? a : 'idle', 0.5)
   }
 
   type View = 'lineup' | 'herd' | 'whale' | 'wide'
   const view = (v: View): void => {
+    follow = v === 'herd'
     if (v === 'lineup') {
-      camera.position.set(0, 2.3, 15)
-      controls.target.set(0, 0.7, 0)
+      camera.position.set(0, 2.6, 21.5)
+      controls.target.set(0, 0.8, 0)
     } else if (v === 'herd') {
-      camera.position.set(-6, 3.2, 26)
-      controls.target.set(0, 0.8, 9)
+      // a three-quarter view of the group from inside its circle (open ground behind it); the camera then rides along
+      herdCentre(centre)
+      lastCentre.copy(centre)
+      const ox = centre.x
+      const oz = centre.z - HERD_Z
+      const ol = Math.hypot(ox, oz) || 1
+      camera.position.set(centre.x - (ox / ol) * 19 + (oz / ol) * 6, 3.4, centre.z - (oz / ol) * 19 - (ox / ol) * 6)
+      controls.target.set(centre.x, 0.9, centre.z)
     } else if (v === 'whale') {
-      camera.position.set(9, 4, 9)
-      controls.target.set(1, 1.2, -9)
+      // three-quarters from the front, from behind the lineup: the head is what reads
+      camera.position.set(-12, 4.5, -1.5)
+      controls.target.set(-1, 1.2, -8.5)
     } else {
-      camera.position.set(0, 16, 36)
-      controls.target.set(0, 0, 0)
+      camera.position.set(0, 24, 32)
+      controls.target.set(0, 0, -12)
     }
     controls.update()
   }
@@ -180,7 +210,12 @@ export function mountAnimals(el: HTMLElement): () => void {
   for (const v of ['lineup', 'herd', 'whale', 'wide'] as const) btn(viewRow, v, () => view(v))
   el.append(panel)
 
-  const perf = { n: 0, update: 0, render: 0, dt: 0 }
+  const perf = { n: 0, update: 0, render: 0, dt: 0, gpu: 0, gpuN: 0 }
+  // (DEV) GPU time per frame from timer queries: the bx browser shares its GPU, so fps alone says little
+  const ctx = renderer.getContext()
+  const gl = ctx instanceof WebGL2RenderingContext ? ctx : null
+  const timer = import.meta.env.DEV && gl ? gl.getExtension('EXT_disjoint_timer_query_webgl2') : null
+  const queries: WebGLQuery[] = []
   const api = {
     anim: (name: string) => {
       const a = ANIMS.find((x) => x === name)
@@ -202,11 +237,13 @@ export function mountAnimals(el: HTMLElement): () => void {
     count: () => members.length + herd.length + 1,
     perf: () => {
       const n = Math.max(1, perf.n)
-      const r = { update: perf.update / n, render: perf.render / n, fps: perf.n / Math.max(1e-3, perf.dt) }
+      const r = { update: perf.update / n, render: perf.render / n, gpu: perf.gpu / Math.max(1, perf.gpuN), fps: perf.n / Math.max(1e-3, perf.dt) }
       perf.n = 0
       perf.update = 0
       perf.render = 0
       perf.dt = 0
+      perf.gpu = 0
+      perf.gpuN = 0
       return r
     },
   }
@@ -218,23 +255,54 @@ export function mountAnimals(el: HTMLElement): () => void {
     const lineSpeed = anim === 'walk' ? 1 : anim === 'run' ? 3 : anim === 'swim' ? 1 : 0
     for (const m of members) m.actor.setSpeed(m.fly ? 9 : lineSpeed)
     whale.setSpeed(anim === 'swim' ? 2 : 0)
+    let sx = 0
+    let sy = 0
     for (const h of herd) {
-      // in the mix each eland changes its mind now and then
+      sx += Math.cos(h.angle)
+      sy += Math.sin(h.angle)
+    }
+    const mean = Math.atan2(sy, sx)
+    for (const h of herd) {
+      // metres behind (+) or ahead (-) of the group's centre along the path
+      const gap = Math.atan2(Math.sin(mean - h.angle), Math.cos(mean - h.angle)) * HERD_R
+      // in the mix each eland changes its mind now and then; stragglers walk to catch up, leaders stop to graze
       if (herdMode === 'mixed') {
         h.next -= dt
+        let mode = h.mode
         if (h.next <= 0) {
           const r = rng.next()
-          h.mode = r < 0.45 ? 'graze' : r < 0.85 ? 'walk' : r < 0.95 ? 'alert' : 'idle'
-          h.actor.setAnim(h.mode, 0.5)
+          mode = r < 0.45 ? 'graze' : r < 0.85 ? 'walk' : r < 0.95 ? 'alert' : 'idle'
           h.next = rng.range(4, 12)
         }
+        if (gap > 5) mode = 'walk'
+        else if (gap < -5 && mode === 'walk') mode = 'graze'
+        if (mode !== h.mode) {
+          h.mode = mode
+          h.actor.setAnim(mode, 0.5)
+        }
       }
-      const target = h.mode === 'run' ? runSpeed : h.mode === 'walk' ? walkSpeed : h.mode === 'graze' ? 0.12 : 0
+      let target = h.mode === 'run' ? runSpeed : h.mode === 'walk' ? walkSpeed : h.mode === 'graze' ? 0.12 : 0
+      if (h.mode === 'walk' || h.mode === 'run') target *= 1 + clamp(gap * 0.06, -0.3, 0.4)
+      // never walk up the back of the one ahead in the same lane
+      for (const o of herd) {
+        if (o === h || Math.abs(o.lane - h.lane) > 1) continue
+        const ahead = Math.atan2(Math.sin(o.angle - h.angle), Math.cos(o.angle - h.angle)) * HERD_R
+        if (ahead > 0 && ahead < 3.6) target = Math.min(target, o.speed * clamp((ahead - 2.6) / 1, 0, 1))
+      }
       h.speed += (target - h.speed) * (1 - Math.exp(-2 * dt))
-      h.angle += (h.speed / h.radius) * dt
-      h.actor.object.position.set(Math.cos(h.angle) * h.radius, 0, Math.sin(h.angle) * h.radius)
-      h.actor.object.rotation.y = Math.atan2(-Math.sin(h.angle), Math.cos(h.angle)) + Math.PI
+      h.angle += (h.speed / (HERD_R + h.lane)) * dt
+      const r = HERD_R + h.lane
+      h.actor.object.position.set(Math.cos(h.angle) * r, 0, HERD_Z + Math.sin(h.angle) * r)
+      // facing along the path: the tangent of a growing angle
+      h.actor.object.rotation.y = Math.atan2(-Math.sin(h.angle), Math.cos(h.angle))
       h.actor.setSpeed(h.speed)
+    }
+    if (follow) {
+      herdCentre(centre)
+      const step = lastCentre.sub(centre).negate()
+      camera.position.add(step)
+      controls.target.add(step)
+      lastCentre.copy(centre)
     }
     const t0 = performance.now()
     for (const m of members) m.actor.update(dt)
@@ -242,7 +310,23 @@ export function mountAnimals(el: HTMLElement): () => void {
     whale.update(dt)
     const t1 = performance.now()
     controls.update()
+    const q = gl && timer && queries.length < 4 ? gl.createQuery() : null
+    if (gl && timer && q) gl.beginQuery(timer.TIME_ELAPSED_EXT, q)
     renderer.render(scene, camera)
+    if (gl && timer && q) {
+      gl.endQuery(timer.TIME_ELAPSED_EXT)
+      queries.push(q)
+    }
+    while (gl && timer) {
+      const head = queries[0]
+      if (!head || !gl.getQueryParameter(head, gl.QUERY_RESULT_AVAILABLE)) break
+      if (!gl.getParameter(timer.GPU_DISJOINT_EXT)) {
+        perf.gpu += Number(gl.getQueryParameter(head, gl.QUERY_RESULT)) / 1e6
+        perf.gpuN++
+      }
+      gl.deleteQuery(head)
+      queries.shift()
+    }
     const t2 = performance.now()
     perf.n++
     perf.update += t1 - t0
