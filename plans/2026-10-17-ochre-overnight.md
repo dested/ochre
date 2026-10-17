@@ -415,6 +415,11 @@ controller, cameras and verbs that make each stage of life feel different; and t
   then the sources from the Field Notes, grouped. (c) The loading screen: a painting and a real progress line.
   (d) A pass over every screen at 1920×1080 and 1280×800. Applies to: ui.
 
+- (2026-10-17 01:45, lead) **The heir is the grandchild nearest 6**, not a child (the elder's children are 23–32).
+  continue-as-heir starts Small with that grandchild, the band ages to match and the old player is dead.
+  `LifeSummary.heirName` carries the grandchild; the summary button reads "Continue as <heirName>". The design doc
+  is updated. Applies to: sim, ui, play.
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: 2078087 (main, 01:15) · Gate: install 0, typecheck 0, test 0 at 2078087 · Deploy: 2078087 live at https://ochre.dested.com (CI 39016003224 green)

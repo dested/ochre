@@ -11,7 +11,7 @@ You are born in a cave above the sea at the southern tip of Africa, around 80,00
 exactly like the person playing: the same body, the same mind, the same fear of the dark. The world around you
 is completely different. You live one whole life, from being carried on your mother's back to being the old one
 who tells the stories at the fire. Each stage of life plays differently (the Spore idea, applied to one human
-life). When you die, you go on as your child, carrying what you taught them.
+life). When you die, you go on as your grandchild, carrying what you taught them.
 
 The game is about **understanding**: why these people did what they did, and how anyone survived. Every system
 is grounded in real archaeology (Blombos Cave, Pinnacle Point, Klasies River, Sibudu, Panga ya Saidi), and the
@@ -186,7 +186,8 @@ day around you. Beats fire on day triggers:
    hear it learn that skill · unlock `stories`.
 3. **The last walk** · objective: "Walk down to the sea" · slow walk, no HUD, dawn. Sit at the shore (E).
    Fade to the **Life summary**: years lived, children, what you taught, the bead you gave, the story you told.
-   Then: "Continue as <child name>" (starts stage 2 as your child, keeping the band) or "Return to the title".
+   Then: "Continue as <grandchild name>" (starts stage 2 as the grandchild nearest 6, keeping the band, everyone
+   aged to match) or "Return to the title".
 
 ## Visual direction ("painted light")
 
