@@ -47,7 +47,7 @@ export function createRuntime(
   const host = createHost(el)
   const pipeline = modules.createRenderPipeline(host.renderer)
   const scene = new Scene()
-  const camera = new PerspectiveCamera(60, 1, 0.05, 4000)
+  const camera = new PerspectiveCamera(60, 1, 0.1, 30000)
   const input = createInput(host.canvas)
   const base = modules.createAudio()
   const audio = opts.wrapAudio ? opts.wrapAudio(base) : base
