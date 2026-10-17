@@ -10,6 +10,7 @@ import type {
   ClockState,
   GameAudio,
   Interaction,
+  Hand,
   LifeStageId,
   LifeSummary,
   PersonActor,
@@ -129,6 +130,10 @@ const OCC_HIDE = 0.2
 const HEAD_HIDE = 0.3
 /** fade level past which tags and the prompt hide, and how far a face is made out at night */
 const FADE_HIDE = 0.3
+/** name tags anchor this far above the head top, metres */
+const TAG_ABOVE = 0.15
+/** looking within this of what she offers counts as looking at it, radians */
+const REACH_CONE = 0.35
 /** an interaction this close to the objective's point is the beat's work, metres */
 const GOAL_NEAR = 6
 const DARK_RANGE = 10
@@ -524,30 +529,40 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     }
     sim.command({ type: 'gaze', personId: best?.id ?? null, dt })
 
-    // reach: LMB while looking roughly at what she offers
+    // reach: what she offers is in her hand; the gaze drifts to it, and looking at it enables the reach (E or click)
     const list = sim.interactionsNear(player.position, INTERACT_RADIUS)
     const reach = list.find((i) => i.verb === 'reach' && i.enabled)
-    held.attract = reach
-      ? reachAt.set(
-          reach.position.x,
-          world.heightAt(reach.position.x, reach.position.z) + 0.8,
-          reach.position.z
-        )
-      : null
+    const hand: Hand =
+      carrier.held.left !== 'none' && carrier.held.right === 'none' ? 'left' : 'right'
+    if (reach && carrierActor) carrierActor.handPosition(hand, reachAt)
+    else if (reach)
+      reachAt.set(
+        reach.position.x,
+        world.heightAt(reach.position.x, reach.position.z) + 0.8,
+        reach.position.z
+      )
+    held.attract = reach ? reachAt : null
     if (reach) {
       tmp2.copy(reachAt).sub(camera.position)
-      const looking = fwd.angleTo(tmp2) < 0.5
+      const looking = fwd.angleTo(tmp2) < REACH_CONE
       setPrompt({
-        label: looking ? 'Reach' : 'Look at what she offers',
-        key: 'LMB',
+        label: looking ? 'Reach for it' : 'Look at what she offers',
+        key: 'E',
         holdSeconds: 0,
         holdProgress: 0,
         enabled: looking,
-        reason: null,
+        reason: looking ? null : 'Turn to look at her hand',
       })
-      if (looking && input.mouse.lmbPressed)
+      if (looking && (input.mouse.lmbPressed || input.pressed('KeyE')))
         sim.command({ type: 'interact', interactionId: reach.id })
     } else setPrompt(null)
+  }
+
+  const talked = new Set<string>()
+  let talkedBeat = ''
+  const act = (it: Interaction) => {
+    sim.command({ type: 'interact', interactionId: it.id })
+    if (it.verb === 'talk') talked.add(it.targetId)
   }
 
   const updateInteract = (dt: number, player: SimPerson) => {
@@ -562,12 +577,20 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       i.verb !== 'talk' &&
       Math.hypot(i.position.x - place.x, i.position.z - place.z) < GOAL_NEAR
     const hungry = player.needs.fed < 0.5
+    // someone already talked to this beat steps back, so the prompt moves on to the next person (or the work)
+    const beatNow = sim.state.chapter.beatId
+    if (beatNow !== talkedBeat) {
+      talkedBeat = beatNow
+      talked.clear()
+    }
+    const fresh = (i: Interaction) => i.verb !== 'talk' || !talked.has(i.targetId)
     const it =
       list.find((i) => i.enabled && i.id.startsWith('dir:')) ??
       list.find((i) => i.enabled && i.targetKind === 'person' && i.targetId === goal) ??
       list.find((i) => i.enabled && atPlace(i)) ??
       (hungry ? list.find((i) => i.enabled && i.verb === 'eat') : undefined) ??
       list.find((i) => i.enabled && i.verb !== 'eat' && i.verb !== 'talk') ??
+      list.find((i) => i.enabled && i.verb !== 'eat' && fresh(i)) ??
       list.find((i) => i.enabled && i.verb !== 'eat') ??
       list.find((i) => i.enabled) ??
       list[0] ??
@@ -587,13 +610,13 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     if (it.enabled && !holdLatch) {
       if (it.holdSeconds <= 0) {
         if (input.pressed('KeyE')) {
-          sim.command({ type: 'interact', interactionId: it.id })
+          act(it)
           holdLatch = true
         }
       } else if (input.down('KeyE')) {
         holdT += dt
         if (holdT >= it.holdSeconds) {
-          sim.command({ type: 'interact', interactionId: it.id })
+          act(it)
           holdT = 0
           holdLatch = true
         }
@@ -697,7 +720,8 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       if (d > TAG_RANGE || (heldStage && d < HELD_FACE_RANGE)) continue
       head.copy(tmp)
       head.y += 0.1
-      tmp.y += heldStage ? 0.22 : 0.32
+      // the tag's anchor sits TAG_ABOVE over the head top (about 0.1 m above the eyes)
+      tmp.y += heldStage ? 0.22 : 0.1 + TAG_ABOVE
       tmp.project(camera)
       if (tmp.z > 1 || tmp.z < -1 || Math.abs(tmp.x) > 1.1 || Math.abs(tmp.y) > 1.1) continue
       // a person out of sight loses their tag after OCC_HIDE (faded by the UI, then dropped)

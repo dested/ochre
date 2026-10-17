@@ -49,6 +49,9 @@ export function createInput(canvas: HTMLCanvasElement): Input {
   const lockLost = new Set<() => void>()
   let releasing = false
   let dragging = false
+  /** the last pointer position while dragging unlocked (synthetic and some trackpad drags carry no movementX) */
+  let lastX: number | null = null
+  let lastY = 0
 
   const input: Input = {
     down: (c) => input.enabled && held.has(c),
@@ -124,6 +127,8 @@ export function createInput(canvas: HTMLCanvasElement): Input {
       mouse.rmbPressed = true
     }
     dragging = true
+    lastX = e.clientX
+    lastY = e.clientY
     if (input.wantLock) input.requestLock()
   }
   const onMouseUp = (e: MouseEvent) => {
@@ -133,10 +138,16 @@ export function createInput(canvas: HTMLCanvasElement): Input {
   }
   const onMouseMove = (e: MouseEvent) => {
     if (!input.enabled) return
-    if (document.pointerLockElement === canvas || dragging) {
+    // raw pixels, never scaled by frame time: locked, the browser's movement; unlocked, the pointer's own travel
+    if (document.pointerLockElement === canvas) {
       mouse.dx += e.movementX
       mouse.dy += e.movementY
+    } else if (dragging && lastX !== null) {
+      mouse.dx += e.clientX - lastX
+      mouse.dy += e.clientY - lastY
     }
+    lastX = e.clientX
+    lastY = e.clientY
   }
   const onWheel = (e: WheelEvent) => {
     if (!input.enabled) return

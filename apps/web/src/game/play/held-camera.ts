@@ -20,6 +20,16 @@ const FORWARD_IDLE = 2
 const FORWARD_RATE = 0.8
 /** forward on the back: just outside her head, on the infant's side */
 const FORWARD_YAW = 0.12
+/**
+ * cradled, the view sits out in front of her face and a little below it, so her face is up at ~30° with the
+ * horizon level (straight up at it, the view rolls and her hair crosses the lens)
+ */
+const CRADLE_OUT = 0.42
+const CRADLE_DROP = 0.22
+/** her body as a post under her head, for keeping a downward look out of it */
+const BODY_RADIUS = 0.34
+const BODY_BELOW_FACE = 0.12
+const BODY_REACH = 1.6
 
 export type HeldCamera = {
   /** relative to the carrier's heading */
@@ -69,8 +79,9 @@ export function createHeldCamera(): HeldCamera {
     update(dt, input, camera, eye, carrierHeading, carrierSpeed, settings, slot, face) {
       // cradled in the arms the infant faces the carrier
       const facing = slot === 'arms' ? carrierHeading + Math.PI : carrierHeading
-      // cradled, her face is almost straight above: the infant can look right up at it
-      const pitchMin = slot === 'arms' ? -1.45 : -0.9
+      // cradled, her face is above the view: up far enough to take it in, never straight up
+      const pitchMin = slot === 'arms' ? -0.8 : -0.9
+      const pitchMax = slot === 'arms' ? 0.6 : 1.0
       if (slot !== lastSlot) {
         // on the back: peek over the shoulder; in the arms: looking up into the carrier's face
         cam.yaw = slot === 'back' ? FORWARD_YAW : 0
@@ -82,7 +93,7 @@ export function createHeldCamera(): HeldCamera {
           let yaw = Math.atan2(dx, dz) - facing
           yaw = Math.atan2(Math.sin(yaw), Math.cos(yaw))
           cam.yaw = MathUtils.clamp(yaw, -cam.cone, cam.cone)
-          cam.pitch = MathUtils.clamp(-Math.atan2(dy, Math.hypot(dx, dz)), pitchMin, 1.0)
+          cam.pitch = MathUtils.clamp(-Math.atan2(dy, Math.hypot(dx, dz)), pitchMin, pitchMax)
         }
         lastSlot = slot
       }
@@ -96,7 +107,7 @@ export function createHeldCamera(): HeldCamera {
         const tp = MathUtils.clamp(
           -Math.atan2(cam.attract.y - eye.y, Math.hypot(dx, dz)),
           pitchMin,
-          1.0
+          pitchMax
         )
         const step = Math.min(1, dt * ATTRACT_RATE)
         cam.yaw += (ty - cam.yaw) * step
@@ -112,14 +123,20 @@ export function createHeldCamera(): HeldCamera {
       cam.pitch = MathUtils.clamp(
         cam.pitch + input.mouse.dy * k * (settings.invertY ? -1 : 1),
         pitchMin,
-        1.0
+        pitchMax
       )
       // on the back: beside her head, on the side the infant is turned to
       if (cam.yaw > 0.15) side = 1
       else if (cam.yaw < -0.15) side = -1
       sideEase += (side - sideEase) * Math.min(1, dt * 3)
       eyeWant.copy(eye)
-      if (slot === 'back') {
+      if (slot === 'arms' && face) {
+        eyeWant.set(
+          face.x + Math.sin(carrierHeading) * CRADLE_OUT,
+          face.y - CRADLE_DROP,
+          face.z + Math.cos(carrierHeading) * CRADLE_OUT
+        )
+      } else if (slot === 'back') {
         eyeWant.x += Math.cos(carrierHeading) * SHOULDER_SIDE * sideEase
         eyeWant.z -= Math.sin(carrierHeading) * SHOULDER_SIDE * sideEase
         eyeWant.y += SHOULDER_UP
@@ -144,6 +161,24 @@ export function createHeldCamera(): HeldCamera {
       const breath = Math.sin(phase * 0.35) * 0.004
 
       const yaw = smoothHeading + cam.yaw
+      // looking down never enters her body: lift the gaze until it clears the post under her head
+      if (face) {
+        const top = face.y - BODY_BELOW_FACE
+        // march the first BODY_REACH of the gaze: any sample inside the post (shoulders, back, sling) is too low
+        const into = (pitch: number) => {
+          const dx = Math.sin(yaw) * Math.cos(pitch)
+          const dy = -Math.sin(pitch)
+          const dz = Math.cos(yaw) * Math.cos(pitch)
+          for (let s = 0.05; s <= BODY_REACH; s += 0.05) {
+            if (eyeSmooth.y + dy * s > top) continue
+            const hx = eyeSmooth.x + dx * s - face.x
+            const hz = eyeSmooth.z + dz * s - face.z
+            if (hx * hx + hz * hz < BODY_RADIUS * BODY_RADIUS) return true
+          }
+          return false
+        }
+        while (cam.pitch > 0.15 && into(cam.pitch)) cam.pitch -= 0.03
+      }
       const p = cam.pitch
       camera.position.set(eyeSmooth.x, eyeSmooth.y + bob + breath, eyeSmooth.z)
       look
