@@ -81,6 +81,22 @@ vec3 ocShafts( vec3 ro, vec3 rd, float dist ) {
 	float phase = 0.2 + 0.35 * pow( mu, 1.5 ) + 0.9 * pow( mu, 8.0 );
 	return uKeyColor * acc * phase * uShafts.x * 0.014;
 }
+// how much of the ray from ro (length dist) runs inside the cave, behind the drip line, metres
+float ocCaveSpan( vec3 ro, vec3 rd, float dist ) {
+	vec2 o = ro.xz - uCave.xy;
+	vec3 lo = vec3( o.x * uCave.z + o.y * uCave.w, ro.y - uCave2.x, o.x * uCave.w - o.y * uCave.z );
+	vec3 ld = vec3( rd.x * uCave.z + rd.z * uCave.w, rd.y, rd.x * uCave.w - rd.z * uCave.z );
+	vec3 bmin = vec3( - uCave2.y - 2.0, - 1.0, - uCave2.z - 1.0 );
+	vec3 bmax = vec3( 0.5, uCave2.w + 1.5, uCave2.z + 1.0 );
+	vec3 safe = vec3( abs( ld.x ) < 1e-5 ? 1e-5 : ld.x, abs( ld.y ) < 1e-5 ? 1e-5 : ld.y, abs( ld.z ) < 1e-5 ? 1e-5 : ld.z );
+	vec3 t0 = ( bmin - lo ) / safe;
+	vec3 t1 = ( bmax - lo ) / safe;
+	vec3 tlo = min( t0, t1 );
+	vec3 thi = max( t0, t1 );
+	float tn = max( max( tlo.x, tlo.y ), max( tlo.z, 0.0 ) );
+	float tf = min( min( thi.x, thi.y ), min( thi.z, dist ) );
+	return max( tf - tn, 0.0 );
+}
 // rain beyond the streaks drawn in the world: fine slanted strokes falling down the screen, over the far land and
 // the sky only (k), a little lighter than what they cross, like a painter's dry-brushed veil
 vec3 ocRainVeil( vec3 c, float k ) {
@@ -136,6 +152,9 @@ void main() {
 	float fogK = 1.0 + uWeather.z * 9.0 + uWeather.y * 3.0;
 	float od = ocHeightFog( dist, yc, yp, uHaze.x, uHaze.y ) * fogK;
 	od += ocHeightFog( dist, yc, yp, uHaze.z, 9.0 ) * fogK;
+	// still air inside the cave: no distance haze behind the drip line, so the back wall keeps its colour (the
+	// fire's smoke is drawn on its own)
+	od *= 1.0 - 0.95 * clamp( ocCaveSpan( uCamPos, dir, dist ) / max( dist, 1e-3 ), 0.0, 1.0 );
 	// lagoon mist at dawn: a low bank lying on the water and the valley floor, torn into drifting banks, lit from
 	// behind by the low sun
 	float Tm = 1.0;

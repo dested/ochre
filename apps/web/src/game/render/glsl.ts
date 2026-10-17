@@ -313,6 +313,10 @@ vec3 ocAmbient( vec3 nw, vec3 wp ) {
 	amb = mix( amb, vec3( dot( amb, vec3( 0.3, 0.5, 0.2 ) ) ) * vec3( 1.15, 0.92, 0.7 ), ( 1.0 - cs ) * 0.85 );
 	// inside, the sunlit ground at the mouth bounces a warm light deep into the cave, most onto walls and roof
 	vec3 bounce = uKeyColor * vec3( 0.95, 0.72, 0.5 ) * ( 0.045 + 0.035 * ( 1.0 - up ) ) * ( 1.0 - cs );
-	return amb * cs + bounce + ocFireFill( uFireGlow, nw, wp ) + ocFireFill( uFireGlow2, nw, wp );
+	// and it comes in through the mouth: rock turned to the mouth catches it, rock turned away keeps its shade,
+	// so the back wall at 20 m holds its form instead of going one flat brown
+	float face = max( dot( nw, vec3( uCave.z, 0.0, uCave.w ) ), nw.y * 0.55 );
+	float dirK = mix( 1.0, 0.5 + 0.8 * smoothstep( - 0.7, 0.9, face ), 1.0 - cs );
+	return ( amb * cs + bounce ) * dirK + ocFireFill( uFireGlow, nw, wp ) + ocFireFill( uFireGlow2, nw, wp );
 }
 `
