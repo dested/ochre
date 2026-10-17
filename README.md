@@ -1,8 +1,8 @@
-# sal-starter
+# ochre
 
 An SSR React starter wired with a current, type-safe stack, plus an optional Expo iOS app that talks to the same server. Clone it, init it, ship.
 
-> Already have a project cloned from an older sal-starter? See [`MIGRATION.md`](./MIGRATION.md) to bring it up to date (it fixes some app-breaking bugs, and covers the move to this monorepo layout).
+> Already have a project cloned from an older ochre? See [`MIGRATION.md`](./MIGRATION.md) to bring it up to date (it fixes some app-breaking bugs, and covers the move to this monorepo layout).
 
 | layer              | choice                                                                                |
 | ------------------ | ------------------------------------------------------------------------------------- |
@@ -38,7 +38,7 @@ bun run dev                         # → http://localhost:<the port init printe
 
 `init` renames everything, writes `project.json` (the project's identity: name, scheme, bundle id, surfaces, ports, db), picks per-project ports and writes a fresh `.env` (web only). Surfaces you didn't ask for are deleted in their own commit ("init: web-only", "init: desktop-only", …); `bun run add:mobile` / `add:desktop` bring one back any time. `--port <n>` picks the API port yourself (Metro gets n + 1, the desktop renderer n + 2). `--fresh-git` wipes history instead, which also cuts you off from `sync`.
 
-**Ports:** every project gets its own distinct, uncommon pair and records it in `cliffnotes.md`. Never 3000/3001/5173/5174/8000/8080/4200/5000. The template uses 4780 (API) and 4781 (Metro).
+**Ports:** every project gets its own distinct, uncommon pair and records it in `cliffnotes.md`. Never 3000/3001/5173/5174/8000/8080/4200/5000. The template uses 4080 (API) and 4081 (Metro).
 
 **Pull template improvements later:**
 
@@ -55,7 +55,7 @@ All run from the repo root.
 
 | script                                   | what it does                                                              |
 | ---------------------------------------- | ------------------------------------------------------------------------- |
-| `bun run dev`                            | web (HMR + SSR on 4780) + Metro on 4781 if `apps/mobile` exists           |
+| `bun run dev`                            | web (HMR + SSR on 4080) + Metro on 4081 if `apps/mobile` exists           |
 | `bun run dev web` / `mobile` / `desktop` | just one of them                                                          |
 | `bun run init <name>`                    | rename the template, write `project.json` + `.env` (`--mobile`, `--port`) |
 | `bun run sync`                           | merge `upstream/main` into this fork without committing                   |
@@ -114,7 +114,7 @@ packages/native-example/ shared Expo module + config plugin (the template's nati
 
 The app runs as a **development build** (a dev client), never Expo Go. The workflow splits across two machines:
 
-- **Windows** (daily): editor, Postgres, `bun run dev` (API on 4780 + Metro on 4781). Allow inbound TCP 4780–4781 on the private network in Windows Firewall so the iPad can reach both.
+- **Windows** (daily): editor, Postgres, `bun run dev` (API on 4080 + Metro on 4081). Allow inbound TCP 4080–4081 on the private network in Windows Firewall so the iPad can reach both.
 - **Mac** (only when native code changes): `git pull`, `bun install`, then in `apps/mobile`: `bun run ios:prebuild` and `bun run ios:device` with the iPad plugged in. That compiles and installs the dev client; it does not start Metro.
 - **iPad**: open the dev client, scan the QR from Windows Metro (or pick the server from the list). JS changes hot-reload from Windows.
 
@@ -128,10 +128,10 @@ When do you need a new build? When the native fingerprint changes: run `bun run 
 
 ## Testing
 
-Playwright e2e lives in `apps/web/e2e/`. `bun run test:e2e` boots the app on port 3100 against an **isolated test database** (`sal_starter_test`), applies the committed migrations and truncates it, and runs the smoke suite (home, sign-up → dashboard → create post → sign-out, the 404 page). Visual baselines are committed under `e2e/__screenshots__/`; update them with `bun run test:e2e:update`.
+Playwright e2e lives in `apps/web/e2e/`. `bun run test:e2e` boots the app on port 3100 against an **isolated test database** (`ochre_test`), applies the committed migrations and truncates it, and runs the smoke suite (home, sign-up → dashboard → create post → sign-out, the 404 page). Visual baselines are committed under `e2e/__screenshots__/`; update them with `bun run test:e2e:update`.
 
 ```bash
-createdb sal_starter_test                       # once; global-setup migrates it
+createdb ochre_test                       # once; global-setup migrates it
 bun run test:e2e                                 # or E2E_DATABASE_URL=postgres://…/x_test bun run test:e2e
 ```
 

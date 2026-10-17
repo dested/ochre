@@ -1,6 +1,6 @@
-# Upgrading an existing sal-starter clone
+# Upgrading an existing ochre clone
 
-This repo (a project cloned from **sal-starter**) predates a round of bug fixes and
+This repo (a project cloned from **ochre**) predates a round of bug fixes and
 hardening in the template. This doc brings it up to date.
 
 Some of these are **correctness bugs that break the app** (auth returns 404, the
@@ -22,11 +22,11 @@ it matches, apply the **Fix**; then run **Verify**. Do them in order.
 
 > ⚠️ Your project was likely renamed (via `bun run init` or by hand). The Detect
 > commands below are name-agnostic. The new _files_ you copy from upstream still
-> say `sal-starter`/`sal_starter`/`Sal Starter` — search-and-replace those to your
+> say `ochre`/`ochre`/`Ochre` — search-and-replace those to your
 > project's name after copying (the same three tokens `bun run init` rewrites).
 
-**Upstream** = a fresh clone of the latest sal-starter. Keep one handy to copy new
-files from (`git clone <sal-starter-url> /tmp/sal-starter-upstream`).
+**Upstream** = a fresh clone of the latest ochre. Keep one handy to copy new
+files from (`git clone <ochre-url> /tmp/ochre-upstream`).
 
 ---
 
@@ -385,7 +385,7 @@ ignores).
 
 ## 21. Moving a single-package clone to the monorepo layout (v2)
 
-sal-starter is now a Bun workspace: the app lives in `apps/web/`, identity in
+ochre is now a Bun workspace: the app lives in `apps/web/`, identity in
 `project.json`, an optional Expo app in `apps/mobile/`. The last single-package
 version is tagged **`v1-single`** upstream. Two choices:
 

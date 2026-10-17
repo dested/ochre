@@ -1,4 +1,4 @@
-# sal-starter — CliffNotes
+# ochre — CliffNotes
 
 > Living map of the project. Read this before any coding session.
 > Last updated: 2026-10-07. Deep briefing → `CLAUDE.md` · human quickstart → `README.md`.
@@ -11,8 +11,8 @@ An SSR React starter template, now a Bun workspace with an optional Expo iOS app
 
 ## Quick Reference
 
-- **Ports:** API **4780** (web + `/api/*`), Metro **4781** (mobile only), desktop renderer **4782** (desktop dev only). All come from `project.json` (`apiPort`, `metroPort`, `desktopPort`); `init` picks a per-name base. Never 3000/3001/5173/5174/8000/8080/4200/5000
-- **Dev:** `bun run dev` (root) → web on http://localhost:4780 (HMR shares the port) + Metro on 4781 if `apps/mobile` exists + the Electron window (renderer on 4782) if `apps/desktop` exists. `bun run dev web|mobile|desktop` for one
+- **Ports:** API **4080** (web + `/api/*`), Metro **4081** (mobile only), desktop renderer **4082** (desktop dev only). All come from `project.json` (`apiPort`, `metroPort`, `desktopPort`); `init` picks a per-name base. Never 3000/3001/5173/5174/8000/8080/4200/5000
+- **Dev:** `bun run dev` (root) → web on http://localhost:4080 (HMR shares the port) + Metro on 4081 if `apps/mobile` exists + the Electron window (renderer on 4082) if `apps/desktop` exists. `bun run dev web|mobile|desktop` for one
 - **New project:** `git clone … <name> && git remote rename origin upstream && bun install && bun run init <name> [--mobile] [--desktop | --desktop-only]` then (web) `createdb <name>` → `bun run db:migrate` → `bun run dev`
 - **Template updates:** `bun run sync` (merge `upstream/main`, never commits) · `bun run add:mobile` / `add:desktop` (bring a dropped app back)
 - **Desktop release:** `bun run release` → `release/win-unpacked/<name>.exe` (unpacked, no installer)
@@ -20,7 +20,7 @@ An SSR React starter template, now a Bun workspace with an optional Expo iOS app
 - **Type-check:** `bun run typecheck` (`tsc --noEmit`, TypeScript 7, root + every workspace; `strict` + `noUncheckedIndexedAccess`)
 - **Unit tests:** `bun run test` (`bun:test` in every workspace that has a `test` script)
 - **Build:** `bun run build` → `apps/web/dist/client` + `dist/server`
-- **E2E:** `bun run test:e2e` (Playwright; isolated DB `sal_starter_test` on :3100, migrated by global-setup, committed screenshots)
+- **E2E:** `bun run test:e2e` (Playwright; isolated DB `ochre_test` on :3100, migrated by global-setup, committed screenshots)
 - **Migrations:** `bun run db:migrate --name <what>` (dev) · `bun run db:migrate:create` (hand-written SQL) · `bun run db:deploy` (prod/CI)
 - **Ship a mobile fix (OTA):** in `apps/mobile`, `eas update --channel production --environment production` (`bun run ota:prod`); check `eas fingerprint:compare --build-id <id>` first. Run `eas` only in `apps/mobile`, never at the root
 - **Mobile checks:** `bun run --cwd apps/mobile doctor` · `bunx expo export --platform ios` (in `apps/mobile`) · `bun run --cwd apps/mobile fingerprint`
@@ -261,7 +261,7 @@ Add `e2e/*.spec.ts`; screenshot only stable views; `bun run test:e2e:update` to 
 - **Run `bun run db:generate` after schema edits** (auto-runs on `bun install`).
 - **superjson everywhere** — any new tRPC link needs `transformer: superjson`; SSR state goes through `ssr-state.ts`, never raw `JSON.stringify`. Format Dates deterministically (UTC / fixed `timeZone`) or SSR/hydration markup diverges.
 - **Migrations, never `db push`** — and review generated SQL: Prisma can emit `DROP INDEX` for hand-made expression indexes.
-- **Port** — `PORT` env (default `project.json` apiPort, 4780); Metro = apiPort + 1; never 3000/3001/5173/5174/8000/8080/4200/5000.
+- **Port** — `PORT` env (default `project.json` apiPort, 4080); Metro = apiPort + 1; never 3000/3001/5173/5174/8000/8080/4200/5000.
 - **Types** — `strict` + `noUncheckedIndexedAccess`; no `any`, no `as` casts to paper over mismatches, narrow instead (see `isSsrContext` in `routes.tsx`).
 - **Stylesheet is a `<link>` in `index.html`** — never `import` CSS from a component (Vite injects it after the module graph loads → unstyled flash in dev). `@import` new CSS from `app.css`.
 - **Theme script and `theme.ts` must stay in sync**; never branch on theme in render (use `dark:` classes) or hydration mismatches.

@@ -1,4 +1,4 @@
-# sal-starter — Decisions
+# ochre — Decisions
 
 > Append-only log of choices with rejected alternatives. Never reverse one silently — add a superseding entry.
 
@@ -32,7 +32,7 @@
 **Why:** a desktop-only fork deletes `apps/web`, which used to own `tokens.css`. Web and desktop import it from `app.css`, mobile from `global.css`, all as `@app/tokens/tokens.css`; `tokens.test.ts` moved with it.
 **Rejected:** copying tokens into desktop (drift), keeping `@app/web` as a desktop dependency (web is deleted there).
 
-## 2026-10-02 — Mobile lives in sal-starter as an optional `apps/mobile` (monorepo, option b)
+## 2026-10-02 — Mobile lives in ochre as an optional `apps/mobile` (monorepo, option b)
 
 **Why:** one template, one sync story: `init` keeps or drops the app, `add:mobile` restores it from upstream, `sync` merges both. Web-only forks pay nothing at runtime (the Expo tree is pruned from their lockfile). The single-package template is tagged `v1-single` for clones that never move.
 **Rejected:** a separate `sal-expo-starter` repo (two templates drift, every fix lands twice), mobile always present (web-only forks carry ~900 unused packages and a Metro dev server).
@@ -87,9 +87,9 @@
 **Why:** the owner deploys on Drydock. A pre-committed root `drydock.yaml` (`kind: ssr`, `runtime: bun`, `rootDir: apps/web`, `predeploy: bunx prisma migrate deploy`) is the seed every fork inherits; `.gitattributes` marks it `merge=ours` because Drydock rewrites it per project. `predeploy` overrides Drydock's `db push --accept-data-loss` default. `start` has no `--env-file`: prod env comes from Drydock. **Unverified:** Drydock's SSR Dockerfile generator copies `apps/web/bun.lock`, which doesn't exist in a Bun workspace, so a deploy fails until Drydock gets its workspace-aware fix (separate task, owner deferred). The template repo itself is never wired to Drydock.
 **Rejected:** keeping `render.yaml` (not the owner's platform), letting Drydock default to `db push` (drops hand-written SQL).
 
-## 2026-09-29 — Dev port from `PORT`, default 4780, unique per project
+## 2026-09-29 — Dev port from `PORT`, default 4080, unique per project
 
-**Why:** 3000 collides with every other Node project on the machine. `PORT` is zod-validated in `server/env.ts` (default 4780) and `BETTER_AUTH_URL` follows it; `bun run init` derives a per-project port from the name (or `--port`) and rewrites 4780 so clones never share one.
+**Why:** 3000 collides with every other Node project on the machine. `PORT` is zod-validated in `server/env.ts` (default 4080) and `BETTER_AUTH_URL` follows it; `bun run init` derives a per-project port from the name (or `--port`) and rewrites 4080 so clones never share one.
 **Rejected:** portless by default (overhead; opt-in only when a stable https origin is needed), a random port per boot (unbookmarkable, breaks auth URLs).
 
 ## 2026-09-29 — superjson on the tRPC wire AND the SSR state

@@ -18,7 +18,7 @@ export function HomePage() {
   return (
     <div className="space-y-8">
       <section className="space-y-3">
-        <h1 className="text-4xl font-bold tracking-tight">Sal Starter</h1>
+        <h1 className="text-4xl font-bold tracking-tight">Ochre</h1>
         <p className="text-muted-foreground">
           An SSR template wired with the latest React stack. Clone and ship.
         </p>

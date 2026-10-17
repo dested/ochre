@@ -1,14 +1,16 @@
 {
-  "name": "sal-starter",
-  "displayName": "Sal Starter",
-  "scheme": "salstarter",
-  "bundleId": "com.dested.salstarter",
-  "appId": "com.dested.salstarter",
-  "surfaces": ["web", "mobile", "desktop"],
-  "apiPort": 4780,
-  "metroPort": 4781,
-  "desktopPort": 4782,
-  "db": "sal_starter",
+  "name": "ochre",
+  "displayName": "Ochre",
+  "scheme": "ochre",
+  "bundleId": "com.dested.ochre",
+  "appId": "com.dested.ochre",
+  "surfaces": [
+    "web"
+  ],
+  "apiPort": 4080,
+  "metroPort": 4081,
+  "desktopPort": 4082,
+  "db": "ochre",
   "easProjectId": null,
   "appleTeamId": null
 }

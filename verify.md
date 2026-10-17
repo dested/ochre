@@ -1,4 +1,4 @@
-# sal-starter — Verify
+# ochre — Verify
 
 > How to check a change. Cheap checks run after every change; `[heavy — ask first]` ones need a database, a device or a remote service.
 
@@ -15,9 +15,9 @@ bun pm why react            # exactly one react (the Expo SDK's version)
 Web boots without a database for pages that don't query:
 
 ```bash
-bun run dev web             # → http://localhost:4780
-curl -s -o /dev/null -w "%{http_code}\n" http://localhost:4780/                       # 200
-curl -s -o /dev/null -w "%{http_code}\n" http://localhost:4780/api/auth/get-session   # 200
+bun run dev web             # → http://localhost:4080
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:4080/                       # 200
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:4080/api/auth/get-session   # 200
 ```
 
 ## Mobile (cheap, Windows)
@@ -36,15 +36,15 @@ In the introspect output: `ios.bundleIdentifier` ends in `.dev`, `infoPlist.SalN
 With `bun run dev` running (API + Metro):
 
 ```bash
-curl -s http://localhost:4781/status            # packager-status:running
-curl -s -H "expo-platform: ios" http://localhost:4781/ -o /dev/null -w "%{http_code}\n"   # 200 manifest
+curl -s http://localhost:4081/status            # packager-status:running
+curl -s -H "expo-platform: ios" http://localhost:4081/ -o /dev/null -w "%{http_code}\n"   # 200 manifest
 ```
 
 ## Desktop (cheap, Windows)
 
 ```bash
 bun run --cwd apps/desktop build     # out/main, out/preload/index.cjs (~1 KB), out/renderer
-bun run dev desktop                  # renderer on 4782 + the window; ping, echo and ticking subscription all work
+bun run dev desktop                  # renderer on 4082 + the window; ping, echo and ticking subscription all work
 bun run release                      # release/win-unpacked/<name>.exe launches and shows the same
 ```
 
@@ -66,16 +66,16 @@ Never run these in the template itself. Clone into a temp dir, `git remote renam
 Needs a reachable Postgres and the credentials in the root `.env`.
 
 ```bash
-createdb sal_starter_test   # once
-bun run test:e2e            # Playwright on :3100 against sal_starter_test
-curl -s http://localhost:4780/healthz          # {"status":"ok",...} with bun run dev up
+createdb ochre_test   # once
+bun run test:e2e            # Playwright on :3100 against ochre_test
+curl -s http://localhost:4080/healthz          # {"status":"ok",...} with bun run dev up
 ```
 
 Screenshot diffs after an intentional UI change: `bun run test:e2e:update`, then review and commit the PNGs.
 
 ## Device (Gate 3) `[heavy — ask first]`
 
-Needs the Mac, the iPad and an Apple Developer account. Windows runs `bun run dev`; inbound TCP 4780–4781 allowed on the private network.
+Needs the Mac, the iPad and an Apple Developer account. Windows runs `bun run dev`; inbound TCP 4080–4081 allowed on the private network.
 
 1. Mac: `git pull` (the branch, not `master`), `bun install`, then in `apps/mobile`: `bun run ios:prebuild`, `bun run ios:device` with the iPad plugged in.
 2. iPad: open the dev client, connect to Windows Metro.

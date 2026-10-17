@@ -108,7 +108,7 @@ export function startupBanner(opts: {
   const mode = opts.isProd ? c.yellow('production') : c.green('development')
   const url = c.cyan(`http://localhost:${opts.port}`)
   console.log()
-  console.log(`  ${c.bold(c.magenta('sal-starter'))} ${c.dim('· Express + React Router 7 SSR')}`)
+  console.log(`  ${c.bold(c.magenta('ochre'))} ${c.dim('· Express + React Router 7 SSR')}`)
   console.log(`  ${c.dim('mode')}     ${mode}`)
   console.log(`  ${c.dim('local')}    ${url}`)
   console.log(`  ${c.dim('health')}   ${c.cyan(`http://localhost:${opts.port}/healthz`)}`)

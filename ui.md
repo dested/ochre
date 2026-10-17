@@ -1,4 +1,4 @@
-# sal-starter — UI / Visual Language
+# ochre — UI / Visual Language
 
 > Source of truth for how this looks and feels. Follow it for anything visual.
 > Keep it current as part of finishing a UI change — same discipline as cliffnotes.
@@ -106,7 +106,7 @@ Signature patterns:
 
 ## Voice / copy
 
-Terse, lowercase-leaning, developer-direct. Sentence case for UI; the brand wordmark is lowercase (`sal-starter`). Short imperative buttons ("Sign in", "Post"). Example good: "No posts yet — be the first." Avoid: marketing fluff, exclamation marks, ALL-CAPS, emoji in UI.
+Terse, lowercase-leaning, developer-direct. Sentence case for UI; the brand wordmark is lowercase (`ochre`). Short imperative buttons ("Sign in", "Post"). Example good: "No posts yet — be the first." Avoid: marketing fluff, exclamation marks, ALL-CAPS, emoji in UI.
 
 ## Mobile (apps/mobile)
 
