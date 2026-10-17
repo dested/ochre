@@ -12,6 +12,17 @@ import { sampleGrid } from '../../world-gen/terrain'
 
 const STEP = 0.7
 
+/** directions the occlusion is sampled along: 48 spread evenly round the sphere (a Fibonacci spiral) */
+const AO_DIRS: readonly (readonly [number, number, number])[] = Array.from({ length: 48 }, (_, i) => {
+  const y = 1 - (2 * (i + 0.5)) / 48
+  const r = Math.sqrt(1 - y * y)
+  const a = i * Math.PI * (3 - Math.sqrt(5))
+  return [Math.cos(a) * r, y, Math.sin(a) * r] as const
+})
+/** how far out each direction is probed, metres, and how much rock found there darkens */
+const AO_REACH = [0.8, 1.6, 2.8, 4.5, 7.5, 11] as const
+const AO_WEIGHT = [1, 0.85, 0.65, 0.45, 0.3, 0.2] as const
+
 /** polygonise the density over the cave box (surface nets: one vertex per crossing cell, one quad per crossing edge) */
 export function buildCaveGeometry(grid: TerrainGrid): BufferGeometry {
   const rock = grid.cave
@@ -150,17 +161,62 @@ export function buildCaveGeometry(grid: TerrainGrid): BufferGeometry {
       }
     }
   }
+  // baked ambient occlusion: how much of the sky each vertex's hemisphere keeps once the rock and the floor round
+  // it are counted, so creases, the wall's foot and the roof's corners go dark the way a painter would put them
+  // the floor counts only close by (the wall's foot): further off it is the bounce, which the ambient already has
+  const solid = (x: number, y: number, z: number, near: boolean): boolean => {
+    if (near && y < sampleGrid(hArr, x, z) - 0.15) return true
+    const i = Math.round((x - CAVE_BOX.x0) / STEP)
+    const j = Math.round((y - CAVE_BOX.y0) / STEP)
+    const k = Math.round((z - CAVE_BOX.z0) / STEP)
+    if (i < 0 || j < 0 || k < 0 || i >= nx || j >= ny || k >= nz) return false
+    return (f[at(i, j, k)] ?? 0) > 0
+  }
+  const vcount = pos.length / 3
+  const ao = new Float32Array(vcount)
+  for (let vi = 0; vi < vcount; vi++) {
+    const nx0 = Nn(vi, 0)
+    const ny0 = Nn(vi, 1)
+    const nz0 = Nn(vi, 2)
+    // start a little off the surface so a vertex never finds its own rock
+    const ox = P(vi, 0) + nx0 * 0.3
+    const oy = P(vi, 1) + ny0 * 0.3
+    const oz = P(vi, 2) + nz0 * 0.3
+    let occ = 0
+    let sum = 0
+    for (const [dx, dy, dz] of AO_DIRS) {
+      const c = dx * nx0 + dy * ny0 + dz * nz0
+      if (c < 0.1) continue
+      sum += c
+      for (let r = 0; r < AO_REACH.length; r++) {
+        const d = AO_REACH[r] ?? 0
+        if (solid(ox + dx * d, oy + dy * d, oz + dz * d, r < 2)) {
+          occ += c * (AO_WEIGHT[r] ?? 0)
+          break
+        }
+      }
+    }
+    ao[vi] = sum > 0 ? 1 - occ / sum : 1
+  }
+
   const g = new BufferGeometry()
   g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3))
   g.setAttribute('normal', new BufferAttribute(new Float32Array(nor), 3))
+  g.setAttribute('aAO', new BufferAttribute(ao, 1))
   g.setIndex(new BufferAttribute(new Uint32Array(idx), 1))
   g.computeBoundingSphere()
   g.computeBoundingBox()
   return g
 }
 
+const ROCK_VERT_HEAD = /* glsl */ `
+attribute float aAO;
+varying float vOcAO;
+`
+
 const ROCK_HEAD = /* glsl */ `
 uniform vec4 uHearthSoot;
+varying float vOcAO;
 vec4 ocFacetT = vec4( 0.0 );
 vec4 ocFacetS = vec4( 0.0 );
 vec3 ocLinR( vec3 c ) { return pow( c, vec3( 2.2 ) ); }
@@ -232,6 +288,8 @@ const ROCK_ALBEDO = /* glsl */ `
 		}
 		// damp, darker toward the back
 		warm *= mix( 0.8, 1.0, sky );
+		// the creases darker in their own colour too, a painter's accent where the rock folds
+		warm *= mix( 0.62, 1.0, smoothstep( 0.1, 0.85, vOcAO ) );
 		diffuseColor.rgb = warm;
 	}
 `
@@ -254,7 +312,12 @@ export function createCaveView(world: WorldData, grid: TerrainGrid): CaveView {
   const material = new MeshStandardMaterial({ roughness: 0.95, metalness: 0 })
   patchPaint(material, { brush: 0.4, rim: 0.2 }, {
     key: 'cave-rock',
+    vertexHead: ROCK_VERT_HEAD,
+    vertexMain: 'vOcAO = aAO;',
     fragmentHead: ROCK_HEAD,
+    // baked occlusion: the creases, the wall's foot and the roof's corners take less of the sky, the bounce and
+    // the hearth's fill
+    ambient: 'irradiance *= mix( 0.15, 1.0, smoothstep( 0.05, 0.95, vOcAO ) );',
     albedo: ROCK_ALBEDO,
     normal: ROCK_NORMAL,
     uniforms: { uHearthSoot: { value: new Vector4(hearth?.x ?? 0, hearth?.z ?? 0, 9, floor) } },

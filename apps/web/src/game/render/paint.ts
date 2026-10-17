@@ -28,6 +28,8 @@ export type PaintExtra = {
   albedo?: string
   /** GLSL run after the normal is known: may bend `normal` (view space) */
   normal?: string
+  /** GLSL run once the ambient light is gathered: may scale `irradiance` (sky, bounce and hearth fill) */
+  ambient?: string
   /** GLSL run at the very end of the fragment main: may adjust `gl_FragColor` */
   fragmentEnd?: string
   /** extra uniforms (shared objects are fine) */
@@ -180,7 +182,7 @@ export function patchPaint(material: MeshStandardMaterial, opts: PaintOptions = 
       .replace('#include <color_fragment>', `#include <color_fragment>\n\tdiffuseColor.rgb = ocBrush( diffuseColor.rgb, vOcWorld, uPaint.x );\n${extra?.albedo ?? ''}\n${WET}`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${extra?.normal ?? ''}`)
       .replace('#include <lights_physical_pars_fragment>', `#include <lights_physical_pars_fragment>\n${DIRECT}`)
-      .replace('#include <lights_fragment_begin>', `#include <lights_fragment_begin>\n${AMBIENT}`)
+      .replace('#include <lights_fragment_begin>', `#include <lights_fragment_begin>\n${AMBIENT}\n${extra?.ambient ?? ''}`)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\n${RIM}`)
       .replace('#include <dithering_fragment>', `#include <dithering_fragment>\n${extra?.fragmentEnd ?? ''}\n\t// a NaN here would spread through the bloom pyramid to the whole frame\n\tif ( any( isnan( gl_FragColor.rgb ) ) || any( isinf( gl_FragColor.rgb ) ) ) gl_FragColor.rgb = vec3( 0.0 );`)
   }
