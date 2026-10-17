@@ -18,6 +18,7 @@ import {
   Matrix4,
   MeshStandardMaterial,
   Quaternion,
+  Sphere,
   Vector3,
 } from 'three'
 import type { Quality, Vec3, WorldData } from '../contracts'
@@ -115,18 +116,19 @@ function lump(b: Builder, tris: Float32Array, c: V3, s: V3, seed: number, dome: 
 }
 
 /** a fynbos clump: a dome of small lumps (erica, a little wider than tall) */
-function fynbosGeo(seed: number, tall: boolean): BufferGeometry {
+/** `far`: the same clump in four bigger lumps, for the outer ring */
+function fynbosGeo(seed: number, tall: boolean, far = false): BufferGeometry {
   const b = new Builder()
   const r = stream(seed)
   const h = tall ? 0.95 : 0.62
   const w = tall ? 0.5 : 0.62
   const dome: V3 = [0, -h * 0.25, 0]
-  const n = tall ? 7 : 8
+  const n = far ? 4 : tall ? 7 : 8
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2 + r() * 0.6
     const rr = i === 0 ? 0 : w * (0.45 + 0.4 * r())
     const y = i === 0 ? h * 0.55 : h * (0.25 + 0.35 * r())
-    const sz = (i === 0 ? 0.42 : 0.3 + 0.14 * r()) * (tall ? 0.9 : 1)
+    const sz = (i === 0 ? 0.42 : 0.3 + 0.14 * r()) * (tall ? 0.9 : 1) * (far ? 1.22 : 1)
     lump(b, ICO0, [Math.cos(a) * rr, y, Math.sin(a) * rr], [sz * 1.1, sz * (tall ? 1.15 : 0.85), sz * 1.1], seed * 13 + i, dome, h, [1, 1, 1], 0.85 + 0.3 * r())
   }
   return b.geometry()
@@ -514,9 +516,19 @@ function rockMaterial(stack = false): MeshStandardMaterial {
 
 type Place = { x: number; z: number; y: number; s: number; yaw: number; r: number; g: number; b: number; tilt: number; sy?: number }
 
+/**
+ * A kind's instances are dealt into slots: the near ring at full detail, and, for kinds with a far LOD, the outer
+ * ring in cheaper geometry that (for shrubs) casts no shadow. Each slot holds one InstancedMesh per variant, with
+ * a bounding sphere round its instances so a ring outside the view or the shadow box is skipped. (Quadrant slots
+ * were tried: a third fewer triangles for twice the draw calls, a bad trade.)
+ */
+type Slots = { sets: InstancedMesh[][]; far: boolean }
+
 type Kind = {
   name: string
-  meshes: InstancedMesh[]
+  slots: Slots
+  /** where the outer ring (far LOD) starts, per quality; Infinity for none */
+  farFrom: Record<Quality, number>
   /** grid cell size, metres */
   cell: number
   /** fill radius per quality */
@@ -526,7 +538,9 @@ type Kind = {
   place(ix: number, iz: number, out: Place): number
   /** full random rotation (stones) instead of upright */
   tumble: boolean
-  counts: number[]
+  /** instances per [slot][variant], and their bounds (min x, y, z, max x, y, z, biggest scale) */
+  counts: number[][]
+  bounds: Float64Array[][]
   cx: number
   cz: number
   q: Quality | null
@@ -573,23 +587,39 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
   }
 
   const disposables: { dispose(): void }[] = []
-  const makeMeshes = (geos: BufferGeometry[], mat: MeshStandardMaterial, max: number, shadow: boolean, name: string): InstancedMesh[] => {
+  /** near geometry (and optionally a cheaper far set, which casts no shadow unless `farShadow`), `max` instances in all */
+  const makeSlots = (
+    geos: BufferGeometry[],
+    farGeos: BufferGeometry[] | null,
+    mat: MeshStandardMaterial,
+    max: number,
+    shadow: boolean,
+    name: string,
+    farShadow = false,
+  ): Slots => {
     disposables.push(mat)
-    return geos.map((geo, i) => {
-      disposables.push(geo)
-      const m = new InstancedMesh(geo, mat, max)
-      m.name = `${name}-${i}`
-      m.count = 0
-      m.frustumCulled = false
-      m.castShadow = shadow
-      m.receiveShadow = true
-      m.instanceMatrix.setUsage(DynamicDrawUsage)
-      m.instanceColor = new InstancedBufferAttribute(new Float32Array(max * 3), 3)
-      m.instanceColor.setUsage(DynamicDrawUsage)
-      root.add(m)
-      return m
-    })
+    for (const g0 of [...geos, ...(farGeos ?? [])]) disposables.push(g0)
+    const make = (gs: BufferGeometry[], cap: number, cast: boolean, tag: string) =>
+      gs.map((geo, i) => {
+        const m = new InstancedMesh(geo, mat, cap)
+        m.name = `${name}-${tag}-${i}`
+        m.count = 0
+        m.castShadow = cast
+        m.receiveShadow = true
+        m.boundingSphere = new Sphere()
+        m.instanceMatrix.setUsage(DynamicDrawUsage)
+        m.instanceColor = new InstancedBufferAttribute(new Float32Array(cap * 3), 3)
+        m.instanceColor.setUsage(DynamicDrawUsage)
+        m.visible = false
+        root.add(m)
+        return m
+      })
+    // the near ring of a two-ring kind holds about a fifth of its instances
+    const sets: InstancedMesh[][] = [make(geos, Math.ceil(max * (farGeos ? 0.35 : 1)), shadow, 'near')]
+    if (farGeos) sets.push(make(farGeos, max, farShadow, 'far'))
+    return { sets, far: farGeos !== null }
   }
+  const NO_FAR: Record<Quality, number> = { high: Infinity, medium: Infinity, low: Infinity }
 
   // fynbos palette (sRGB): greens, olive, rust, blond
   const FYN: readonly V3[] = [
@@ -608,8 +638,10 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
   }
 
   const kinds: Kind[] = []
-  const kind = (k: Omit<Kind, 'counts' | 'cx' | 'cz' | 'q'>) => {
-    const full: Kind = { ...k, counts: k.meshes.map(() => 0), cx: 1e9, cz: 1e9, q: null }
+  const kind = (k: Omit<Kind, 'counts' | 'bounds' | 'cx' | 'cz' | 'q'>) => {
+    const counts = k.slots.sets.map((set) => set.map(() => 0))
+    const bounds = k.slots.sets.map((set) => set.map(() => new Float64Array(7)))
+    const full: Kind = { ...k, counts, bounds, cx: 1e9, cz: 1e9, q: null }
     kinds.push(full)
     return full
   }
@@ -617,7 +649,15 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
   // fynbos clumps
   kind({
     name: 'fynbos',
-    meshes: makeMeshes([fynbosGeo(11, false), fynbosGeo(23, false), fynbosGeo(37, true)], foliageMaterial('fyn', 0.35, 0.6, 9), 7000, true, 'fynbos'),
+    slots: makeSlots(
+      [fynbosGeo(11, false), fynbosGeo(23, false), fynbosGeo(37, true)],
+      [fynbosGeo(11, false, true), fynbosGeo(23, false, true), fynbosGeo(37, true, true)],
+      foliageMaterial('fyn', 0.35, 0.6, 9),
+      7000,
+      true,
+      'fynbos',
+    ),
+    farFrom: { high: 40, medium: 30, low: 22 },
     cell: 1.9,
     radius: { high: 85, medium: 60, low: 40 },
     seed: 101,
@@ -650,7 +690,8 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
   // proteas, in patches through the fynbos
   kind({
     name: 'protea',
-    meshes: makeMeshes([proteaGeo(5), proteaGeo(9)], foliageMaterial('protea', 0.25, 0.4, 0), 900, true, 'protea'),
+    slots: makeSlots([proteaGeo(5), proteaGeo(9)], null, foliageMaterial('protea', 0.25, 0.4, 0), 900, true, 'protea'),
+    farFrom: NO_FAR,
     cell: 4.5,
     radius: { high: 75, medium: 55, low: 35 },
     seed: 201,
@@ -674,7 +715,8 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
   // restios: by the lagoon, on the dunes, and scattered through the fynbos
   kind({
     name: 'restio',
-    meshes: makeMeshes([restioGeo(3), restioGeo(17)], foliageMaterial('restio', 0.9, 0.3, 0), 2500, false, 'restio'),
+    slots: makeSlots([restioGeo(3), restioGeo(17)], null, foliageMaterial('restio', 0.9, 0.3, 0), 2500, false, 'restio'),
+    farFrom: NO_FAR,
     cell: 3.1,
     radius: { high: 70, medium: 50, low: 0 },
     seed: 301,
@@ -701,7 +743,8 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
   // grass tufts: thick on the grassland, between the shrubs, dune grass on the sand
   kind({
     name: 'grass',
-    meshes: makeMeshes([grassGeo(1), grassGeo(2)], foliageMaterial('grass', 1.6, 0.3, 0), 26000, false, 'grass'),
+    slots: makeSlots([grassGeo(1), grassGeo(2)], null, foliageMaterial('grass', 1.6, 0.3, 0), 26000, false, 'grass'),
+    farFrom: NO_FAR,
     cell: 0.62,
     radius: { high: 38, medium: 24, low: 0 },
     seed: 401,
@@ -744,7 +787,16 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
   const rockMat = rockMaterial()
   kind({
     name: 'rock',
-    meshes: makeMeshes([rockGeo(1, 2), rockGeo(2, 2), rockGeo(3, 1), rockGeo(4, 1)], rockMat, 2500, true, 'rock'),
+    slots: makeSlots(
+      [rockGeo(1, 2), rockGeo(2, 2), rockGeo(3, 1), rockGeo(4, 1)],
+      [rockGeo(1, 1), rockGeo(2, 1), rockGeo(3, 0), rockGeo(4, 0)],
+      rockMat,
+      2500,
+      true,
+      'rock',
+      true,
+    ),
+    farFrom: { high: 110, medium: 80, low: 60 },
     cell: 4.2,
     radius: { high: 230, medium: 170, low: 110 },
     seed: 501,
@@ -949,7 +1001,9 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
     k.cx = fx
     k.cz = fz
     k.q = q
-    k.counts.fill(0)
+    for (const c of k.counts) c.fill(0)
+    for (const set of k.bounds) for (const b of set) b.set([1e9, 1e9, 1e9, -1e9, -1e9, -1e9, 0])
+    const farFrom = k.slots.far ? k.farFrom[q] : Infinity
     if (R > 0) {
       const i0 = Math.floor((fx - R) / k.cell)
       const i1 = Math.ceil((fx + R) / k.cell)
@@ -964,11 +1018,14 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
           if (d2 > R2) continue
           const v = k.place(i, j, out)
           if (v < 0) continue
-          const mesh = k.meshes[v]
-          const n = k.counts[v] ?? 0
-          if (!mesh || n >= mesh.instanceMatrix.count) continue
-          // shrink away toward the ring's edge
           const d = Math.sqrt(d2)
+          const slot = d >= farFrom ? 1 : 0
+          const mesh = k.slots.sets[slot]?.[v]
+          const counts = k.counts[slot]
+          const box = k.bounds[slot]?.[v]
+          const n = counts?.[v] ?? 0
+          if (!mesh || !counts || !box || n >= mesh.instanceMatrix.count) continue
+          // shrink away toward the ring's edge
           const fade = smooth(R, R * 0.82, d)
           if (fade <= 0.02) continue
           const s = out.s * fade
@@ -1006,12 +1063,28 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
             ca[n * 3 + 1] = out.g
             ca[n * 3 + 2] = out.b
           }
-          k.counts[v] = n + 1
+          counts[v] = n + 1
+          box[0] = Math.min(box[0] ?? 0, out.x)
+          box[1] = Math.min(box[1] ?? 0, out.y)
+          box[2] = Math.min(box[2] ?? 0, out.z)
+          box[3] = Math.max(box[3] ?? 0, out.x)
+          box[4] = Math.max(box[4] ?? 0, out.y)
+          box[5] = Math.max(box[5] ?? 0, out.z)
+          box[6] = Math.max(box[6] ?? 0, s)
         }
       }
     }
-    k.meshes.forEach((m, v) => {
-      m.count = k.counts[v] ?? 0
+    k.slots.sets.forEach((set, slot) => set.forEach((m, v) => {
+      m.count = k.counts[slot]?.[v] ?? 0
+      const b = k.bounds[slot]?.[v]
+      if (b && m.count > 0 && m.boundingSphere) {
+        const hx = ((b[3] ?? 0) - (b[0] ?? 0)) * 0.5
+        const hy = ((b[4] ?? 0) - (b[1] ?? 0)) * 0.5
+        const hz = ((b[5] ?? 0) - (b[2] ?? 0)) * 0.5
+        m.boundingSphere.center.set((b[0] ?? 0) + hx, (b[1] ?? 0) + hy, (b[2] ?? 0) + hz)
+        // the geometry reaches about its scale past the instance's origin (a rock's tumble a bit more)
+        m.boundingSphere.radius = Math.hypot(hx, hy, hz) + (b[6] ?? 0) * 1.8
+      }
       m.instanceMatrix.clearUpdateRanges()
       m.instanceMatrix.addUpdateRange(0, m.count * 16)
       m.instanceMatrix.needsUpdate = true
@@ -1021,7 +1094,7 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
         m.instanceColor.needsUpdate = true
       }
       m.visible = m.count > 0
-    })
+    }))
   }
 
   return {
