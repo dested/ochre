@@ -458,6 +458,15 @@ controller, cameras and verbs that make each stage of life feel different; and t
   run in summer (day ~10–40), elder in late summer; provider in late autumn into winter (the storm). The cave mouth
   faces SW (heading −0.85, world 82b261e); hearth and sleep POIs rotate with it. Applies to: sim, world, play.
 
+- (2026-10-17 02:30, lead) **sim item S5, "days worth living"** (after S4): small unscripted moments that fire in the
+  free days (mostly Provider, some in Small and Elder), at most one every game hour, each a few captions plus band
+  behaviour, never during a director beat: a honeyguide leads the men to honey (a sweet share at the hearth); a
+  lion's eyes at the edge of the firelight at night (everyone draws in, Tuk builds the fire up); a visitor from the
+  lagoon band brings news and a gift; a seal pup on the rocks (children watch, nobody harms it); a sudden rain
+  shower sends everyone running for the cave, laughing; a full-moon dance at the hearth; the player's child takes
+  first steps toward the player (Provider). Data-driven in `src/sim/moments.ts`, deterministic per seed, a test that
+  each one can fire, and a lab button to trigger each. Applies to: sim.
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: f48612e (main, 02:05) · Gate: install 0, typecheck 0, test 0, build 0 at f48612e · Deploy: f48612e live (CI 39018937226 green)
@@ -466,7 +475,7 @@ Board: down · Last pushed: f48612e (main, 02:05) · Gate: install 0, typecheck 
 | --- | --- | --- | --- | --- | --- |
 | world | opus-xhigh | world-gen, game/world, game/render | W2 (atmosphere, coast drama, shelf, cave rock first) | W1 82b261e passed 02:20 | working |
 | people | opus-xhigh | game/actors | P1 fix (resent 02:10; outranks P3) | c66a392 → fix sent 01:35 (budget 7 calls/97k tris per person, 40 cm face, garments, arms) | working |
-| sim | opus-high | sim | S4 (talk) + seat pose | S3 13c05da done (rings, spacing, hysteresis, meal, labels); S2 071949a passed | working |
+| sim | opus-high | sim | S5 (moments) | S4 d0549fd passed (150 lines); S3 done; S2 071949a passed | working |
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | U6 | U5 1fa2a6b passed; U3 bf4973b passed | working |
 | play | opus-high | game/play, game/audio, app/play.tsx | PL3 (director in; real world + people swapped) | PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
 
