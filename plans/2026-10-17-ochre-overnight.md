@@ -519,6 +519,8 @@ controller, cameras and verbs that make each stage of life feel different; and t
   the band" ("…the evening…" from 17:00), so the HUD never shows a stale one; the honeyguide aside still shows as a
   second line through `aside`. (3) Save the open window (from, until, pick, got) so a load inside provider.steps
   still gets first steps.
+  (4) When the heir takes over, set the new player's anim to `idle` and clear its task unless the director seats it
+  (play found Rebal starting small.follow asleep on the cave floor: `W:\junk\sim-80k\play\pl3-heir-small.png`).
 
 - (2026-10-17 02:40, lead) **Frozen QA server: http://localhost:4090** is a production build of a fixed sha (see
   `/w/junk/sim-80k/qa-server/SHA`). It never reloads, so use it for playthroughs and shots that need more than a
