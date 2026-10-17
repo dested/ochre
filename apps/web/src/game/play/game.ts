@@ -11,6 +11,7 @@ import type {
   GameAudio,
   Interaction,
   LifeStageId,
+  PersonAnim,
   RenderPipeline,
   SaveData,
   Sim,
@@ -27,7 +28,7 @@ import { createHeldCamera, type HeldCamera } from './held-camera'
 import { createHunt, type Hunt } from './hunt'
 import type { Input } from './input'
 import type { Modules } from './modules'
-import { STAGE_FEEL } from './stages'
+import { STAGE_FEEL, shownAge } from './stages'
 import { createSteps } from './steps'
 import { createTracks } from './tracks'
 
@@ -118,6 +119,24 @@ const TAG_TALL = 52
 /** samples along the eye→head line for tag occlusion, and how long a person stays hidden before the tag fades */
 const OCC_STEPS = 8
 const OCC_HIDE = 0.2
+/** poses the sim puts the player in (a hearth seat, a task); they hold while the player stands still */
+const SIM_POSES: ReadonlySet<PersonAnim> = new Set<PersonAnim>([
+  'sit',
+  'sleep',
+  'eat',
+  'gather',
+  'dig',
+  'knap',
+  'scrape',
+  'grind',
+  'tend-fire',
+  'engrave',
+  'mourn',
+  'dance',
+  'point',
+  'wave',
+  'lie-dead',
+])
 const MAX_TAGS = 6
 const HELD_FACE_RANGE = 1.2
 
@@ -551,10 +570,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       visible: s.chapter.beatId !== 'elder.walk',
       name: player.name,
       // whole years from one, tenths for an infant
-      ageYears:
-        player.look.ageYears >= 1
-          ? Math.floor(player.look.ageYears)
-          : Math.round(player.look.ageYears * 10) / 10,
+      ageYears: shownAge(player.look.ageYears),
       stage: s.stage,
       needs: s.stage === 'held' ? null : { ...player.needs },
       clock,
@@ -612,7 +628,12 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
           !live,
           hunt.aim
         )
-        const anim = hunt.throwing ? 'throw' : out.anim
+        const still = out.speed < 0.05 && out.anim === 'idle'
+        const anim = hunt.throwing
+          ? 'throw'
+          : still && SIM_POSES.has(player.anim)
+            ? player.anim
+            : out.anim
         pose = {
           x: out.position.x,
           z: out.position.z,

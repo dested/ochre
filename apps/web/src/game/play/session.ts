@@ -6,6 +6,7 @@ import { z } from 'zod'
 import type { LineageEntry, Screen } from '../bridge'
 import { LIFE_STAGES, type LifeStageId, type SaveData, type Sim } from '../contracts'
 import { createRuntime, type Runtime } from './runtime'
+import { shownAge } from './stages'
 import { debugDirector } from '../../sim'
 
 export const SAVE_KEY = 'ochre.save.v1'
@@ -134,7 +135,9 @@ export function mount(el: HTMLElement): () => void {
     const f = readSave()
     return {
       hasLife: f !== null,
-      saved: f ? { name: f.name, stage: f.stage, ageYears: f.age ?? STAGE_AGE[f.stage] } : null,
+      saved: f
+        ? { name: f.name, stage: f.stage, ageYears: shownAge(f.age ?? STAGE_AGE[f.stage]) }
+        : null,
     }
   }
   bridge.set({ screen: 'title', ...savedState() })
@@ -149,7 +152,7 @@ export function mount(el: HTMLElement): () => void {
       stage: g.sim.state.stage,
       seed: SEED,
       save: g.sim.serialize(),
-      age: Math.floor(g.player().look.ageYears * 10) / 10,
+      age: g.player().look.ageYears,
     })
     bridge.set(savedState())
   }

@@ -104,3 +104,8 @@ export const STAGE_AGE: Record<LifeStageId, number> = {
   provider: 26,
   elder: 58,
 }
+
+/** the age the HUD and the title's Continue card show: whole years from one, tenths before */
+export function shownAge(age: number): number {
+  return age >= 1 ? Math.floor(age) : Math.round(age * 10) / 10
+}
