@@ -396,7 +396,8 @@ export class BeastActor implements AnimalActor {
   }
 
   setSpeed(mps: number): void {
-    this.speed = Math.max(0, mps)
+    // a bad speed from the caller must not poison the pose
+    this.speed = Number.isFinite(mps) ? Math.min(40, Math.max(0, mps)) : 0
   }
 
   private startFade(seconds: number): void {

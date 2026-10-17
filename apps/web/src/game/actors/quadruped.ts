@@ -832,13 +832,18 @@ function makePlan(kind: QuadKind, seed: number): Plan {
     k.rot(HEAD, nod, yaw * 0.15, 0)
   }
 
-  /** the neck pitch that brings the muzzle down to height `y` (bisection on the posed chain) */
-  const reachDown = (k: Kin, y: number, yaw: number, nod: number): void => {
+  /**
+   * the neck pitch that brings the muzzle down to height `y` (bisection on the posed chain). The face holds `face`
+   * radians below horizontal in the world whatever the neck does, so the muzzle drops steadily as the neck lowers
+   * and the head reaches forward to the grass instead of curling back between the forelegs.
+   */
+  const reachDown = (k: Kin, y: number, yaw: number, face: number, bodyPitch: number): void => {
+    const nodFor = (p: number): number => face - sp.headAng - bodyPitch - p
     let lo = 0
-    let hi = 2.6
-    for (let it = 0; it < 8; it++) {
+    let hi = 2
+    for (let it = 0; it < 9; it++) {
       const mid = (lo + hi) / 2
-      neck(k, mid, yaw, nod)
+      neck(k, mid, yaw, nodFor(mid))
       const qh = k.Q[HEAD]
       const ph = k.P[HEAD]
       if (!qh || !ph) return
@@ -846,7 +851,8 @@ function makePlan(kind: QuadKind, seed: number): Plan {
       if (my > y) lo = mid
       else hi = mid
     }
-    neck(k, (lo + hi) / 2, yaw, nod)
+    const p = (lo + hi) / 2
+    neck(k, p, yaw, nodFor(p))
   }
 
   const tail = (k: Kin, swish: number, lift: number): void => {
@@ -962,13 +968,15 @@ function makePlan(kind: QuadKind, seed: number): Plan {
       for (const i of [1, 3]) places[i]?.toe.add(_d.set(0, 0, 0.07 * sp.Hs))
     }
     _off.set(0, bob - 0.004 * sp.Hs * breathe + (alert ? 0.01 * sp.Hs : 0), 0)
-    k.begin(_off, eq(pitch + (grazing ? 0.03 : 0), 0, 0, _bq))
+    // grazing also tips the forequarters down, the forelegs giving at the knee, so the short neck reaches the grass
+    const tip = grazing ? 0.09 : 0
+    k.begin(_off, eq(pitch + tip, 0, 0, _bq))
     k.rot(SPINE, -flexSp, 0, 0)
     k.rot(CHEST, -flexSp * 0.8 + 0.008 * breathe, 0, 0)
     const run = moving && (gt === GALLOP || gt === CANTER)
     if (grazing) {
       // nose to the grass, nibbling, the head working side to side
-      reachDown(k, 0.07 * sp.Hs + 0.025 * sp.Hs * Math.max(0, Math.sin(t * 1.9)), 0.18 * Math.sin(t * 0.4 + c.jit * 5), 0.3)
+      reachDown(k, 0.05 * sp.Hs + 0.025 * sp.Hs * Math.max(0, Math.sin(t * 1.9)), 0.18 * Math.sin(t * 0.4 + c.jit * 5), 1.4, pitch + tip)
       k.rot(JAW, jawFor(t, true, false), 0, 0)
       ears(k, 0, flick)
       tail(k, swish, 0)
