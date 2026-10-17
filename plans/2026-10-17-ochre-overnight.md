@@ -378,6 +378,10 @@ controller, cameras and verbs that make each stage of life feel different; and t
 
 - (2026-10-17 00:50, lead) `host.ts` creates the renderer with `reversedDepthBuffer: true` (3c5b2d9). Read
   `renderer.capabilities.reversedDepthBuffer` if your shaders write depth. Applies to: world, people, play.
+- (2026-10-17 01:00, lead) `carry(child, 'arms')`: the child faces the carrier (child heading = carrier heading + π),
+  cradled at chest height so the child's `headPosition` sits 35–45 cm in front of the carrier's face (stage 1 opens
+  on the mother's face from there). `'back'`: the child faces the same way as the carrier, head above the carrier's
+  shoulder. Applies to: people, play.
 
 ## Ledger (lead, updated 2026-10-17 00:40)
 
@@ -389,7 +393,7 @@ Board: down · Last pushed: 60add27 (main) · Gate: typecheck green at 60add27 �
 | people | opus-xhigh | game/actors | P1 | — | working (spawned 00:39) |
 | sim | opus-high | sim | S1 | — | working (spawned 00:38) |
 | ui | opus-high | ui, content, audio, public/art, index.html, ui.md | U1 | — | working (spawned 00:38) |
-| play | opus-high | game/play, app/play.tsx | PL1 | — | working (spawned 00:38) |
+| play | opus-high | game/play, app/play.tsx | PL2 | PL1 8214411 passed | working |
 
 Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); Drydock portal :4400 (Windows bun, log in
 scratchpad drydock-portal.log)
