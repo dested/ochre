@@ -223,17 +223,20 @@ export function createCaveFloor(world: WorldData): CaveFloorView {
     [-19.4, -2.4, 1.9, 0.46],
     [-18.9, 3.3, 1.6, 0.38],
     [-7.5, -10.4, 1.4, 0.32],
-    [-1.6, 7.6, 1.25, 0.28],
-    [-3.6, -8.6, 1.0, 0.22],
+    // the two nearest the mouth stand higher, so they read from the hearth looking out
+    [-1.6, 7.6, 1.4, 0.42],
+    [-3.6, -8.6, 1.15, 0.34],
   ]
   const wood = at(-4.2, 4.7)
   const knap = at(-1.7, -3.7)
   const slabAt = at(-2.2, 3.0)
+  // a day bed in the mouth's light, where the view from the hearth falls on it
+  const rest = at(-2.6, -1.4)
   for (const [a, b, rad] of heaps) {
     const p = at(a, b)
     keep.push({ x: p.x, z: p.z, r: rad })
   }
-  keep.push({ x: wood.x, z: wood.z, r: 0.9 }, { x: knap.x, z: knap.z, r: 1.0 }, { x: slabAt.x, z: slabAt.z, r: 0.6 })
+  keep.push({ x: wood.x, z: wood.z, r: 0.9 }, { x: knap.x, z: knap.z, r: 1.0 }, { x: slabAt.x, z: slabAt.z, r: 0.6 }, { x: rest.x, z: rest.z, r: 1.0 })
   const disposables: BufferGeometry[] = []
   const geo = (g: BufferGeometry) => {
     disposables.push(g)
@@ -297,42 +300,65 @@ export function createCaveFloor(world: WorldData): CaveFloorView {
   })
 
   // ─── bedding: a mat of grass at each sleeping hollow, a hide over some ────────────────────────────────────
+  const bed = (x: number, z: number, yaw: number, seed: number, withHide: boolean) => {
+    const y = world.heightAt(x, z)
+    const grass = geo(moundGeo(5, 26, 60 + seed, 0.24, (t) => 0.09 * Math.pow(Math.max(0, 1 - t * t * t), 0.6) - 0.01))
+    const straw = lin(0.56, 0.47, 0.3)
+    const dryer = lin(0.44, 0.36, 0.23)
+    place(x, y, z, yaw, [0.62, 1, 1.05])
+    soup.put(grass, m, (lx, _ly, lz) => mixc(straw, dryer, Math.min(1, Math.hypot(lx, lz)) * 0.8 + 0.2 * r()), [0, 1])
+    if (!withHide) return
+    // an eland hide: four leg lobes and a neck, draped a little over the grass
+    const hide = geo(moundGeo(4, 32, 80 + seed, 0.0, (t) => 0.105 - 0.075 * t * t * t))
+    const hp = hide.getAttribute('position')
+    for (let k = 0; k < hp.count; k++) {
+      const hx = hp.getX(k)
+      const hz = hp.getZ(k)
+      const a = Math.atan2(hz, hx)
+      const lobes = 1 + 0.18 * Math.max(0, Math.cos(a * 4 + 0.6)) ** 3 + 0.08 * Math.cos(a * 2) + 0.05 * ring(a, 90 + seed)
+      hp.setXYZ(k, hx * lobes * 0.55, hp.getY(k), hz * lobes * 0.78)
+    }
+    // a hide lies smooth: normals of a low dome, not the mound's facets (whose peak would draw a star of creases)
+    const hn = hide.getAttribute('normal')
+    for (let k = 0; k < hn.count; k++) {
+      const nx = hp.getX(k) * 0.5
+      const nz = hp.getZ(k) * 0.35
+      const l = Math.hypot(nx, 1, nz)
+      hn.setXYZ(k, nx / l, 1 / l, nz / l)
+    }
+    const tan = lin(0.5, 0.34, 0.21)
+    const pale = lin(0.66, 0.52, 0.36)
+    place(x, y, z, yaw + (r() - 0.5) * 0.3, [1, 1, 1])
+    soup.put(hide, m, (lx, _ly, lz) => {
+      const rr = Math.hypot(lx / 0.55, lz / 0.78)
+      // darker along the spine, the belly's paler fringe at the edge
+      return mixc(scale(tan, 0.8 + 0.4 * Math.min(1, Math.abs(lx) * 4)), pale, Math.max(0, rr - 0.75) * 2.5)
+    }, [0, 0.5])
+  }
   const centre = at(-9, 0)
   world.pois
     .filter((p) => p.kind === 'sleep-spot')
     .forEach((p, i) => {
-      const y = world.heightAt(p.x, p.z)
       // the long side along the wall
       const yaw = Math.atan2(p.x - centre.x, p.z - centre.z) + Math.PI / 2 + (r() - 0.5) * 0.4
-      const grass = geo(moundGeo(5, 26, 60 + i, 0.24, (t) => 0.09 * Math.pow(Math.max(0, 1 - t * t * t), 0.6) - 0.01))
-      const straw = lin(0.56, 0.47, 0.3)
-      const dryer = lin(0.44, 0.36, 0.23)
-      place(p.x, y, p.z, yaw, [0.62, 1, 1.05])
-      soup.put(grass, m, (lx, _ly, lz) => mixc(straw, dryer, Math.min(1, Math.hypot(lx, lz)) * 0.8 + 0.2 * r()), [0, 1])
-      if (i % 2 === 0) {
-        // an eland hide: four leg lobes and a neck, draped a little over the grass
-        const hide = geo(
-          moundGeo(4, 32, 80 + i, 0.0, (t) => 0.105 - 0.075 * t * t * t),
-        )
-        const hp = hide.getAttribute('position')
-        for (let k = 0; k < hp.count; k++) {
-          const x = hp.getX(k)
-          const z = hp.getZ(k)
-          const a = Math.atan2(z, x)
-          const lobes = 1 + 0.18 * Math.max(0, Math.cos(a * 4 + 0.6)) ** 3 + 0.08 * Math.cos(a * 2) + 0.05 * ring(a, 90 + i)
-          hp.setXYZ(k, x * lobes * 0.55, hp.getY(k), z * lobes * 0.78)
-        }
-        hide.computeVertexNormals()
-        const tan = lin(0.5, 0.34, 0.21)
-        const pale = lin(0.66, 0.52, 0.36)
-        place(p.x, y, p.z, yaw + (r() - 0.5) * 0.3, [1, 1, 1])
-        soup.put(hide, m, (lx, _ly, lz) => {
-          const rr = Math.hypot(lx / 0.55, lz / 0.78)
-          // darker along the spine, the belly's paler fringe at the edge
-          return mixc(scale(tan, 0.8 + 0.4 * Math.min(1, Math.abs(lx) * 4)), pale, Math.max(0, rr - 0.75) * 2.5)
-        }, [0, 0.5])
-      }
+      bed(p.x, p.z, yaw, i, i % 2 === 0)
     })
+  bed(rest.x, rest.z, caveYaw + 1.2, 7, true)
+
+  // ─── ostrich-eggshell water flasks by the wood, each with its small drinking hole ──────────────────────────
+  const eggGeo = geo(new IcosahedronGeometry(1, 2).toNonIndexed())
+  const eggCream = lin(0.84, 0.78, 0.64)
+  for (const [a, b, yaw] of [
+    [-5.0, 5.7, 0.4],
+    [-5.35, 5.35, 1.9],
+    [-1.9, 3.7, 2.8],
+  ] as const) {
+    const p = at(a, b)
+    place(p.x, p.y + 0.055, p.z, yaw, [0.075, 0.062, 0.062], 0, Math.PI / 2 - 0.15)
+    // the hole at one end, the shell a little stained low down where it lies on the floor
+    soup.put(eggGeo, m, (lx, ly) => (ly > 0.93 ? lin(0.12, 0.1, 0.08) : scale(eggCream, 0.85 + 0.15 * Math.min(1, lx * 0.5 + 0.75))), [0, 0])
+    keep.push({ x: p.x, z: p.z, r: 0.15 })
+  }
 
   // ─── the firewood pile beside the main hearth ─────────────────────────────────────────────────────────────
   const woodYaw = caveYaw + 0.15
@@ -428,6 +454,19 @@ export function createCaveFloor(world: WorldData): CaveFloorView {
       const len = 0.12 + 0.16 * r()
       place(x, world.heightAt(x, z) + 0.014, z, r() * 6.28, [1, len, 1], Math.PI / 2, (r() - 0.5) * 0.2)
       soup.put(boneGeo, m, () => lin(0.8, 0.75, 0.64), [0, 0])
+    }
+  }
+
+  // ─── shells dropped round the main hearth and toward the mouth: limpets cream, mussels blue-black ─────────
+  const mainHearth = world.pois.find((p) => p.id === 'hearth-main')
+  if (mainHearth) {
+    for (let k = 0; k < 34; k++) {
+      const ang = r() * 6.28
+      const d = 1.2 + 1.6 * r()
+      const x = mainHearth.x + Math.cos(ang) * d
+      const z = mainHearth.z + Math.sin(ang) * d
+      if (!clear(x, z, 0.05)) continue
+      shell(x, z, world.heightAt(x, z) - 0.01, 0.025 + 0.02 * r())
     }
   }
 
