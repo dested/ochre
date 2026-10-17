@@ -647,6 +647,10 @@ controller, cameras and verbs that make each stage of life feel different; and t
   must finish with at least 40% of the time to spare. Your choice how (deadline, count, carry, a nearer wood spot in
   the layout data you own). A test drives the walking pace and asserts completion before the deadline.
   (3) Drop the literal "(0/5)" from the objective text (chapters.ts:1154); the counter shows the count.
+  (4) After the heir takes over, Teni's sister Kaya reads "Elder"; she is the heir's great-aunt ("Great-aunt" /
+  "Great-uncle" for a grandparent's sibling) (`/w/junk/sim-80k/ui/shots/f1/sheet-11.png`). (5) The elder.mark QA skip
+  doesn't advance; ui had to engrave by hand. (6) The story caption ("You tell them how the moon pulls...") is still on
+  screen when elder.walk fades in: clear captions when a beat opens behind a fade.
 
 ## Ledger (lead, updated 2026-10-17 01:05)
 
