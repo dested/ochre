@@ -634,7 +634,7 @@ controller, cameras and verbs that make each stage of life feel different; and t
   jump to provider.whale, walk to the whale beach and confirm the stranded whale renders, beached on the sand (not
   under it, not floating, not in the water), big enough to read from the cliff path. If it's missing, find why; a fix
   in `game/play/cast.ts` (play's) goes to play as exact lines. Ready line with a shot from the cliff path and one beside it.
-  **P4 item 0b (04:37):** the held.shell offering: the shell prop is a 1.6 cm bead; make the offered shell a real
+  **P4 item 0b (04:37; shell part dropped 04:44, play made `play/offer-shell.ts` in 5b19af8, only the crouch hand stays):** the held.shell offering: the shell prop is a 1.6 cm bead; make the offered shell a real
   shell, ~5 cm (a periwinkle or a small abalone with its nacre), readable in the infant's view. And the crouch pose
   leaves both hands at her sides; the offering hand comes up in front of her chest at ~0.25 m. Play stands her up as a
   stop-gap (29ac34c) and drops that once the crouch holds the offer.
