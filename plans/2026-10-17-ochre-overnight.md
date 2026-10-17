@@ -666,6 +666,15 @@ controller, cameras and verbs that make each stage of life feel different; and t
   `PersonActor.setSinging?(on)` (18cae73; people builds it; play calls it in cast.ts when `p.speech?.text === '♪'`,
   with setTalking(false)). Play folds both lines into its next commit after F2.
 
+- (2026-10-17 04:52, lead) **Sim S7, Tuk teaches** (from look-only 2, logs `/w/junk/sim-80k/sim/pt7-*.log`).
+  (1) youth.track: 113 s with nothing said. Tuk teaches tracking as he goes, real knowledge, short practical lines
+  (at most 14 words, his voice): at the plateau top (the wind: keep it in your face); reading the ground (a fresh print
+  has crisp edges, an old one is softened by wind and dew; the deep toe-dig of a running eland against a walking one);
+  on the trail, whispered, two or three keyed to distance along it (dung still warm or crusted; a bent grass stem
+  still rising; stop when I stop). No gap over 45 s at headless pace in the beat. (2) youth.stone: silent; 3 Tuk
+  lines about choosing silcrete (the fine grain, the clear ring when you knock it, the fire under the sand that makes
+  it flake true), at the walk start, the first collect and the third. A test asserts the youth.track gap.
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: a10f6ba (main, 04:46) · Gate: install 0, typecheck 0, test 0 (69), build 0 at a10f6ba · Deploy: CI pending (previous cca08b3 live, CI 39028574081)
@@ -674,7 +683,7 @@ Board: down · Last pushed: a10f6ba (main, 04:46) · Gate: install 0, typecheck 
 | --- | --- | --- | --- | --- | --- |
 | world | opus-xhigh | world-gen, game/world, game/render | F1a follow-up (no haze inside the drip line), spike verdict, then F1 c–e; notes: softer ledges, flame cards, cave dressing visibility | F1b 9bb5669 + F1a 5da59ed passed 04:34; W3 4–5 passed 04:20 (421b1a6 tris: cave 126/805k high, 97/484k medium; e988dd0 gold); W3 1–3 passed 04:10 (aeb266c, 500a203, 25aa317); tris 12f7386/3812240; W2 86a96f0 passed 03:20; W1 82b261e passed | working |
 | people | opus-xhigh | game/actors | P4: eland graze, then anim pass (dance, mourn, lie-dead, crawl, tend-fire, engrave, sing) | wrinkles cca08b3 + necklace 126c800 passed 04:30; P3 6798b36 passed 04:40; P1b 3f8b1a9 passed 04:35 (L0 ≤70k); P2 afe56e2 passed | working |
-| sim | opus-high | sim | look-only 2: held, small, youth + fresh start (gaps > 90 s, repeats, stale counts) | S6 d5d5e8d passed 04:48 (memories, storm wood, great-aunt, skip); look-only run passed 04:31 (all objectives complete); F2 0624283 passed (whale at rise + 3); F1 adc88d1 passed (50 tests); pacing 972f17c passed (47 tests, waits 29–91 s real); aside 74bce0a passed; S5c 95e8327 passed; S5b rest 69428c6 passed (41 tests; covers S5c 1–2); f683e42 superseded; S5b part 6aa3225 passed (held 18:20, follow walk); S5 209a09c passed (7 moments); S4 d0549fd passed; S2 071949a passed | working |
+| sim | opus-high | sim | S7: Tuk teaches (youth.track, youth.stone lines) | look-only 2 passed 04:52 (all reach summary); S6 d5d5e8d passed 04:48 (memories, storm wood, great-aunt, skip); look-only run passed 04:31 (all objectives complete); F2 0624283 passed (whale at rise + 3); F1 adc88d1 passed (50 tests); pacing 972f17c passed (47 tests, waits 29–91 s real); aside 74bce0a passed; S5c 95e8327 passed; S5b rest 69428c6 passed (41 tests; covers S5c 1–2); f683e42 superseded; S5b part 6aa3225 passed (held 18:20, follow walk); S5 209a09c passed (7 moments); S4 d0549fd passed; S2 071949a passed | working |
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | on call: held.* recheck after F2 rebuild | 8ca2317 male small/youth/provider cards passed 04:42; f491768 male elder/summary painting passed 04:39; recheck #9/#11 passed 04:37 (663f793 captions under hidden HUD, 6e14e84 scrollbars); F1 mark 23acc39 passed; U7 passed (bdc3b86); chatter 830a7ab; U6 ce615bc passed; U5, U3 passed | working |
 | play | opus-high | game/play, game/audio, app/play.tsx | F2 held opening (acked 04:21) | F1 play 7e42a4a passed (all 9; dd47469 summary hang fixed); PL3 runs 1–2 reached the summary, no errors; 8c75080 aim, 8f774e0 tags, 7a6f0e5 spoor passed; 9a7684d passed (E verb, seated camera); PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
 
