@@ -655,6 +655,11 @@ controller, cameras and verbs that make each stage of life feel different; and t
   screen when elder.walk fades in: clear captions when a beat opens behind a fade. **(Moved to play as F2 item 8,
   04:40: the contract has no caption-clear event.)**
 
+- (2026-10-17 04:45, lead) **Contract adds:** `HudState.sex?: Sex` (6698df4; play sets `sex: player.sex` in
+  updateHud; ui picks intro/3.webp mirrored for male lives on the summary and elder card) and the optional
+  `PersonActor.setSinging?(on)` (18cae73; people builds it; play calls it in cast.ts when `p.speech?.text === '♪'`,
+  with setTalking(false)). Play folds both lines into its next commit after F2.
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: cca08b3 (main, 04:24) · Gate: install 0, typecheck 0, test 0 (68), build 0 at cca08b3 · Deploy: cca08b3 live (CI 39028574081 green, /healthz ok)
