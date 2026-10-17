@@ -52,9 +52,18 @@ export type ArmSpec = {
   abduct: number
   twist: number
   elbow: number
-  // IK: wrist target (body space) and where the elbow points
+  // IK: wrist target and where the elbow points (body space)
   wrist: Vector3
   pole: Vector3
+  /**
+   * the bone the wrist target rides on: 0 (root) means body space; otherwise the target is given in bind
+   * coordinates and follows that bone's posed transform (a hand to the mouth stays on the mouth)
+   */
+  space: number
+  /** a second target (in its own space) the wrist blends toward by `mix`: lap → mouth without a jump */
+  wrist2: Vector3
+  space2: number
+  mix: number
   // wrist relative to the forearm: flex (palm-ward), deviation, pronation
   hand: Vector3
   /** if set, the held item axis (hand +Z) points along aimAxis with the palm facing aimPalm (body space) */
@@ -92,6 +101,10 @@ function armSpec(): ArmSpec {
     elbow: 0.15,
     wrist: new Vector3(),
     pole: new Vector3(0, 0, -1),
+    space: 0,
+    wrist2: new Vector3(),
+    space2: 0,
+    mix: 0,
     hand: new Vector3(),
     aim: false,
     aimAxis: new Vector3(0, 1, 0),
@@ -134,6 +147,9 @@ export function resetSpec(s: PoseSpec, rig: RigInfo): void {
     l.yaw = 0.1
     l.pole.set(side * 0.15, 0, 1)
     a.ik = false
+    a.space = 0
+    a.space2 = 0
+    a.mix = 0
     a.flex = 0
     a.abduct = 0.1
     a.twist = 0
@@ -169,6 +185,8 @@ const _t = new Vector3()
 const _mid = new Vector3()
 const _qi = new Quaternion()
 const _qa = new Quaternion()
+const _tg = new Vector3()
+const _tg2 = new Vector3()
 
 function eulerQ(v: Vector3, order: 'YXZ' | 'XYZ' | 'ZXY', out: Quaternion): Quaternion {
   return out.setFromEuler(_e.set(v.x, v.y, v.z, order))
@@ -257,6 +275,22 @@ export class Solver {
     out.q[b]?.copy(_qi.copy(Qp).invert().multiply(Qb))
   }
 
+  /** an arm's wrist target in body space (mapped through its bone when it rides on one) */
+  private target(arm: ArmSpec, out: Vector3): Vector3 {
+    this.mapTo(arm.space, arm.wrist, out)
+    if (arm.mix > 0) out.lerp(this.mapTo(arm.space2, arm.wrist2, _tg2), arm.mix)
+    return out
+  }
+
+  private mapTo(space: number, v: Vector3, out: Vector3): Vector3 {
+    if (space <= 0) return out.copy(v)
+    const bind = this.rig.bind[space]
+    const Qb = this.Q[space]
+    const Pb = this.P[space]
+    if (!bind || !Qb || !Pb) return out.copy(v)
+    return out.copy(v).sub(bind).applyQuaternion(Qb).add(Pb)
+  }
+
   solve(s: PoseSpec, out: Pose): void {
     const rig = this.rig
     const Q = this.Q
@@ -328,14 +362,15 @@ export class Solver {
         const Pa = P[ua]
         if (!Pc || !Qc || !offA || !Pa) continue
         Pa.copy(offA).applyQuaternion(Qc).add(Pc)
-        solveMid(Pa, arm.wrist, rig.upperArm, rig.foreArm, arm.pole, this.knee)
+        const tgt = this.target(arm, _tg)
+        solveMid(Pa, tgt, rig.upperArm, rig.foreArm, arm.pole, this.knee)
         // the upper arm's Z leans toward where the forearm goes
-        _t.subVectors(arm.wrist, this.knee)
+        _t.subVectors(tgt, this.knee)
         _mid.subVectors(Pa, this.knee)
         basisYZ(_mid, _t.lengthSq() > 1e-8 ? _t : this.tmpV.copy(arm.pole).negate(), _qa)
         this.setWorld(ua, B.chest, _qa, out)
         this.hingeX.set(1, 0, 0).applyQuaternion(_qa)
-        basisXY(this.hingeX, this.tmpV.subVectors(this.knee, arm.wrist), _qa)
+        basisXY(this.hingeX, this.tmpV.subVectors(this.knee, tgt), _qa)
         this.setWorld(fa, ua, _qa, out)
       }
       if (arm.aim) {

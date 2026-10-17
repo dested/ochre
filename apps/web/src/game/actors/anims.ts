@@ -4,14 +4,51 @@
  * stance and arc forward in swing, the pelvis bobs, sways and yaws, the chest counter-rotates. Stride length
  * follows the Froude number, so a child takes quick short steps and an adult long ones at the same speed.
  */
+import type { Vector3 } from 'three'
 import type { CarrySlot, HeldItem, PersonAnim } from '../contracts'
 import type { BodyDims } from './body'
 import { clamp, lerp, smooth } from './geo'
 import type { ArmSpec, PoseSpec, RigInfo } from './pose'
 import { resetSpec } from './pose'
+import { B } from './rig'
+import {
+  poseAim,
+  poseCrawl,
+  poseDance,
+  poseDig,
+  poseEat,
+  poseEngrave,
+  poseGrind,
+  poseKnap,
+  poseLieDead,
+  poseMourn,
+  posePoint,
+  poseScrape,
+  poseSleep,
+  poseTendFire,
+  poseThrow,
+  poseWave,
+  talkGestures,
+} from './poses'
 
 const TAU = Math.PI * 2
 const frac = (x: number): number => x - Math.floor(x)
+
+/** how far an arms-carried child leans back from upright, radians */
+export const ARMS_RECLINE = 0.12
+
+/** an arms-carried child's seat, in the carrier's bind body space (riding on the chest bone) */
+export type CarrySeat = {
+  /** the child's hip joint */
+  hip: Vector3
+  /** the child's eyes above its hips */
+  up: number
+  /** the child's back, behind its hip joint (away from the carrier) */
+  back: number
+  /** the child's armpits above its hips, and its chest width */
+  armpitUp: number
+  chestW: number
+}
 
 export type AnimCtx = {
   rig: RigInfo
@@ -26,12 +63,18 @@ export type AnimCtx = {
   held: readonly [HeldItem, HeldItem]
   /** what this person carries (as carrier) */
   carrying: CarrySlot | null
+  /** for an arms carry: where the child sits, so the hands can cradle it */
+  seat: CarrySeat | null
   /** how this person is carried (as the child) */
   carriedIn: CarrySlot | null
   /** 0..1 per-person variety */
   jit: number
   /** which locomotion pose to write while moving: 0 the walk, 1 the run (the actor blends the two) */
   runK: number
+  /** the look target in body space, if any */
+  look: Vector3 | null
+  /** 0..1 how much this person is talking */
+  talk: number
 }
 
 /* ─── gait ─────────────────────────────────────────────────────────────────────────────────────────────── */
@@ -306,8 +349,31 @@ function carryArms(c: AnimCtx, s: PoseSpec): void {
     s.hipRot.z += 0.06
     s.hip.x += 0.015 * H
     s.spine.z -= 0.05
+  } else if (c.seat) {
+    // held up face to face: the hands under the child's arms, palms on its ribs, fingers round its back
+    const st = c.seat
+    const pitY = st.hip.y + st.armpitUp
+    for (const a of [l, r]) {
+      const side = a === l ? 1 : -1
+      a.ik = true
+      a.space = B.chest
+      // the fingers run (0, 0.4, 0.9) from the wrist; the palm's middle sits just under the armpit
+      a.wrist.set(side * (st.chestW * 0.5 + 0.012 * H), pitY - 0.4 * 0.55 * d.palm - 0.01 * H, st.hip.z - 0.9 * 0.55 * d.palm)
+      a.pole.set(side * 0.8, -1, -0.3)
+      a.aim = true
+      // hand +Z for fingers along (0, 0.4, 0.9) with the palm inward: Z = X × (−fingers)
+      a.aimAxis.set(side * 0.12, 0.9, -0.4)
+      a.aimPalm.set(-side, 0, 0)
+      a.curl = 0.25
+      a.thumb = 0.1
+    }
+    // leaning back a touch against the weight, the head tipped toward the child
+    s.hipRot.x -= 0.03
+    s.spine.x -= 0.04
+    s.chest.x -= 0.03
+    s.head.z += 0.08
   } else {
-    // in the arms, or a load in front
+    // a load in front
     for (const a of [l, r]) {
       const side = a === l ? 1 : -1
       a.ik = true
@@ -327,11 +393,20 @@ function poseHeld(c: AnimCtx, s: PoseSpec): void {
   const legL = rig.thigh + rig.shin
   const slot = c.carriedIn ?? 'back'
   s.hip.set(0, rig.hipY, 0)
-  s.hipRot.set(slot === 'arms' ? -0.2 : 0.05, 0, 0)
-  s.spine.set(0.08, 0, 0)
-  s.chest.set(0.04, 0, 0)
-  s.neck.set(-0.1, 0.15 * Math.sin(t * 0.31), 0)
-  s.head.set(-0.15 + 0.05 * Math.sin(t * 0.53), 0.3 * Math.sin(t * 0.23 + 1), 0.05)
+  if (slot === 'arms') {
+    // held up under the arms, face to face with the carrier
+    s.hipRot.set(-ARMS_RECLINE, 0, 0)
+    s.spine.set(0.04, 0, 0)
+    s.chest.set(0.02, 0, 0)
+    s.neck.set(-0.02, 0.06 * Math.sin(t * 0.31), 0)
+    s.head.set(0.02 + 0.04 * Math.sin(t * 0.53), 0.1 * Math.sin(t * 0.23 + 1), 0.04 * Math.sin(t * 0.41))
+  } else {
+    s.hipRot.set(0.05, 0, 0)
+    s.spine.set(0.08, 0, 0)
+    s.chest.set(0.04, 0, 0)
+    s.neck.set(-0.1, 0.15 * Math.sin(t * 0.31), 0)
+    s.head.set(-0.15 + 0.05 * Math.sin(t * 0.53), 0.3 * Math.sin(t * 0.23 + 1), 0.05)
+  }
   for (let i = 0; i < 2; i++) {
     const side = i === 0 ? 1 : -1
     const leg = s.legs[i]
@@ -342,16 +417,17 @@ function poseHeld(c: AnimCtx, s: PoseSpec): void {
       leg.ankle.set(side * rig.hipX * 3.2, rig.hipY - legL * 0.55, legL * 0.45)
       leg.pole.set(side * 1.2, 0.2, 0.6)
     } else {
-      leg.ankle.set(side * rig.hipX * 1.4, rig.hipY - legL * 0.35, legL * 0.65)
-      leg.pole.set(side * 0.3, 0.6, 0.8)
+      // held up under the arms: the legs hang, knees soft and a little apart
+      leg.ankle.set(side * rig.hipX * 1.9, rig.hipY - legL * 0.78, legL * 0.32 + 0.04 * legL * Math.sin(t * 1.1 + side))
+      leg.pole.set(side * 0.5, 0.3, 1)
     }
     leg.pitch = 0.3
     leg.yaw = 0.3
     a.ik = false
-    a.flex = slot === 'back' ? 0.9 + 0.1 * Math.sin(t * 0.9 + side) : 0.6
-    a.abduct = 0.4
+    a.flex = slot === 'back' ? 0.9 + 0.1 * Math.sin(t * 0.9 + side) : slot === 'arms' ? 1.25 + 0.2 * Math.sin(t * 0.7 + side * 2) : 0.6
+    a.abduct = slot === 'arms' ? 0.25 : 0.4
     a.twist = 0.3
-    a.elbow = 0.9
+    a.elbow = slot === 'arms' ? 0.55 + 0.25 * Math.sin(t * 0.9 + side) : 0.9
     a.curl = 0.55
   }
 }
@@ -368,8 +444,8 @@ function holdItems(c: AnimCtx, s: PoseSpec, anim: PersonAnim, moving: boolean): 
     const side = i === 0 ? 1 : -1
     a.curl = 0.88
     a.thumb = 0.7
-    const standing = anim === 'idle' || anim === 'talk' || anim === 'walk' || anim === 'run' || anim === 'carry'
-    if (!standing) continue
+    const standing = anim === 'idle' || anim === 'talk' || anim === 'walk' || anim === 'run' || anim === 'carry' || anim === 'point' || anim === 'wave'
+    if (!standing || a.ik) continue
     if (item === 'spear' || item === 'digging-stick') {
       if (!moving) {
         // butt on the ground by the foot, held upright at chest height
@@ -400,12 +476,30 @@ function holdItems(c: AnimCtx, s: PoseSpec, anim: PersonAnim, moving: boolean): 
       a.aimPalm.set(-side * 0.3, 0, 1)
     } else if (item === 'shell' || item === 'corm' || item === 'stone' || item === 'ochre' || item === 'beads') {
       if (!moving) {
+        // turned over in the hand, looked at
         a.flex = 0.55
         a.elbow = 1.35
         a.hand.set(-0.2, 0, -0.9)
         a.curl = 0.55
         a.thumb = 0.5
+      } else {
+        a.curl = 0.6
       }
+    } else if (item === 'bag' || item === 'meat') {
+      // hanging from the fist: the arm a little out, the swing damped by the weight
+      a.flex *= 0.5
+      a.abduct += 0.08
+      a.elbow = Math.min(a.elbow, 0.3)
+      a.hand.set(0, 0, 0)
+      a.curl = 0.92
+    } else if (item === 'firewood') {
+      // the bundle on the shoulder, steadied by the hand
+      a.ik = true
+      a.wrist.set(side * d.shoulderX * 0.95, d.shoulderJointY + 0.02 * H, 0.1 * H)
+      a.pole.set(side * 0.6, -1, 0)
+      a.aim = true
+      a.aimAxis.set(side * 0.15, 0.35, -1)
+      a.aimPalm.set(-side, 0, 0)
     } else if (item === 'firebrand') {
       a.flex = 0.45
       a.elbow = 1.0
@@ -418,6 +512,10 @@ function holdItems(c: AnimCtx, s: PoseSpec, anim: PersonAnim, moving: boolean): 
 
 /* ─── entry ────────────────────────────────────────────────────────────────────────────────────────────── */
 
+const LYING = new Set<PersonAnim>(['sleep', 'lie-dead'])
+/** anims an infant too young to stand can do; anything else sits them up */
+const INFANT_OK = new Set<PersonAnim>(['crawl', 'sleep', 'lie-dead', 'held'])
+
 /** write the pose for `anim` (before the look/talk layers) */
 export function poseAnim(anim: PersonAnim, c: AnimCtx, s: PoseSpec): void {
   resetSpec(s, c.rig)
@@ -425,6 +523,7 @@ export function poseAnim(anim: PersonAnim, c: AnimCtx, s: PoseSpec): void {
   const infant = c.d.age < 1.1
   let base: PersonAnim = anim
   if (c.carriedIn) base = 'held'
+  else if (infant && !INFANT_OK.has(base)) base = 'idle'
   switch (base) {
     case 'held':
       poseHeld(c, s)
@@ -433,35 +532,76 @@ export function poseAnim(anim: PersonAnim, c: AnimCtx, s: PoseSpec): void {
       poseCrouch(c, s, false)
       break
     case 'gather':
-    case 'dig':
-    case 'scrape':
-    case 'grind':
       poseCrouch(c, s, true)
       break
+    case 'dig':
+      poseDig(c, s)
+      break
+    case 'scrape':
+      poseScrape(c, s)
+      break
+    case 'grind':
+      poseGrind(c, s)
+      break
     case 'sit':
-    case 'knap':
-    case 'eat':
-    case 'engrave':
-    case 'sleep':
-    case 'mourn':
-    case 'tend-fire':
       poseSit(c, s)
       break
+    case 'knap':
+      poseSit(c, s)
+      poseKnap(c, s, s.hip.y)
+      break
+    case 'eat':
+      poseSit(c, s)
+      poseEat(c, s, s.hip.y)
+      break
+    case 'engrave':
+      poseSit(c, s)
+      poseEngrave(c, s, s.hip.y)
+      break
+    case 'mourn':
+      poseMourn(c, s)
+      break
+    case 'tend-fire':
+      poseTendFire(c, s)
+      break
+    case 'sleep':
+      poseSleep(c, s)
+      break
+    case 'lie-dead':
+      poseLieDead(c, s)
+      break
     case 'crawl':
-      poseBabySit(c, s)
+      poseCrawl(c, s)
+      break
+    case 'aim':
+      poseAim(c, s)
+      break
+    case 'throw':
+      poseThrow(c, s)
+      break
+    case 'dance':
+      poseDance(c, s)
       break
     default: {
-      // walk/run/idle and the upper-body anims share the locomotion legs
+      // idle, walk, run, carry, talk, point and wave share the standing or walking legs
       if (infant) poseBabySit(c, s)
       else if (moving) poseGait(c, s, c.runK)
       else poseIdle(c, s)
-      if (anim === 'carry' || c.carrying) carryArms(c, s)
+      if (base === 'carry' || c.carrying) carryArms(c, s)
+      if (base === 'point') posePoint(c, s)
+      else if (base === 'wave') poseWave(c, s)
     }
   }
-  if (!c.carriedIn && !infant) holdItems(c, s, base, moving)
+  const lying = LYING.has(base)
+  if (!c.carriedIn && !infant && !lying && base !== 'crawl') holdItems(c, s, base, moving)
+  // conversation: the 'talk' anim gestures fully; talking during anything else adds a little
+  if (!lying && base !== 'held' && base !== 'crawl') {
+    const w = base === 'talk' ? 0.8 + 0.2 * c.talk : 0.45 * c.talk
+    if (w > 0.01) talkGestures(c, s, w)
+  }
   // old age: a stoop, the head lifted to keep the gaze level, knees soft
   const e = c.d.elder
-  if (e > 0 && base !== 'held') {
+  if (e > 0 && base !== 'held' && !lying && base !== 'crawl') {
     s.spine.x += 0.1 * e
     s.chest.x += 0.1 * e
     s.neck.x += 0.12 * e

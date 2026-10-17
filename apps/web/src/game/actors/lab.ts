@@ -1,7 +1,8 @@
 /**
  * /lab/people: the fixed cast on a warm ground disc under a golden-hour key and a sky-blue fill. Orbit camera,
  * an anim picker, an age slider for the selected person, close-ups that frame a face at 40 cm, and (DEV)
- * window.__lab = { anim, age, closeup, lineup, select, crowd } for bx.
+ * window.__lab = { anim, age, closeup, lineup, select, talk, carry, held, cam, count } for bx. ?crowd=N adds N walkers
+ * in circles for the budget test.
  */
 import {
   ACESFilmicToneMapping,
@@ -12,20 +13,47 @@ import {
   HemisphereLight,
   Mesh,
   MeshStandardMaterial,
-  PCFSoftShadowMap,
+  PCFShadowMap,
   PerspectiveCamera,
   Scene,
   Vector3,
 } from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import type { PersonActor, PersonAnim } from '../contracts'
+import type { CarrySlot, HeldItem, PersonActor, PersonAnim } from '../contracts'
 import { createHost } from '../engine/host'
 import { LAB_CAST, LAB_INFANT } from './cast'
 import { createPerson } from './person'
 import { randomLook } from './looks'
 import { Rng } from '~/core/rng'
 
-const ANIMS: PersonAnim[] = ['idle', 'walk', 'run', 'crouch', 'gather', 'sit', 'carry']
+const ANIMS: PersonAnim[] = [
+  'idle',
+  'walk',
+  'run',
+  'talk',
+  'point',
+  'wave',
+  'carry',
+  'crouch',
+  'gather',
+  'dig',
+  'scrape',
+  'grind',
+  'sit',
+  'knap',
+  'engrave',
+  'eat',
+  'tend-fire',
+  'mourn',
+  'aim',
+  'throw',
+  'dance',
+  'crawl',
+  'sleep',
+  'lie-dead',
+]
+const ITEMS: HeldItem[] = ['none', 'spear', 'digging-stick', 'stick', 'shell', 'stone', 'ochre', 'beads', 'corm', 'firebrand', 'bag', 'meat', 'firewood']
+const SLOTS: (CarrySlot | 'none')[] = ['back', 'hip', 'arms', 'none']
 const SPACING = 0.82
 
 type Walker = { actor: PersonActor; home: Vector3; radius: number; angle: number; walkSpeed: number }
@@ -35,8 +63,9 @@ export function mount(el: HTMLElement): () => void {
   const renderer = host.renderer
   renderer.toneMapping = ACESFilmicToneMapping
   renderer.toneMappingExposure = 1.05
-  renderer.shadowMap.enabled = true
-  renderer.shadowMap.type = PCFSoftShadowMap
+  const query = new URLSearchParams(window.location.search)
+  renderer.shadowMap.enabled = query.get('shadows') !== '0'
+  renderer.shadowMap.type = PCFShadowMap
 
   const scene = new Scene()
   const bg = new Color('#d6b48c')
@@ -80,8 +109,7 @@ export function mount(el: HTMLElement): () => void {
   scene.add(ground)
 
   // the cast
-  const params = new URLSearchParams(window.location.search)
-  const crowdN = Number(params.get('crowd') ?? 0)
+  const crowdN = Number(query.get('crowd') ?? 0)
   const people: PersonActor[] = []
   const walkers: Walker[] = []
   const names: string[] = []
@@ -116,6 +144,13 @@ export function mount(el: HTMLElement): () => void {
     }
   }
 
+  // the crowd test looks over the band from where a game camera would, a few metres back and up
+  if (crowdN > 0) {
+    camera.position.set(0, 3.4, 12.5)
+    controls.target.set(0, 0.8, 0)
+    controls.update()
+  }
+
   let anim: PersonAnim = 'idle'
   let selected = 4
   let closeIdx: number | null = null
@@ -123,9 +158,13 @@ export function mount(el: HTMLElement): () => void {
 
   const setAnim = (a: PersonAnim): void => {
     anim = a
-    for (const p of people) if (p !== infant) p.setAnim(a)
+    // the infant crawls, sleeps and lies with the others; otherwise it rides or sits
+    const infantOwn = a === 'crawl' || a === 'sleep' || a === 'lie-dead'
+    for (const p of people) if (p !== infant || infantOwn) p.setAnim(a)
+    if (!infantOwn) infant.setAnim('idle')
     if (a !== 'walk' && a !== 'run') walkers.forEach((w) => w.actor.object.position.copy(w.home))
-    for (const w of walkers) w.actor.object.rotation.y = 0
+    // sleepers lie along X (on the right side); turn them so the row lies side by side
+    for (const w of walkers) w.actor.object.rotation.y = a === 'sleep' ? Math.PI / 2 : 0
     animSel.value = a
   }
   const lineup = (): void => {
@@ -240,6 +279,46 @@ export function mount(el: HTMLElement): () => void {
     lookAtCam = lookBox.checked
   }
   r4.append(lookBox, 'Look at the camera')
+  const talkBox = document.createElement('input')
+  talkBox.type = 'checkbox'
+  talkBox.onchange = () => people.forEach((p) => p.setTalking(talkBox.checked))
+  r4.append(talkBox, 'Talking')
+  const r5 = row()
+  const slotSel = document.createElement('select')
+  for (const s of SLOTS) {
+    const o = document.createElement('option')
+    o.value = s
+    o.textContent = s
+    slotSel.appendChild(o)
+  }
+  const setCarry = (slot: CarrySlot | 'none'): void => {
+    if (!ama) return
+    slotSel.value = slot
+    if (slot === 'none') {
+      ama.carry(null)
+      infant.object.position.set(ama.object.position.x + 0.35, 0, 0.45)
+    } else ama.carry(infant, slot)
+  }
+  slotSel.onchange = () => {
+    const s = SLOTS.find((x) => x === slotSel.value)
+    if (s) setCarry(s)
+  }
+  r5.append('Baby', slotSel)
+  const itemSel = document.createElement('select')
+  for (const it of ITEMS) {
+    const o = document.createElement('option')
+    o.value = it
+    o.textContent = it
+    itemSel.appendChild(o)
+  }
+  const setHeld = (i: number, hand: 'left' | 'right', item: HeldItem): void => {
+    people[i]?.setHeld(hand, item)
+  }
+  itemSel.onchange = () => {
+    const it = ITEMS.find((x) => x === itemSel.value)
+    if (it) setHeld(selected, 'right', it)
+  }
+  r5.append('Right hand', itemSel)
   el.appendChild(panel)
   personSel.onchange(new Event('change'))
 
@@ -255,7 +334,28 @@ export function mount(el: HTMLElement): () => void {
       selected = i
       personSel.value = String(i)
     },
-    talk: (on: boolean) => people.forEach((p) => p.setTalking(on)),
+    talk: (on: boolean) => {
+      talkBox.checked = on
+      people.forEach((p) => p.setTalking(on))
+    },
+    carry: (slot: string) => {
+      const s = SLOTS.find((x) => x === slot)
+      if (s) setCarry(s)
+    },
+    held: (i: number, hand: 'left' | 'right', item: string) => {
+      const it = ITEMS.find((x) => x === item)
+      if (it) setHeld(i, hand, it)
+    },
+    look: (on: boolean) => {
+      lookBox.checked = on
+      lookAtCam = on
+    },
+    /** the distance between the infant's eyes and the carrier's (the arms-carry rule: 35–45 cm) */
+    carryGap: () => {
+      if (!ama) return 0
+      const a = ama.headPosition(new Vector3())
+      return a.distanceTo(infant.headPosition(new Vector3()))
+    },
     /** free camera for screenshots: eye position and target */
     cam: (px: number, py: number, pz: number, tx: number, ty: number, tz: number) => {
       closeIdx = null
@@ -264,10 +364,21 @@ export function mount(el: HTMLElement): () => void {
       controls.update()
     },
     count: () => people.length + crowd.length,
+    /** mean CPU ms per frame for the actors' update and for render submission since the last call, and the fps */
+    perf: () => {
+      const n = Math.max(1, perf.n)
+      const r = { update: perf.update / n, render: perf.render / n, fps: perf.n / Math.max(1e-3, perf.dt) }
+      perf.n = 0
+      perf.update = 0
+      perf.render = 0
+      perf.dt = 0
+      return r
+    },
   }
   if (import.meta.env.DEV) Object.assign(window, { __lab: api })
 
   const tmp = new Vector3()
+  const perf = { n: 0, update: 0, render: 0, dt: 0 }
   const off = host.onFrame((dt) => {
     const walking = anim === 'walk' || anim === 'run'
     for (const w of walkers) {
@@ -291,11 +402,18 @@ export function mount(el: HTMLElement): () => void {
     }
     camera.getWorldPosition(tmp)
     for (const p of people) p.setLookAt(lookAtCam ? tmp : null)
+    const t0 = performance.now()
     for (const p of people) p.update(dt)
     for (const w of crowd) w.actor.update(dt)
+    const t1 = performance.now()
     if (closeIdx !== null && !walking) frameClose()
     controls.update()
     renderer.render(scene, camera)
+    const t2 = performance.now()
+    perf.n++
+    perf.update += t1 - t0
+    perf.render += t2 - t1
+    perf.dt += dt
   })
   const offResize = host.onResize((s) => {
     camera.aspect = s.width / s.height

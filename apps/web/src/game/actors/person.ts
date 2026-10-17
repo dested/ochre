@@ -7,7 +7,7 @@
 import { Group, Matrix4, Object3D, Quaternion, Vector3 } from 'three'
 import type { CarrySlot, CreatePerson, Hand, HeldItem, PersonActor, PersonAnim, PersonLook, Vec3 } from '../contracts'
 import { Rng, mix32 } from '~/core/rng'
-import { gaitFor, poseAnim, type AnimCtx } from './anims'
+import { ARMS_RECLINE, gaitFor, poseAnim, type AnimCtx, type CarrySeat } from './anims'
 import { buildPerson, type BuiltPerson } from './build'
 import { clamp } from './geo'
 import { Solver, blendPose, copyPose, makePose, makeSpec, type PoseSpec } from './pose'
@@ -21,6 +21,10 @@ const _m = new Matrix4()
 const _q = new Quaternion()
 const AX = new Vector3(1, 0, 0)
 const AY = new Vector3(0, 1, 0)
+
+/** arms carry: the child's eyes this far below and out in front of the carrier's (scaled by the carrier's size) */
+const ARMS_EYE_DROP = 0.30
+const ARMS_EYE_OUT = 0.36
 
 const damp = (cur: number, target: number, rate: number, dt: number): number => cur + (target - cur) * (1 - Math.exp(-rate * dt))
 
@@ -67,6 +71,11 @@ class PersonImpl implements PersonActor {
   private cape = 0
   private capeV = 0
   private eyeMid = new Vector3()
+  private lookBody = new Vector3()
+  /** this frame's gaze: the set target, or the face of the child in our arms (or of the one holding us) */
+  private gaze: Vector3 | null = null
+  private autoGaze = new Vector3()
+  private seat: CarrySeat | null = null
   private disposed = false
 
   constructor(look: PersonLook) {
@@ -123,6 +132,7 @@ class PersonImpl implements PersonActor {
       c.inner.position.set(0, 0, 0)
       c.inner.quaternion.identity()
       this.attach.removeFromParent()
+      this.seat = null
     }
     if (child) {
       const impl = people.get(child)
@@ -201,6 +211,7 @@ class PersonImpl implements PersonActor {
   /** where a carried child's rig sits, relative to the carrier's chest or hips bone */
   private placeAttach(): void {
     const c = this.carrying
+    this.seat = null
     if (!c) return
     const d = this.built.dims
     const cd = c.child.built.dims
@@ -220,9 +231,18 @@ class PersonImpl implements PersonActor {
       this.attach.position.copy(seat).sub(hipsBind)
       this.attach.quaternion.setFromAxisAngle(AY, -Math.PI / 2 + 0.7)
     } else {
+      // held up face to face: the child's eyes ~40 cm out from the carrier's and a little below (the stage-1 shot)
       chest.add(this.attach)
-      const seat = new Vector3(0, d.waistY - cd.hipY * 0.75, d.chestDepth + cd.hipDepth + 0.03)
-      this.attach.position.copy(seat).sub(chestBind)
+      const k = clamp(d.stature / 1.6, 0.75, 1.1)
+      const up = cd.headCy + cd.eyeY - cd.hipY
+      const fwd = cd.eyeZ + cd.eyeR
+      const hip = new Vector3(
+        0,
+        d.headCy + d.eyeY - ARMS_EYE_DROP * k - up * Math.cos(ARMS_RECLINE),
+        d.eyeZ + d.eyeR + ARMS_EYE_OUT * k + fwd - up * Math.sin(ARMS_RECLINE),
+      )
+      this.seat = { hip, up, back: cd.hipDepth * 0.9, armpitUp: cd.shoulderJointY - cd.hipY - cd.armR * 1.4, chestW: cd.chestW }
+      this.attach.position.set(hip.x, hip.y - cd.hipY, hip.z).sub(chestBind)
       this.attach.quaternion.setFromAxisAngle(AY, Math.PI)
     }
   }
@@ -273,10 +293,20 @@ class PersonImpl implements PersonActor {
       this.wasMoving = moving
       this.startFade(0.22)
     }
+    this.gaze = this.target
+    if (!this.gaze) {
+      if (this.carrying?.slot === 'arms') this.gaze = this.carrying.child.headPosition(this.autoGaze)
+      else if (this.carrier && this.carriedSlot === 'arms') this.gaze = this.carrier.headPosition(this.autoGaze)
+    }
     this.lookLayer(dt)
     this.blinkLayer(dt)
     this.talkW = damp(this.talkW, this.talking ? 1 : 0, 8, dt)
 
+    let look: Vector3 | null = null
+    if (this.gaze) {
+      this.inner.updateWorldMatrix(true, false)
+      look = this.lookBody.copy(this.gaze).applyMatrix4(_m.copy(this.inner.matrixWorld).invert())
+    }
     const ctx: AnimCtx = {
       rig,
       d,
@@ -286,9 +316,12 @@ class PersonImpl implements PersonActor {
       speed: moving ? this.speedS : 0,
       held: this.held,
       carrying: this.carrying?.slot ?? null,
+      seat: this.seat,
       carriedIn: this.carriedSlot,
       jit: this.jit,
       runK: 0,
+      look,
+      talk: this.talkW,
     }
     const anim = this.anim
     if (moving && gait.run > 0.02 && gait.run < 0.98) {
@@ -317,8 +350,9 @@ class PersonImpl implements PersonActor {
     this.apply(dt)
   }
 
-  /** head turn and talking, added onto the anim's spec */
+  /** head turn and talking, added onto the anim's spec (not while lying down) */
   private layers(s: PoseSpec): void {
+    if (this.anim === 'sleep' || this.anim === 'lie-dead') return
     s.neck.y += this.headYaw * 0.4
     s.head.y += this.headYaw * 0.6
     s.neck.x += this.headPitch * 0.3
@@ -337,10 +371,10 @@ class PersonImpl implements PersonActor {
     let wantYaw = 0
     let wantPitch = 0
     const chest = this.built.bones[B.chest]
-    if (this.target && chest) {
+    if (this.gaze && chest) {
       chest.updateWorldMatrix(true, false)
       _m.copy(chest.matrixWorld).invert()
-      _v.copy(this.target).applyMatrix4(_m)
+      _v.copy(this.gaze).applyMatrix4(_m)
       // from the head, in the chest's frame
       const neckUp = this.built.dims.headCy - this.built.dims.chestY
       _v.y -= neckUp
@@ -354,8 +388,8 @@ class PersonImpl implements PersonActor {
     // idle saccades when looking at nothing in particular
     if (this.t > this.saccade.next) {
       this.saccade.next = this.t + this.rng.range(0.8, 3.2)
-      this.saccade.yaw = this.target ? this.rng.range(-0.03, 0.03) : this.rng.range(-0.18, 0.18)
-      this.saccade.pitch = this.target ? this.rng.range(-0.02, 0.02) : this.rng.range(-0.08, 0.06)
+      this.saccade.yaw = this.gaze ? this.rng.range(-0.03, 0.03) : this.rng.range(-0.18, 0.18)
+      this.saccade.pitch = this.gaze ? this.rng.range(-0.02, 0.02) : this.rng.range(-0.08, 0.06)
     }
   }
 
@@ -387,10 +421,10 @@ class PersonImpl implements PersonActor {
     const headBind = this.built.rig.bind[B.head]
     if (head && headBind) {
       let haveTarget = false
-      if (this.target) {
+      if (this.gaze) {
         head.updateWorldMatrix(true, false)
         _m.copy(head.matrixWorld).invert()
-        _v2.copy(this.target).applyMatrix4(_m)
+        _v2.copy(this.gaze).applyMatrix4(_m)
         haveTarget = true
       }
       for (const side of [1, -1] as const) {

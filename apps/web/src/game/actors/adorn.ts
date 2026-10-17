@@ -14,6 +14,11 @@ const UP = new Vector3(0, 1, 0)
 
 /** beads along a closed or open path; each bead's long axis follows the string */
 function beadString(ctx: BuildCtx, pts: readonly Vector3[], br: number, skin: SkinFn, spacing = 1.25): void {
+  if (ctx.gear.q < 1) {
+    // far away the shells are sub-pixel: one pale cord in their place
+    ctx.gear.at(new Matrix4(), skin).tube(pts, () => br * 0.75, BONE_WHITE.clone().multiplyScalar(0.92), 5)
+    return
+  }
   const rng = ctx.rng.fork(0xbe4d + pts.length)
   let acc = 0
   const step = br * 2 * spacing

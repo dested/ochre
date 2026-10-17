@@ -99,7 +99,12 @@ function bobbles(ctx: BuildCtx, hs: HeadShape, surf: (th: number, Y: number, out
   const rng = ctx.rng.fork(0xb0bb)
   const line = hairlineFn(ctx, hs)
   const P = new Vector3()
-  for (let i = 0; i < count; i++) {
+  // far levels keep the first part of the same scatter, coarser
+  const q = ctx.gear.q
+  const n = q < 1 ? Math.round(count * q ** 0.7) : count
+  const segs = q < 1 ? 5 : 7
+  const rings = q < 1 ? 3 : 5
+  for (let i = 0; i < n; i++) {
     const th = rng.range(0, Math.PI * 2)
     const h = line(th)
     const Y = lerp(Math.max(h + 0.1, minY), 0.98, Math.sqrt(rng.next()))
@@ -110,7 +115,7 @@ function bobbles(ctx: BuildCtx, hs: HeadShape, surf: (th: number, Y: number, out
     const k = rng.range(0.82, 1.15)
     const col = hairSheen(color, k - 0.8)
     const dark = tone(col, 0.6)
-    ctx.gear.at(mul(hs.centre, T(P.x, P.y, P.z)), rigid(B.head)).ellipsoid(r, r * 0.9, r, (_y, _t, v) => (v.y < -r * 0.2 ? dark : col), 7, 5)
+    ctx.gear.at(mul(hs.centre, T(P.x, P.y, P.z)), rigid(B.head)).ellipsoid(r, r * 0.9, r, (_y, _t, v) => (v.y < -r * 0.2 ? dark : col), segs, rings)
   }
 }
 

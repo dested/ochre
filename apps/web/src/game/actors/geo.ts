@@ -53,7 +53,16 @@ export type GridPoint = { x: number; y: number; z: number; c: Color }
 
 const POLE_EPS = 1e-5
 
+/** level-of-detail resampling: small counts stay (their shape depends on them), large ones scale by q */
+const lodN = (n: number, q: number, keep: number): number => (q >= 1 || n <= keep ? n : Math.max(keep, Math.round(n * q)))
+
 export class MeshBuilder {
+  /**
+   * Detail level: 1 builds every part as asked; below 1 every lathe, grid and tube is resampled with about q times
+   * the segments and rings (the far levels of a person). Builders may also read it to thin out scattered parts.
+   */
+  constructor(readonly q = 1) {}
+
   private pos: number[] = []
   private col: number[] = []
   private sIdx: number[] = []
@@ -74,6 +83,10 @@ export class MeshBuilder {
 
   get vertexCount(): number {
     return this.pos.length / 3
+  }
+
+  get triangleCount(): number {
+    return this.idx.length / 3
   }
 
   /** emit one vertex in the current frame; returns its index */
@@ -99,8 +112,8 @@ export class MeshBuilder {
   }
 
   lathe(o: LatheOpts): void {
-    const segs = o.segs ?? 16
-    const rings = o.rings ?? 12
+    const segs = lodN(o.segs ?? 16, this.q, 6)
+    const rings = lodN(o.rings ?? 12, this.q, 4)
     const depth = o.depth ?? 1
     const e = 2 / (o.sq ?? 2)
     const span = o.y1 - o.y0
@@ -223,12 +236,16 @@ export class MeshBuilder {
    * Frames are parallel-transported, so it never twists. Ends are capped with a rounded pole.
    */
   tube(
-    pts: readonly Vector3[],
+    ptsIn: readonly Vector3[],
     radius: (t: number) => number,
     color: Color | ((t: number, a: number) => Color),
-    segs = 8,
+    segsIn = 8,
     opts: { flatten?: number; roll?: number } = {},
   ): void {
+    const segs = lodN(segsIn, this.q, 5)
+    const m = lodN(ptsIn.length, this.q, 4)
+    // resample the path to m points, keeping both ends
+    const pts = m === ptsIn.length ? ptsIn : Array.from({ length: m }, (_, i) => ptsIn[Math.round((i * (ptsIn.length - 1)) / (m - 1))]).filter((p): p is Vector3 => !!p)
     const n = pts.length
     if (n < 2) return
     const flatten = opts.flatten ?? 1
@@ -308,7 +325,9 @@ export class MeshBuilder {
    * A parametric grid: f(u, v) for u ∈ [0,1] (nu+1 columns, or nu wrapped) and v ∈ [0,1] (nv+1 rows).
    * Open grids are single surfaces: draw them with a double-sided material.
    */
-  grid(nu: number, nv: number, f: (u: number, v: number, out: GridPoint) => void, opts: { wrapU?: boolean } = {}): void {
+  grid(nuIn: number, nvIn: number, f: (u: number, v: number, out: GridPoint) => void, opts: { wrapU?: boolean } = {}): void {
+    const nu = lodN(nuIn, this.q, opts.wrapU ? 6 : 3)
+    const nv = lodN(nvIn, this.q, 3)
     const cols = opts.wrapU ? nu : nu + 1
     const out: GridPoint = { x: 0, y: 0, z: 0, c: new Color() }
     const rows: number[][] = []
