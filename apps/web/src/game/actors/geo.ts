@@ -247,16 +247,18 @@ export class MeshBuilder {
 
   /**
    * A tube along a polyline (smoothed by the caller), radius and colour per arc fraction t ∈ [0,1].
-   * Frames are parallel-transported, so it never twists. Ends are capped with a rounded pole.
+   * Frames are parallel-transported, so it never twists. Ends are capped with a rounded pole; `tipRings` rounds the
+   * far end properly (a squashed dome of that many rings before the pole), for fingertips seen up close.
    */
   tube(
     ptsIn: readonly Vector3[],
     radius: (t: number) => number,
     color: Color | ((t: number, a: number) => Color),
     segsIn = 8,
-    opts: { flatten?: number; roll?: number } = {},
+    opts: { flatten?: number; roll?: number; tipRings?: number } = {},
   ): void {
     const segs = lodN(segsIn, this.q, 5)
+    const tipRings = this.q >= 1 ? (opts.tipRings ?? 0) : 0
     const m = lodN(ptsIn.length, this.q, 4)
     // resample the path to m points, keeping both ends
     const pts = m === ptsIn.length ? ptsIn : Array.from({ length: m }, (_, i) => ptsIn[Math.round((i * (ptsIn.length - 1)) / (m - 1))]).filter((p): p is Vector3 => !!p)
@@ -282,6 +284,8 @@ export class MeshBuilder {
     const colorAt = (t: number, a: number): Color => (color instanceof Color ? color : color(t, a))
     const rows: number[][] = []
     const q = new Vector3()
+    const endN = new Vector3()
+    const endB = new Vector3()
     for (let i = 0; i < n; i++) {
       const tan = tangents[i] ?? t0
       if (i > 0) {
@@ -292,6 +296,10 @@ export class MeshBuilder {
         normal = normal.sub(q.copy(tan).multiplyScalar(normal.dot(tan))).normalize()
       }
       const bin = new Vector3().crossVectors(tan, normal)
+      if (i === n - 1) {
+        endN.copy(normal)
+        endB.copy(bin)
+      }
       const t = (lens[i] ?? 0) / total
       const r = radius(t)
       const p = pts[i]
@@ -313,6 +321,35 @@ export class MeshBuilder {
         const j1 = (j + 1) % segs
         this.tri(a[j] ?? 0, a[j1] ?? 0, b[j1] ?? 0)
         this.tri(a[j] ?? 0, b[j1] ?? 0, b[j] ?? 0)
+      }
+    }
+    // the far end's dome: rings shrinking on a quarter ellipse (0.7 deep, closed by the pole), each joined to the last
+    if (tipRings > 0) {
+      const p = pts[n - 1]
+      const tan = tangents[n - 1]
+      const r = radius(1)
+      if (p && tan) {
+        for (let k = 1; k <= tipRings; k++) {
+          const phi = (k / (tipRings + 1)) * (Math.PI / 2)
+          const c = p.clone().addScaledVector(tan, r * 0.7 * Math.sin(phi))
+          const rr = r * Math.cos(phi)
+          const row: number[] = []
+          for (let j = 0; j < segs; j++) {
+            const a = (2 * Math.PI * j) / segs
+            const ca = Math.cos(a) * rr
+            const sa = Math.sin(a) * rr * flatten
+            row.push(this.vertex({ x: c.x + endN.x * ca + endB.x * sa, y: c.y + endN.y * ca + endB.y * sa, z: c.z + endN.z * ca + endB.z * sa }, colorAt(1, a)))
+          }
+          const prev = rows[rows.length - 1]
+          if (prev) {
+            for (let j = 0; j < segs; j++) {
+              const j1 = (j + 1) % segs
+              this.tri(prev[j] ?? 0, prev[j1] ?? 0, row[j1] ?? 0)
+              this.tri(prev[j] ?? 0, row[j1] ?? 0, row[j] ?? 0)
+            }
+          }
+          rows.push(row)
+        }
       }
     }
     // rounded-ish caps: a fan to a point pushed out along the tangent

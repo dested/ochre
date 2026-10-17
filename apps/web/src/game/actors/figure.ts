@@ -305,7 +305,7 @@ function buildHand(ctx: BuildCtx, s: 1 | -1, sx: number, wristY: number, handBon
       const tip = Math.sqrt(Math.max(0, 1 - Math.max(0, (t - 0.86) / 0.14) ** 2))
       return fr * (1 - 0.22 * t) * joints * Math.max(0.12, tip)
     }
-    ctx.skin.at(new Matrix4(), rigid(fingersBone)).tube(pts, rad, (t) => (t < 0.08 ? knuckle : t > 0.84 ? nail : skinC), near ? 8 : 6, { flatten: 0.88 })
+    ctx.skin.at(new Matrix4(), rigid(fingersBone)).tube(pts, rad, (t) => (t < 0.08 ? knuckle : t > 0.84 ? nail : skinC), near ? 8 : 6, { flatten: 0.88, tipRings: 2 })
   }
   // thumb: from the thenar pad, out toward the front and down, two joints and a broad tip
   {
@@ -317,12 +317,12 @@ function buildHand(ctx: BuildCtx, s: 1 | -1, sx: number, wristY: number, handBon
       const t = 1 - (1 - k / (nt - 1)) ** 1.6
       pts.push(new Vector3(base.x - s * thick * 0.75 * Math.sin(t * 1.4), base.y - tl * t * 0.78, base.z + tl * 0.42 * t - tl * 0.16 * t * t))
     }
-    // a broad base off the thenar pad, the knuckle, then a flat, rounded pad and nail
+    // a broad base off the thenar pad, the knuckle, then a flat pad that stays broad to a blunt, rounded end
     const rad = (t: number): number => {
-      const tip = Math.sqrt(Math.max(0, 1 - Math.max(0, (t - 0.8) / 0.2) ** 2))
-      return hw * 0.14 * (1.3 - 0.4 * smooth(0, 0.5, t) + 0.08 * bump(((t - 0.55) / 0.08) ** 2) + 0.05 * bump(((t - 0.8) / 0.1) ** 2)) * Math.max(0.2, tip)
+      const tip = Math.sqrt(Math.max(0, 1 - Math.max(0, (t - 0.84) / 0.16) ** 2))
+      return hw * 0.14 * (1.25 - 0.27 * smooth(0, 0.35, t) + 0.08 * bump(((t - 0.55) / 0.08) ** 2) + 0.06 * bump(((t - 0.76) / 0.1) ** 2)) * Math.max(0.7, tip)
     }
-    ctx.skin.at(new Matrix4(), rigid(thumbBone)).tube(pts, rad, (t) => (t > 0.8 ? nail : skinC), near ? 8 : 6, { flatten: 0.85 })
+    ctx.skin.at(new Matrix4(), rigid(thumbBone)).tube(pts, rad, (t) => (t > 0.8 ? nail : skinC), near ? 8 : 6, { flatten: 0.85, tipRings: 3 })
   }
 }
 
