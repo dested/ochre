@@ -39,11 +39,15 @@ export function createCaveRock(seed: number, finalH: HeightSampler, preH: Height
     const hFinal = finalH(x, z)
     const hPre = preH(x, z)
     const ex = Math.min(x - CAVE_BOX.x0, CAVE_BOX.x1 - x, z - CAVE_BOX.z0, CAVE_BOX.z1 - z)
-    const edge = 1 - smoothstep(4, 22, ex)
+    // the shell and the face round the mouth; beyond that the heightfield's own rock takes over
+    const ea = Math.max(-CAVE.depth - 5 - a, a - 9, 0)
+    const eb = Math.max(Math.abs(b) - CAVE.halfWidth - 9, 0)
+    const edge = Math.max(1 - smoothstep(4, 22, ex), smoothstep(0, 9, Math.hypot(ea, eb)))
     const slope = (Math.abs(preH(x + 2, z) - preH(x - 2, z)) + Math.abs(preH(x, z + 2) - preH(x, z - 2))) / 8
     const slopeK = smoothstep(0.3, 0.9, slope)
     const faceN = n3.fbm(x / 9, 3.7, z / 9, 2)
-    let bulge = (0.25 + 1.1 * slopeK + faceN * 1.2) * (1 - edge) - 4 * edge
+    // rock stands proud only on the steep faces; on gentle ground it stays under the soil
+    let bulge = (slopeK * (1.3 + faceN * 1.3) - 0.7 * (1 - slopeK)) * (1 - edge) - 4 * edge
     bulge -= 5 * (1 - smoothstep(2.4, 5.5, pathNear(x, z)))
     const hw = caveHalfWidth(Math.min(a, 0))
     const terraceK =

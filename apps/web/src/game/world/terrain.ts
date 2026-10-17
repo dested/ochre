@@ -184,9 +184,9 @@ varying vec4 vSplatB;
 uniform vec3 uKeyDirT;
 uniform vec4 uOchre;
 vec3 ocLin( vec3 c ) { return pow( c, vec3( 2.2 ) ); }
-// fynbos from above: rounded shrubs in a mix of greens, rust and blond, lit on the sun's side
-vec3 ocBushes( vec2 p, float px, vec3 soil ) {
-	float cs = 2.4;
+// fynbos from above: two layers of rounded shrubs (big and small) in greens, rust and blond, each lit on the
+// key light's side with a shadowed crescent opposite, over dry soil speckled with litter
+vec4 ocBushLayer( vec2 p, float cs, float seed ) {
 	vec2 g = p / cs;
 	vec2 i = floor( g );
 	vec2 f = fract( g );
@@ -196,32 +196,41 @@ vec3 ocBushes( vec2 p, float px, vec3 soil ) {
 	for ( int y = - 1; y <= 1; y ++ ) {
 		for ( int x = - 1; x <= 1; x ++ ) {
 			vec2 o = vec2( float( x ), float( y ) );
-			vec2 r = o + 0.15 + 0.7 * ocHash2( i + o ) - f;
+			vec2 r = o + 0.1 + 0.8 * ocHash2( i + o + seed ) - f;
 			float d = dot( r, r );
 			if ( d < d1 ) { d1 = d; rel = r; id = i + o; }
 		}
 	}
-	float h = ocHash( id + 3.7 );
-	float size = 0.36 + 0.2 * ocHash( id + 9.1 );
+	float size = 0.34 + 0.24 * ocHash( id + 9.1 + seed );
 	float dist = sqrt( d1 );
-	float bush = 1.0 - smoothstep( size * 0.75, size, dist );
-	vec3 c;
-	if ( h < 0.34 ) c = ocLin( vec3( 0.49, 0.545, 0.35 ) );
-	else if ( h < 0.56 ) c = ocLin( vec3( 0.37, 0.41, 0.23 ) );
-	else if ( h < 0.72 ) c = ocLin( vec3( 0.56, 0.31, 0.17 ) );
-	else if ( h < 0.88 ) c = ocLin( vec3( 0.70, 0.62, 0.38 ) );
-	else c = ocLin( vec3( 0.47, 0.53, 0.47 ) );
-	// the lit side of the dome
+	float present = step( 0.18, ocHash( id + 4.4 + seed ) );
+	float bush = ( 1.0 - smoothstep( size * 0.6, size, dist ) ) * present;
 	vec2 sd = normalize( uKeyDirT.xz + 1e-4 );
 	float side = clamp( dot( - rel / max( dist, 1e-3 ), sd ) * ( dist / size ), - 1.0, 1.0 );
-	c *= 0.82 + 0.32 * side * bush;
-	// a protea's pink head now and then
-	float pr = step( 0.965, ocHash( id + 21.0 ) ) * ( 1.0 - smoothstep( 0.06, 0.1, length( rel - vec2( 0.1 ) ) ) );
-	c = mix( c, ocLin( vec3( 0.86, 0.52, 0.58 ) ), pr );
-	vec3 o = mix( soil, c, bush );
+	return vec4( bush, side, ocHash( id + 3.7 + seed ), ocHash( id + 21.0 + seed ) );
+}
+vec3 ocBushTone( float h ) {
+	if ( h < 0.3 ) return ocLin( vec3( 0.45, 0.52, 0.32 ) );
+	if ( h < 0.5 ) return ocLin( vec3( 0.33, 0.38, 0.22 ) );
+	if ( h < 0.64 ) return ocLin( vec3( 0.58, 0.33, 0.18 ) );
+	if ( h < 0.8 ) return ocLin( vec3( 0.68, 0.6, 0.36 ) );
+	if ( h < 0.9 ) return ocLin( vec3( 0.48, 0.52, 0.46 ) );
+	return ocLin( vec3( 0.52, 0.42, 0.24 ) );
+}
+vec3 ocBushes( vec2 p, float px, vec3 soil ) {
+	vec3 ground = soil * ( 0.85 + 0.3 * ocNoise( p * 3.1 ) );
+	ground = mix( ground, ocLin( vec3( 0.62, 0.55, 0.36 ) ), smoothstep( 0.55, 0.8, ocNoise( p * 1.3 + 2.0 ) ) * 0.5 );
+	vec4 a = ocBushLayer( p, 1.7, 0.0 );
+	vec4 b = ocBushLayer( p + 0.6, 0.95, 17.0 );
+	vec3 ca = ocBushTone( a.z ) * ( 0.72 + 0.4 * a.y );
+	vec3 cb = ocBushTone( b.z ) * ( 0.8 + 0.35 * b.y ) * 1.06;
+	// a protea's pink head now and then on the big bushes
+	ca = mix( ca, ocLin( vec3( 0.86, 0.52, 0.58 ) ), step( 0.97, a.w ) * smoothstep( 0.5, 0.2, abs( a.y - 0.4 ) ) );
+	vec3 o = mix( ground, cb, b.x );
+	o = mix( o, ca, a.x );
 	// far away: the average
-	vec3 avg = mix( soil, ocLin( vec3( 0.5, 0.48, 0.3 ) ), 0.62 );
-	return mix( avg, o, smoothstep( cs * 0.9, cs * 0.35, px * 3.0 ) );
+	vec3 avg = mix( soil, ocLin( vec3( 0.47, 0.47, 0.3 ) ), 0.66 );
+	return mix( avg, o, smoothstep( 1.4, 0.45, px * 3.0 ) );
 }
 `
 
@@ -238,8 +247,8 @@ const TERRAIN_ALBEDO = /* glsl */ `
 		float rr = r1 * 0.65 + r2 * 0.35;
 		wa *= vec4( 0.55 + 0.9 * rr, 0.55 + 0.9 * ( 1.0 - rr ), 0.55 + 0.9 * rr, 0.55 + 0.9 * ( 1.0 - rr ) );
 		wb *= vec4( 0.55 + 0.9 * ( 1.0 - rr ), 0.8 + 0.4 * rr, 0.55 + 0.9 * rr, 0.6 + 0.8 * ( 1.0 - rr ) );
-		wa = pow( wa, vec4( 1.6 ) );
-		wb = pow( wb, vec4( 1.6 ) );
+		wa = pow( max( wa, 0.0 ), vec4( 1.6 ) );
+		wb = pow( max( wb, 0.0 ), vec4( 1.6 ) );
 		float ws = dot( wa, vec4( 1.0 ) ) + dot( wb, vec4( 1.0 ) ) + 1e-4;
 		wa /= ws;
 		wb /= ws;
@@ -259,7 +268,7 @@ const TERRAIN_ALBEDO = /* glsl */ `
 		grass *= 0.9 + 0.18 * ocNoise( vec2( p.x * 3.0, p.y * 0.8 ) + 5.0 );
 		// rock: limestone in blocky facets, ledges along the strata, orange lichen
 		float facet = floor( ocNoise3( vOcWorld * 0.42 ) * 4.0 ) / 4.0;
-		float strata = smoothstep( 0.78, 0.96, sin( y * 1.45 + ocNoise( p * 0.12 ) * 4.0 ) );
+		float strata = smoothstep( 0.8, 0.96, sin( y * 1.45 + ocNoise( p * 0.12 ) * 4.0 ) ) * smoothstep( 0.8, 0.45, nW.y );
 		vec3 rock = mix( ocLin( vec3( 0.60, 0.52, 0.41 ) ), ocLin( vec3( 0.74, 0.64, 0.50 ) ), facet );
 		rock = mix( rock, ocLin( vec3( 0.36, 0.30, 0.24 ) ), strata * 0.55 );
 		float lichen = smoothstep( 0.68, 0.8, ocNoise( p * 0.33 + y * 0.21 ) ) * smoothstep( 0.2, 0.7, nW.y + 0.5 );

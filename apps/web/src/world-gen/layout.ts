@@ -77,7 +77,7 @@ export const PI_DROP = 8
 export const CAVE = {
   x: -40,
   z: 88,
-  heading: -0.35,
+  heading: -0.85,
   floor: 33.5,
   /** how far the interior runs back from the drip line */
   depth: 22,
@@ -86,7 +86,7 @@ export const CAVE = {
   /** ceiling height above the floor near the mouth */
   ceiling: 7.5,
   /** the terrace in front of the mouth runs this far out */
-  terrace: 9,
+  terrace: 6,
 } as const
 
 const CAVE_FX = Math.sin(CAVE.heading)
@@ -137,7 +137,7 @@ export const PATHS: readonly PathDef[] = [
   {
     id: 'shore',
     pts: [
-      { x: -27, z: 98 },
+      { x: -23, z: 98 },
       { x: 14, z: 105 },
       { x: -16, z: 113 },
       { x: 22, z: 120 },
@@ -153,7 +153,7 @@ export const PATHS: readonly PathDef[] = [
   {
     id: 'plateau',
     pts: [
-      { x: -27, z: 95 },
+      { x: -24, z: 94 },
       { x: 0, z: 91.5 },
       { x: 30, z: 88.5 },
       { x: 60, z: 84.5 },
@@ -167,7 +167,7 @@ export const PATHS: readonly PathDef[] = [
   {
     id: 'cove',
     pts: [
-      { x: -52, z: 93 },
+      { x: -46, z: 92 },
       { x: -72, z: 96 },
       { x: -92, z: 100 },
       { x: -110, z: 104 },
@@ -304,7 +304,7 @@ export const POI_DEFS: readonly PoiDef[] = [
   { id: 'eland-plateau', kind: 'eland-range', x: -60, z: -640, radius: 140, label: 'The eland grass' },
   { id: 'lagoon-camp', kind: 'lagoon-camp', x: 402, z: -6, radius: 16, label: 'The river-mouth camp' },
   { id: 'spring', kind: 'spring', x: 120, z: 40, radius: 3, label: 'The spring' },
-  { id: 'shore-path-top', kind: 'path-node', x: -27, z: 98, radius: 2, label: 'The cliff path' },
+  { id: 'shore-path-top', kind: 'path-node', x: -23, z: 98, radius: 2, label: 'The cliff path' },
   { id: 'shore-path-bottom', kind: 'path-node', x: 42, z: 141, radius: 2, label: 'The foot of the path' },
   { id: 'plateau-path-top', kind: 'path-node', x: 90, z: 78, radius: 2, label: 'The top of the path' },
 ]

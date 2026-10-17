@@ -154,7 +154,7 @@ export function patchPaint(material: MeshStandardMaterial, opts: PaintOptions = 
       .replace('#include <lights_physical_pars_fragment>', `#include <lights_physical_pars_fragment>\n${DIRECT}`)
       .replace('#include <lights_fragment_begin>', `#include <lights_fragment_begin>\n${AMBIENT}`)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\n${RIM}`)
-      .replace('#include <dithering_fragment>', `#include <dithering_fragment>\n${extra?.fragmentEnd ?? ''}`)
+      .replace('#include <dithering_fragment>', `#include <dithering_fragment>\n${extra?.fragmentEnd ?? ''}\n\t// a NaN here would spread through the bloom pyramid to the whole frame\n\tif ( any( isnan( gl_FragColor.rgb ) ) || any( isinf( gl_FragColor.rgb ) ) ) gl_FragColor.rgb = vec3( 0.0 );`)
   }
   const prevKey = material.customProgramCacheKey
   material.customProgramCacheKey = () => `${prevKey.call(material)}|${key}`

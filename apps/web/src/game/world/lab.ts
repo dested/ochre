@@ -7,7 +7,7 @@ import { PerspectiveCamera, Scene, Vector3 } from 'three'
 import { clockAt, type ClockEpoch } from '../../core/clock'
 import type { FireState, Quality, WeatherState } from '../contracts'
 import { createHost } from '../engine/host'
-import { createRenderPipeline, isPaintedPipeline } from '../render/index'
+import { LIGHT, POST, createRenderPipeline, isPaintedPipeline } from '../render/index'
 import { createWorldData } from '../../world-gen/index'
 import { CAVE, caveWorld } from '../../world-gen/layout'
 import { createWorldView } from './index'
@@ -22,6 +22,8 @@ export type WorldLabApi = {
   /** where the camera is and where it looks (for composing views) */
   where(): { x: number; y: number; z: number; yaw: number; pitch: number; seaLevel: number; hour: number }
   place(x: number, y: number, z: number, yaw: number, pitch: number): void
+  /** 'raw' draws the scene straight to the canvas (no post chain), 'post' the normal chain */
+  debug(mode: 'raw' | 'post'): void
 }
 
 type ViewDef = { x: number; y: number; z: number; yaw: number; pitch: number; fov?: number }
@@ -229,8 +231,11 @@ export function mount(el: HTMLElement): () => void {
       return { x: pos.x, y: pos.y, z: pos.z, yaw, pitch, seaLevel: c.seaLevel, hour: c.hour }
     },
     place,
+    debug(mode) {
+      raw = mode === 'raw'
+    },
   }
-  if (import.meta.env.DEV) Object.assign(window, { __lab: api })
+  if (import.meta.env.DEV) Object.assign(window, { __lab: api, __labScene: { scene, camera, renderer: host.renderer, pipeline, LIGHT, POST } })
 
   const offResize = host.onResize((s) => {
     pipeline.setSize(s.width, s.height, s.dpr)
@@ -245,6 +250,7 @@ export function mount(el: HTMLElement): () => void {
   const fires: FireState[] = []
   const hearths = world.pois.filter((p) => p.kind === 'hearth')
   let frames = 0
+  let raw = q.get('post') === '0'
   const offFrame = host.onFrame((dt) => {
     // fly
     fwd.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch))
@@ -280,7 +286,11 @@ export function mount(el: HTMLElement): () => void {
     if (firesOn) hearths.forEach((h, i) => fires.push({ id: h.id, x: h.x, z: h.z, intensity: i === 0 ? 1 : 0.65 }))
 
     view.update({ dt, clock, weather, camera, fires, focus })
-    pipeline.render(scene, camera, dt)
+    if (raw) {
+      host.renderer.setRenderTarget(null)
+      host.renderer.clear(true, true, true)
+      host.renderer.render(scene, camera)
+    } else pipeline.render(scene, camera, dt)
 
     if ((frames++ & 15) === 0) {
       const sunEl = (Math.asin(clock.sunDir.y) * 180) / Math.PI

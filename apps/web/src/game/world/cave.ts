@@ -169,13 +169,13 @@ const ROCK_ALBEDO = /* glsl */ `
 		vec3 wp = vOcWorld;
 		vec3 nW = normalize( vOcNormalW );
 		// blocky facets: quantised 3D noise picks a tone per chunk, like knife-laid paint
-		float facet = floor( ocNoise3( wp * 0.38 ) * 5.0 ) / 5.0;
-		float facet2 = floor( ocNoise3( wp * 1.1 + 7.0 ) * 3.0 ) / 3.0;
-		vec3 warm = mix( ocLinR( vec3( 0.62, 0.43, 0.27 ) ), ocLinR( vec3( 0.76, 0.58, 0.40 ) ), facet );
-		warm = mix( warm, ocLinR( vec3( 0.55, 0.50, 0.44 ) ), smoothstep( 0.55, 0.9, facet2 ) * 0.45 );
+		float facet = floor( ocNoise3( wp * 0.3 ) * 4.0 + 0.5 ) / 4.0;
+		float facet2 = floor( ocNoise3( wp * 0.8 + 7.0 ) * 3.0 ) / 3.0;
+		vec3 warm = mix( ocLinR( vec3( 0.62, 0.46, 0.33 ) ), ocLinR( vec3( 0.76, 0.62, 0.47 ) ), facet );
+		warm = mix( warm, ocLinR( vec3( 0.52, 0.48, 0.47 ) ), smoothstep( 0.6, 0.9, facet2 ) * 0.5 );
 		// strata: darker bands, iron-red seams
 		float band = sin( wp.y * 1.3 + ocNoise( wp.xz * 0.09 ) * 5.0 );
-		warm = mix( warm, ocLinR( vec3( 0.34, 0.24, 0.17 ) ), smoothstep( 0.8, 0.97, band ) * 0.55 );
+		warm = mix( warm, ocLinR( vec3( 0.38, 0.27, 0.19 ) ), smoothstep( 0.82, 0.97, band ) * 0.45 * smoothstep( 0.75, 0.35, abs( nW.y ) ) );
 		warm = mix( warm, ocLinR( vec3( 0.66, 0.33, 0.17 ) ), smoothstep( 0.6, 0.85, ocNoise( vec2( wp.x + wp.z, wp.y * 3.0 ) * 0.21 ) ) * 0.35 );
 		// lichen on the tops that see the sky
 		float sky = ocCaveSky( wp );
@@ -185,7 +185,7 @@ const ROCK_ALBEDO = /* glsl */ `
 		// soot over the hearths, darkest on the ceiling
 		float dh = length( wp.xz - uHearthSoot.xy );
 		float soot = ( 1.0 - smoothstep( 1.5, uHearthSoot.z, dh ) ) * smoothstep( uHearthSoot.w + 1.5, uHearthSoot.w + 5.0, wp.y );
-		soot *= 0.75 + 0.25 * ocNoise( wp.xz * 1.7 );
+		soot *= ( 0.75 + 0.25 * ocNoise( wp.xz * 1.7 ) ) * smoothstep( 0.95, 0.5, sky );
 		warm = mix( warm, ocLinR( vec3( 0.11, 0.09, 0.08 ) ), clamp( soot, 0.0, 1.0 ) * 0.85 );
 		// damp, darker toward the back
 		warm *= mix( 0.8, 1.0, sky );
@@ -198,13 +198,13 @@ const ROCK_NORMAL = /* glsl */ `
 	{
 		vec3 wp = vOcWorld;
 		vec3 g = vec3(
-			ocNoise3( wp * 0.6 + vec3( 0.0, 3.1, 0.0 ) ),
-			ocNoise3( wp * 0.6 + vec3( 5.7, 0.0, 0.0 ) ),
-			ocNoise3( wp * 0.6 + vec3( 0.0, 0.0, 9.2 ) )
+			ocNoise3( wp * 0.45 + vec3( 0.0, 3.1, 0.0 ) ),
+			ocNoise3( wp * 0.45 + vec3( 5.7, 0.0, 0.0 ) ),
+			ocNoise3( wp * 0.45 + vec3( 0.0, 0.0, 9.2 ) )
 		) - 0.5;
-		g = floor( g * 3.0 + 0.5 ) / 3.0;
+		g = floor( g * 4.0 + 0.5 ) / 4.0;
 		vec3 gv = ( viewMatrix * vec4( g, 0.0 ) ).xyz;
-		normal = normalize( normal + gv * 0.55 );
+		normal = normalize( normal + gv * 0.3 );
 	}
 `
 

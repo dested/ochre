@@ -14,7 +14,7 @@ import {
   Mesh,
   NoToneMapping,
   OrthographicCamera,
-  PCFSoftShadowMap,
+  PCFShadowMap,
   PerspectiveCamera,
   Scene,
   ShaderMaterial,
@@ -22,6 +22,7 @@ import {
   Vector3,
   Vector4,
   WebGLRenderTarget,
+  type RenderItem,
   type WebGLRenderer,
 } from 'three'
 import type { CreateRenderPipeline, Quality, RenderPipeline } from '../contracts'
@@ -34,8 +35,8 @@ export { LIGHT, POST } from './uniforms'
 type QualitySpec = { samples: number; taps: number; levels: number; maxDpr: number; radius: [number, number] }
 
 const QUALITY: Record<Quality, QualitySpec> = {
-  high: { samples: 4, taps: 4, levels: 6, maxDpr: 1.5, radius: [0.0, 4.2] },
-  medium: { samples: 2, taps: 3, levels: 5, maxDpr: 1.25, radius: [0.0, 3.2] },
+  high: { samples: 4, taps: 4, levels: 6, maxDpr: 1.5, radius: [0.0, 3.2] },
+  medium: { samples: 2, taps: 3, levels: 5, maxDpr: 1.25, radius: [0.0, 2.6] },
   low: { samples: 0, taps: 0, levels: 4, maxDpr: 1, radius: [0, 0] },
 }
 
@@ -45,10 +46,41 @@ export type PaintedPipeline = RenderPipeline & {
   readonly quality: Quality
   /** 0..1 dream amount (read by the world for audio-free cues) */
   readonly dream: number
+  /** lab only: 0 the finished frame; 1 scene, 2 after the air, 3 bloom, 4 graded, 5 distance */
+  debugStage(stage: number): void
 }
+
+const DEBUG_FRAG = /* glsl */ `
+#include <packing>
+uniform sampler2D tSrc;
+uniform sampler2D tDepth;
+uniform float uMode;
+uniform float uNear;
+uniform float uFar;
+uniform float uScale;
+varying vec2 vUv;
+void main() {
+	if ( uMode > 4.5 ) {
+		float d = texture2D( tDepth, vUv ).r;
+		float z = - perspectiveDepthToViewZ( d, uNear, uFar );
+		gl_FragColor = vec4( vec3( fract( log2( max( z, 0.01 ) ) ), log2( max( z, 0.01 ) ) / 16.0, d * 50.0 ), 1.0 );
+		return;
+	}
+	vec3 c = texture2D( tSrc, vUv ).rgb * uScale;
+	gl_FragColor = vec4( pow( clamp( c, 0.0, 1.0 ), vec3( uMode > 3.5 ? 1.0 : 1.0 / 2.2 ) ), 1.0 );
+}
+`
 
 export function isPaintedPipeline(p: RenderPipeline): p is PaintedPipeline {
   return 'painted' in p
+}
+
+/** group, renderOrder, then (opaque) near-first or (transparent) far-first; z is reversed-depth NDC */
+function compareItems(a: RenderItem, b: RenderItem, zSign: number): number {
+  if (a.groupOrder !== b.groupOrder) return a.groupOrder - b.groupOrder
+  if (a.renderOrder !== b.renderOrder) return a.renderOrder - b.renderOrder
+  if (a.z !== b.z) return (a.z - b.z) * zSign
+  return a.id - b.id
 }
 
 function fsTriangle(): BufferGeometry {
@@ -70,7 +102,13 @@ function mat(frag: string, uniforms: Record<string, { value: unknown }>): Shader
 
 export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRenderer): PaintedPipeline => {
   renderer.shadowMap.enabled = true
-  renderer.shadowMap.type = PCFSoftShadowMap
+  renderer.shadowMap.type = PCFShadowMap
+  // three reverses its sorted render lists under a reversed depth buffer (to fix the z order), which also
+  // reverses renderOrder; sort the other way round so renderOrder still means "drawn earlier"
+  if (renderer.capabilities.reversedDepthBuffer) {
+    renderer.setOpaqueSort((a: RenderItem, b: RenderItem) => -compareItems(a, b, -1))
+    renderer.setTransparentSort((a: RenderItem, b: RenderItem) => -compareItems(a, b, 1))
+  }
   renderer.toneMapping = NoToneMapping
   renderer.autoClear = false
 
@@ -183,6 +221,9 @@ export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRender
     uGrain: { value: 0.025 },
     uPool: { value: 0.35 },
   })
+
+  let debugStage = 0
+  const debugMat = mat(DEBUG_FRAG, { tSrc: { value: null }, tDepth: { value: depthTex }, uMode: { value: 0 }, uNear: near, uFar: far, uScale: { value: 1 } })
 
   const pass = (m: ShaderMaterial, target: WebGLRenderTarget | null) => {
     quad.material = m
@@ -315,7 +356,14 @@ export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRender
 
       // 7. finish to the canvas
       fadeU.value = fade
-      pass(finish, null)
+      if (debugStage > 0) {
+        const src = [sceneRT, sceneRT, hdrRT, up[0] ?? hdrRT, spec.taps > 0 ? ldrRT : paintRT, sceneRT][debugStage] ?? sceneRT
+        const u = debugMat.uniforms
+        if (u.tSrc) u.tSrc.value = src.texture
+        if (u.uMode) u.uMode.value = debugStage
+        if (u.uScale) u.uScale.value = debugStage === 3 ? 1 / levels : 1
+        pass(debugMat, null)
+      } else pass(finish, null)
     },
     setSize(width: number, height: number, dpr: number) {
       cssW = width
@@ -336,8 +384,10 @@ export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRender
         paintMat.dispose()
         paintMat = mat(paintFrag(spec.taps), paintUniforms)
       }
-      renderer.shadowMap.type = PCFSoftShadowMap
       applySize()
+    },
+    debugStage(stage: number) {
+      debugStage = stage
     },
     setDream(amount: number) {
       dream = Math.min(1, Math.max(0, amount))

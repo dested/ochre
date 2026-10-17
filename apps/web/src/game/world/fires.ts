@@ -146,11 +146,11 @@ void main() {
 	vec4 f = uFires[ int( aPuff.x ) ];
 	float seed = aPuff.y;
 	float life = fract( uTime * 0.07 + seed );
-	float rise = 0.8 + life * ( 4.5 + 3.0 * f.w );
+	float rise = 0.9 + life * ( 3.5 + 2.0 * f.w );
 	vec3 c = f.xyz + vec3( 0.0, rise, 0.0 );
 	c.xz += vec2( uWind.x, uWind.z ) * ( 0.4 + uWind.y * 2.5 ) * life * life * 3.0;
 	c.xz += vec2( sin( seed * 19.0 + life * 3.0 ), cos( seed * 13.0 + life * 2.0 ) ) * 0.6 * life;
-	float size = ( 0.5 + life * 2.4 ) * ( 0.6 + 0.6 * f.w );
+	float size = ( 0.3 + life * 1.3 ) * ( 0.6 + 0.6 * f.w );
 	vec3 toCam = normalize( cameraPosition - c );
 	vec3 right = normalize( cross( vec3( 0.0, 1.0, 0.0 ), toCam ) );
 	vec3 up = cross( toCam, right );
@@ -178,7 +178,7 @@ void main() {
 	float d = length( vUvS );
 	float n = fNoise( vUvS * 2.2 + vSeedS * 13.0 + uTime * 0.1 );
 	float a = 1.0 - smoothstep( 0.3, 1.0, d + ( n - 0.5 ) * 0.6 );
-	a *= smoothstep( 0.0, 0.15, vLifeS ) * ( 1.0 - smoothstep( 0.5, 1.0, vLifeS ) ) * 0.2 * min( 1.0, vK * 1.5 );
+	a *= smoothstep( 0.0, 0.15, vLifeS ) * ( 1.0 - smoothstep( 0.4, 1.0, vLifeS ) ) * 0.07 * min( 1.0, vK * 1.5 );
 	if ( a < 0.004 ) discard;
 	// lit from below by the fire when young, by the sky when old
 	vec3 col = mix( vec3( 0.55, 0.36, 0.22 ) * ( 0.6 + vK ), uSmokeLit, smoothstep( 0.0, 0.5, vLifeS ) );
@@ -315,7 +315,7 @@ export function createFiresView(world: WorldData): FiresView {
       })
       const sky = LIGHT.uSkyAmb.value
       const keyC = LIGHT.uKeyColor.value
-      smokeLit.value.set(sky.r * 1.4 + keyC.r * 0.25, sky.g * 1.4 + keyC.g * 0.25, sky.b * 1.4 + keyC.b * 0.25)
+      smokeLit.value.set(sky.r * 0.6 + keyC.r * 0.08, sky.g * 0.6 + keyC.g * 0.08, sky.b * 0.6 + keyC.b * 0.08)
     },
     dispose() {
       flameGeo.dispose()

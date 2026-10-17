@@ -67,8 +67,8 @@ export const createWorldView: CreateWorldView = (data: WorldData, pipeline: Rend
     sun.shadow.map = null
   }
   setShadowSize(shadowQ)
-  sun.shadow.bias = -0.0004
-  sun.shadow.normalBias = 0.06
+  sun.shadow.bias = -0.0006
+  sun.shadow.normalBias = 0.14
   sun.shadow.radius = 2
   const sc = sun.shadow.camera
   sc.near = 1

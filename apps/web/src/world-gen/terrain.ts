@@ -664,7 +664,8 @@ export function buildTerrain(seed: number): TerrainGrid {
       const i = iz * N + ix
       const hv = h[i] ?? 0
       const sl = slope[i] ?? 0
-      const sd = sand[i] ?? 0
+      // a ragged sand/rock boundary, not the straight line the stations interpolate
+      const sd = (sand[i] ?? 0) + nD.at(x / 34, z / 34) * 0.3 + nD.at(x / 9 + 3.1, z / 9) * 0.1
       let m: number
       if (inCaveFootprint(x, z)) m = MAT.cave
       else if (pathMask[i] === 1) m = MAT.path

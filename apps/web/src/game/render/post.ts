@@ -71,7 +71,8 @@ void main() {
 		od += ocHeightFog( dist, yc - 0.5, yp - 0.5, uHaze.w * lk * 0.02, 3.5 );
 	}
 	float T = exp( - od );
-	vec3 sd = normalize( vec3( dir.x, max( dir.y, 0.0 ) * 0.6 + 0.01, dir.z ) );
+	// the air takes the colour of the sky a little above the horizon: blue by day, so distance goes blue
+	vec3 sd = normalize( vec3( dir.x, max( dir.y, 0.0 ) * 0.6 + 0.1, dir.z ) );
 	vec3 inscatter = ocSkyBase( sd );
 	gl_FragColor = vec4( sc.rgb * T + inscatter * ( 1.0 - T ), 1.0 );
 }
@@ -158,7 +159,14 @@ void main() {
 		c *= mix( vec3( 1.0 ), vec3( 1.08, 0.96, 0.86 ), uDream );
 	}
 	c *= uExposure;
-	c = ocAces( c );
+	// tone map the luminance and keep the hue (golden light stays golden), letting only the hottest
+	// colours (sun, fire) roll per channel toward white
+	vec3 pc = ocAces( c );
+	float L0 = dot( c, vec3( 0.2126, 0.7152, 0.0722 ) );
+	float Lt = ocAces( vec3( L0 ) ).r;
+	vec3 lp = c * ( Lt / max( L0, 1e-4 ) );
+	float hot = max( max( lp.r, lp.g ), lp.b );
+	c = mix( lp, pc, smoothstep( 0.85, 1.5, hot ) );
 	float L = dot( c, vec3( 0.2126, 0.7152, 0.0722 ) );
 	c *= mix( uSplitShadow, uSplitHighlight, smoothstep( 0.05, 0.75, L ) );
 	L = dot( c, vec3( 0.2126, 0.7152, 0.0722 ) );
@@ -243,7 +251,7 @@ void main() {
 		vec3 mean = m[k].rgb / m[k].w;
 		vec3 var = abs( s[k] / m[k].w - mean * mean );
 		float sigma2 = var.r + var.g + var.b;
-		float w = 1.0 / ( 1.0 + pow( 120.0 * sigma2, 4.0 ) );
+		float w = 1.0 / ( 1.0 + pow( 700.0 * sigma2, 4.0 ) );
 		o += vec4( mean * w, w );
 	}
 	gl_FragColor = vec4( o.rgb / max( o.w, 1e-5 ), 1.0 );
@@ -280,11 +288,21 @@ void main() {
 	vec3 c = texture2D( tSrc, vUv ).rgb;
 	// pigment pooled at silhouettes: where depth jumps, the wash darkens a little and deepens in colour
 	if ( uPool > 0.0 ) {
-		float z0 = ocDist( vUv );
+		// 1/z is linear across a plane in screen space, so its Laplacian is zero on any flat surface however
+		// grazing, and spikes only where one surface steps in front of another
 		vec2 o = uTexel * 1.5;
-		float zmin = min( min( ocDist( vUv + vec2( o.x, 0.0 ) ), ocDist( vUv - vec2( o.x, 0.0 ) ) ), min( ocDist( vUv + vec2( 0.0, o.y ) ), ocDist( vUv - vec2( 0.0, o.y ) ) ) );
-		float jump = clamp( ( z0 - zmin ) / max( zmin, 0.5 ), 0.0, 4.0 );
-		float edge = smoothstep( 0.06, 0.5, jump ) * ( 1.0 - smoothstep( 300.0, 2000.0, zmin ) );
+		float z0 = ocDist( vUv );
+		float w0 = 1.0 / z0;
+		float wl = 1.0 / ocDist( vUv - vec2( o.x, 0.0 ) );
+		float wr = 1.0 / ocDist( vUv + vec2( o.x, 0.0 ) );
+		float wd = 1.0 / ocDist( vUv - vec2( 0.0, o.y ) );
+		float wu = 1.0 / ocDist( vUv + vec2( 0.0, o.y ) );
+		float lx = abs( wl + wr - 2.0 * w0 );
+		float ly = abs( wu + wd - 2.0 * w0 );
+		float jump = max( lx, ly ) / w0;
+		// only the far side of a step pools (the background just outside a silhouette)
+		float behind = step( 0.0, max( max( wl, wr ), max( wu, wd ) ) - w0 * 1.02 );
+		float edge = smoothstep( 0.08, 0.4, jump ) * behind * ( 1.0 - smoothstep( 300.0, 2000.0, z0 ) );
 		vec3 deep = c * c * 1.1;
 		c = mix( c, deep, edge * uPool );
 	}
@@ -327,7 +345,8 @@ float ocSkyMask( vec2 uv ) {
 		float sky = d >= 1.0 ? 1.0 : 0.0;
 	#endif
 	vec3 c = texture2D( tSrc, uv ).rgb;
-	return sky * clamp( dot( c, vec3( 0.3, 0.5, 0.2 ) ) - 0.6, 0.0, 6.0 );
+	// only the sun and its hot glow cast rays, not the whole bright sky
+	return sky * clamp( dot( c, vec3( 0.3, 0.5, 0.2 ) ) - 3.5, 0.0, 8.0 );
 }
 void main() {
 	vec2 sun = uRays.yz;
