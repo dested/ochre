@@ -376,6 +376,9 @@ controller, cameras and verbs that make each stage of life feel different; and t
   `/w/junk/sim-80k/bun13/bun-linux-x64/bun`. Applies to: all.
 - (2026-10-17, lead) Sal pre-approved self-review: the lead's `pass` on your sample is the approval. Applies to: all.
 
+- (2026-10-17 00:50, lead) `host.ts` creates the renderer with `reversedDepthBuffer: true` (3c5b2d9). Read
+  `renderer.capabilities.reversedDepthBuffer` if your shaders write depth. Applies to: world, people, play.
+
 ## Ledger (lead, updated 2026-10-17 00:40)
 
 Board: down · Last pushed: 60add27 (main) · Gate: typecheck green at 60add27 · Deploy: c61a551 live at https://ochre.dested.com (CI green)
