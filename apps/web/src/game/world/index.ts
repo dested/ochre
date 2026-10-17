@@ -11,6 +11,7 @@ import { LIGHT, POST } from '../render/uniforms'
 import { isOchreWorld } from '../../world-gen/index'
 import { CAVE } from '../../world-gen/layout'
 import { createCaveView, type CaveView } from './cave'
+import { createCaveFloor, type CaveFloorView } from './cavefloor'
 import { applyColourScript } from './colour'
 import { createFiresView } from './fires'
 import { createFoliageView } from './foliage'
@@ -47,9 +48,12 @@ export const createWorldView: CreateWorldView = (data: WorldData, pipeline: Rend
   root.add(sea.sea, sea.lagoon)
   if (sea.river) root.add(sea.river)
   let cave: CaveView | null = null
+  let caveFloor: CaveFloorView | null = null
   if (grid) {
     cave = createCaveView(data, grid)
     root.add(cave.mesh)
+    caveFloor = createCaveFloor(data)
+    root.add(caveFloor.mesh)
   }
   const fires = createFiresView(data)
   root.add(fires.root)
@@ -161,6 +165,7 @@ export const createWorldView: CreateWorldView = (data: WorldData, pipeline: Rend
       terrain.dispose()
       sea.dispose()
       cave?.dispose()
+      caveFloor?.dispose()
       fires.dispose()
       foliage.dispose()
       spray.dispose()

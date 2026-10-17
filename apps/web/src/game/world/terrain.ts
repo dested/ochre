@@ -509,13 +509,24 @@ const TERRAIN_ALBEDO = /* glsl */ `
 				mid = mix( mid, ocLin( vec3( 0.76, 0.71, 0.62 ) ), shellA * gritK );
 				mid = mix( mid, ocLin( vec3( 0.56, 0.54, 0.55 ) ), shellB * gritK );
 				float dh = min( length( p - uHearths.xy ), length( p - uHearths.zw ) ) + ( ocNoise( p * 1.6 ) - 0.5 ) * 0.9;
-				float ash = 1.0 - smoothstep( 0.8, 2.8, dh );
-				mid = mix( mid, ocLin( vec3( 0.42, 0.4, 0.38 ) ), ash * 0.7 );
+				// ash spread round each hearth: pale grey powder, darker toward the stones, kicked out in tongues
+				float ash = ( 1.0 - smoothstep( 0.9, 2.7, dh ) ) * smoothstep( 0.25, 0.6, ocNoise( p * 2.6 + 1.0 ) * 0.45 + ( 1.0 - smoothstep( 0.9, 2.7, dh ) ) * 0.6 );
+				mid = mix( mid, ocLin( vec3( 0.62, 0.6, 0.57 ) ), ash * 0.75 );
+				mid = mix( mid, ocLin( vec3( 0.33, 0.32, 0.31 ) ), ( 1.0 - smoothstep( 0.55, 1.3, dh ) ) * 0.75 );
 				float coal = ocEdge( 0.66, ocNoise( p * 13.0 + 3.0 ) * 0.7 + ocNoise( p * 31.0 ) * 0.3 ) * ( 1.0 - smoothstep( 0.5, 1.4, dh ) );
 				mid = mix( mid, ocLin( vec3( 0.1, 0.08, 0.07 ) ), coal * 0.7 );
 				float och = ocEdge( 0.8, ocNoise( p * 0.9 + 17.0 ) * 0.7 + ocNoise( p * 4.0 ) * 0.3 );
 				mid = mix( mid, ocLin( vec3( 0.55, 0.27, 0.16 ) ), och * 0.26 );
 				earth = mix( earth, mid, inCave );
+				// gentle unevenness: trodden hollows and low rises, drawn (darker in the hollows)
+				vec2 eq = p * 0.7;
+				float e0 = ocNoise( eq );
+				vec2 eg = vec2( ocNoise( eq + vec2( 0.05, 0.0 ) ) - e0, ocNoise( eq + vec2( 0.0, 0.05 ) ) - e0 ) / 0.05 * 0.7 * 0.24;
+				vec2 fq = p * 2.4 + 5.0;
+				float f0 = ocNoise( fq );
+				eg += vec2( ocNoise( fq + vec2( 0.05, 0.0 ) ) - f0, ocNoise( fq + vec2( 0.0, 0.05 ) ) - f0 ) / 0.05 * 2.4 * 0.025;
+				ocBumpT += vec3( - eg.x, 0.0, - eg.y ) * inCave;
+				earth *= 1.0 - ( 0.1 - 0.2 * e0 ) * inCave;
 			}
 		}
 		vec3 col = sand * wa.x + dune * wa.y + fyn * wa.z + grass * wa.w + rock * wb.x + cliff * wb.y + shelf * wb.z + earth * wb.w;

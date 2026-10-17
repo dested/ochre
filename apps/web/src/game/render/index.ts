@@ -9,6 +9,7 @@ import {
   Float32BufferAttribute,
   FloatType,
   HalfFloatType,
+  LessEqualCompare,
   LinearFilter,
   Matrix4,
   Mesh,
@@ -126,6 +127,10 @@ export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRender
   let time = 0
 
   const depthTex = new DepthTexture(1, 1, FloatType)
+  // the shafts sample the key light's shadow map as a shadow sampler; until there is one (the first frame, a lab
+  // with no world) they get a 1×1 comparison texture, since a plain texture there fails the whole draw
+  const noShadow = new DepthTexture(1, 1, FloatType)
+  noShadow.compareFunction = LessEqualCompare
   const makeScene = () => {
     const t = new WebGLRenderTarget(w, h, { type: HalfFloatType, samples: spec.samples, depthTexture: depthTex })
     t.texture.name = 'oc:scene'
@@ -168,7 +173,7 @@ export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRender
     uHaze: LIGHT.uHaze,
     uSeaLevel: LIGHT.uSeaLevel,
     uLagoon: lagoon,
-    tShadow: LIGHT.uShadowMap,
+    tShadow: { value: noShadow },
     uShadowMatrix: LIGHT.uShadowMatrix,
     uShafts: LIGHT.uShafts,
     uCave: LIGHT.uCave,
@@ -331,6 +336,8 @@ export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRender
       // 2. the air
       t0('air')
       setTex(atmos, 'tScene', sceneRT)
+      const shadowU = atmos.uniforms.tShadow
+      if (shadowU) shadowU.value = LIGHT.uShadowMap.value ?? noShadow
       pass(atmos, hdrRT)
       t1()
 
@@ -467,6 +474,7 @@ export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRender
       timer?.dispose()
       sceneRT.dispose()
       depthTex.dispose()
+      noShadow.dispose()
       for (const t of [hdrRT, ldrRT, paintRT, raysRT, flowA, flowB, ...down, ...up]) t.dispose()
       for (const m of [atmos, downKaris, downPlain, upMat, rays, grade, paintMat, tensor, tblur, finish, debugMat]) m.dispose()
       quad.geometry.dispose()
