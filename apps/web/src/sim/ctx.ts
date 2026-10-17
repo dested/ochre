@@ -5,6 +5,7 @@ import type { ClockEpoch } from '../core/clock'
 import type { Rng } from '../core/rng'
 import type { CarrySlot, HeldItem, Interaction, LifeStageId, PersonAnim, SimEvent, SimState, SkillId, TaskKind, Vec2, WorldData } from '../game/contracts'
 import type { PathRequest, PathService } from './path'
+import type { TalkState } from './talk'
 
 /** game seconds per substep at most (movement and decisions stay stable at ×600) */
 export const MAX_SUBSTEP = 6
@@ -209,6 +210,8 @@ export type SimCtx = {
   director: DirectorHooks | null
   /** this child learns only from the player (Provider's teaching beat) */
   pupil: string | null
+  /** lines said today, what the band is talking about, chatter timing */
+  talk: TalkState
 }
 
 /**

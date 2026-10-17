@@ -14,6 +14,7 @@ import { interact, interactionsNear, playerOf, relationOf, updateSleepSkip } fro
 import { gaze, spoil, updateAge, updateBonds, updateFires, updateLearning, updateNeeds } from './life'
 import { PathService } from './path'
 import { decodeSave, encodeSave, type SavePayload } from './save'
+import { emptyTalk, noticeRecent, updateChatter } from './talk'
 import { resetStage } from './setup'
 import { STAGE_EPOCH } from './time'
 import { weatherAt } from './weather'
@@ -92,6 +93,7 @@ export function createSimWith(opts: SimOptions, flags: { director: boolean }): S
     demo: null,
     director: null,
     pupil: null,
+    talk: emptyTalk(),
   }
 
   resetStage(ctx, stage, buildBand(seed, stage, playerName))
@@ -145,7 +147,9 @@ export function createSimWith(opts: SimOptions, flags: { director: boolean }): S
     const gameDt = dt * state.timeScale
     const n = Math.max(1, Math.ceil(gameDt / MAX_SUBSTEP))
     for (let i = 0; i < n; i++) substep(gameDt / n, dt / n)
+    noticeRecent(ctx)
     director?.update(dt)
+    updateChatter(ctx, dt)
     returned = ctx.events.length
     return ctx.events
   }
@@ -244,6 +248,7 @@ export function createSimWith(opts: SimOptions, flags: { director: boolean }): S
       })),
       herds: ctx.herds,
       nextAnimalId: ctx.nextAnimalId,
+      talk: { used: ctx.talk.used, recent: ctx.talk.recent, talkedAt: ctx.talk.talkedAt },
       ...(director ? { director: director.save() } : {}),
     }
     return encodeSave(payload)
@@ -294,6 +299,7 @@ function restore(ctx: SimCtx, s: SavePayload): void {
   }
   ctx.herds = s.herds.map((h) => ({ ...h }))
   ctx.nextAnimalId = s.nextAnimalId
+  ctx.talk = { ...emptyTalk(), ...(s.talk ?? {}), lastMeat: s.hearth.meat }
   ctx.lastHour = Math.floor(s.t / 3600)
   const den = [...ctx.brains.values()].find((b) => b.id.startsWith('hyena'))?.home ?? null
   ctx.brains.clear()

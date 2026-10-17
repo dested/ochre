@@ -6,6 +6,7 @@ import type { Interaction, Poi, SimPerson, SkillId, Vec2, Verb } from '../game/c
 import { FOOD_VALUE, type SimCtx } from './ctx'
 import { addBond } from './life'
 import { periodOf } from './ai'
+import { talkTo } from './talk'
 import { bedOut, sunTimes } from './time'
 
 export const NEED_SKILL = "You don't know how yet. Watch someone."
@@ -117,24 +118,6 @@ export function interactionsNear(ctx: SimCtx, p: Vec2, radius: number): Interact
 
 // ─── doing it ───────────────────────────────────────────────────────────────────────────────────────────────
 
-const talkedAt = new WeakMap<SimPerson, number>()
-
-function talkLine(ctx: SimCtx, q: SimPerson): string {
-  const rel = relationOf(ctx, q.id)
-  const task = q.task.kind
-  const rng = ctx.rng
-  if (task === 'gather-shellfish') return rng.pick(['Stay close to me. The sea is strong.', 'Pull them off with a twist, like this.', 'Only the big ones. Leave the small ones to grow.'])
-  if (task === 'dig-corms') return rng.pick(['Look for the dry leaves. The corm sleeps under them.', 'Dig gently. Do not break it.'])
-  if (task === 'knap') return rng.pick(['Listen to the stone.', 'Not yet. Watch my hands.'])
-  if (task === 'eat') return rng.pick(['Eat. There is enough for everyone.', 'Here, take this one.'])
-  if (task === 'tend-fire') return 'The fire is hungry tonight.'
-  if (task === 'play') return rng.pick(['You are the eland! Run!', 'Catch me if you can!'])
-  if (rel === 'Mother') return rng.pick(['There you are.', 'Stay where I can see you.', 'You are getting so tall.'])
-  if (rel === 'Grandmother') return rng.pick(['Come and sit with me.', 'When I was small, the sea came right up to the cave.'])
-  if (rel === 'Father') return rng.pick(['Watch the wind. It tells you everything.', 'Mm. Good.'])
-  return rng.pick(['The days are getting longer.', 'Have you eaten?', 'Ah, it is you.'])
-}
-
 function eatPlayer(ctx: SimCtx, player: SimPerson): void {
   const h = ctx.state.hearth
   let want = Math.max(0, 1 - player.needs.fed)
@@ -228,14 +211,7 @@ export function interact(ctx: SimCtx, interactionId: string): Interaction | null
     case 'talk': {
       const q = s.people.find((x) => x.id === it.targetId)
       if (!q) break
-      const text = ctx.director?.talk(q.id) ?? talkLine(ctx, q)
-      q.speech = { text, until: s.clock.t + 4 * s.timeScale }
-      ctx.events.push({ type: 'caption', caption: { id: `talk-${q.id}-${Math.floor(s.clock.t)}`, text, speaker: q.name, kind: 'speech', seconds: 4 } })
-      const last = talkedAt.get(q)
-      if (last === undefined || s.clock.t - last > 3600) {
-        talkedAt.set(q, s.clock.t)
-        addBond(ctx, q, 0.03)
-      }
+      talkTo(ctx, q)
       break
     }
     case 'give-beads': {

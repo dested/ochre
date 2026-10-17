@@ -25,6 +25,7 @@ import { findWalkable, headingTo } from '../animals'
 import type { Order, SimCtx } from '../ctx'
 import { learn } from '../life'
 import type { DirectorSave } from '../save'
+import { quiet } from '../talk'
 import { sunTimes } from '../time'
 import type { LifeRecord } from './history'
 
@@ -209,6 +210,7 @@ export function caption(d: D, text: string, who: Role | string | null, kind?: Ca
   const secs = seconds ?? Math.max(3, Math.min(9, text.split(/\s+/).length * 0.42 + 1.2))
   const k: Caption['kind'] = kind ?? (p ? 'speech' : 'narration')
   emit(d, { type: 'caption', caption: { id: `${d.beatId}:${d.captionN++}`, text, speaker: p ? p.name : null, kind: k, seconds: secs } })
+  quiet(d.ctx, secs)
   if (p) p.speech = { text, until: d.ctx.state.clock.t + secs * d.ctx.state.timeScale }
 }
 

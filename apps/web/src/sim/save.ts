@@ -196,6 +196,14 @@ export const payloadSchema = z.object({
   nextAnimalId: z.number(),
   /** the director's place in the life; absent in a sandbox sim */
   director: directorSchema.optional(),
+  /** lines said today and what the band is talking about */
+  talk: z
+    .object({
+      used: z.record(z.string(), z.string()),
+      recent: z.partialRecord(z.enum(['whale', 'storm', 'oro-died', 'loss', 'note', 'hunt']), z.number()),
+      talkedAt: z.record(z.string(), z.number()),
+    })
+    .optional(),
 })
 
 export type SavePayload = z.infer<typeof payloadSchema>
