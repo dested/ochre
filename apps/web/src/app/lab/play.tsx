@@ -1,5 +1,5 @@
 import { ClientMount } from '../client-mount'
-import { PlayOverlay } from '~/game/play/overlay'
+import { GameUI } from '~/ui/GameUI'
 
 const load = () => import('~/game/play/lab')
 
@@ -8,7 +8,7 @@ export function PlayLab() {
   return (
     <>
       <ClientMount load={load} />
-      <PlayOverlay />
+      <GameUI />
     </>
   )
 }

@@ -19,8 +19,21 @@ export type Controller = {
   yaw: number
   pitch: number
   teleport(x: number, z: number, heading: number): void
-  /** move the player from input; frozen keeps the body still but lets the camera orbit */
-  update(dt: number, input: Input, feel: StageFeel, seaLevel: number, settings: ControlSettings, frozen: boolean): ControllerOutput
+  /** an impulse in m/s (the surf knocking you back) */
+  push(vx: number, vz: number): void
+  /**
+   * move the player from input; frozen keeps the body still but lets the camera orbit; aim (0..1) slows the
+   * body, stops running and turns it to face where the camera looks
+   */
+  update(
+    dt: number,
+    input: Input,
+    feel: StageFeel,
+    seaLevel: number,
+    settings: ControlSettings,
+    frozen: boolean,
+    aim: number,
+  ): ControllerOutput
   /** place the camera behind the player; aim tightens it over the shoulder */
   updateCamera(dt: number, camera: PerspectiveCamera, feel: StageFeel, aim: number): void
 }
@@ -38,6 +51,7 @@ export function createController(world: WorldData): Controller {
   let heading = 0
   let speed = 0
   let idleMouse = 0
+  let pushT = 0
   let moving = false
   let camDist = 3
   let zoom = 1
@@ -65,8 +79,13 @@ export function createController(world: WorldData): Controller {
       speed = 0
       snapCamera = true
     },
-    update(dt, input, feel, seaLevel, settings, frozen) {
-      const k = 0.0023 * settings.sensitivity
+    push(vx, vz) {
+      vel.x += vx
+      vel.z += vz
+      pushT = 0.7
+    },
+    update(dt, input, feel, seaLevel, settings, frozen, aim) {
+      const k = 0.0023 * settings.sensitivity * (1 - aim * 0.45)
       if (input.mouse.dx !== 0 || input.mouse.dy !== 0) idleMouse = 0
       else idleMouse += dt
       ctl.yaw -= input.mouse.dx * k
@@ -88,15 +107,17 @@ export function createController(world: WorldData): Controller {
       let dz = fz * f + fx * r
       const len = Math.hypot(dx, dz)
       moving = len > 0.01
-      const running = feel.run > 0 && (input.down('ShiftLeft') || input.down('ShiftRight'))
-      let target = moving ? (running ? feel.run : feel.walk) : 0
+      const running = feel.run > 0 && aim < 0.3 && (input.down('ShiftLeft') || input.down('ShiftRight'))
+      let target = moving ? (running ? feel.run : feel.walk) * (1 - aim * 0.55) : 0
       if (moving) {
         dx /= len
         dz /= len
       }
       const depth = world.waterDepth(position.x, position.z, seaLevel)
       if (depth > 0.05) target *= 1 - Math.min(0.65, depth * 1.1)
-      const a = 1 - Math.exp(-dt / Math.max(0.01, feel.accel))
+      // while a push is fresh, input only steers it a little
+      pushT = Math.max(0, pushT - dt)
+      const a = (1 - Math.exp(-dt / Math.max(0.01, feel.accel))) * (pushT > 0 ? 0.15 : 1)
       vel.x += (dx * target - vel.x) * a
       vel.z += (dz * target - vel.z) * a
 
@@ -116,7 +137,10 @@ export function createController(world: WorldData): Controller {
         vel.z = 0
       }
       speed = Math.hypot(vel.x, vel.z)
-      if (speed > 0.08) {
+      if (aim > 0.3) heading += angleDiff(heading, ctl.yaw) * Math.min(1, dt * 14)
+      else if (pushT > 0) {
+        // knocked back: keep facing the way you were
+      } else if (speed > 0.08) {
         const want = Math.atan2(vel.x, vel.z)
         heading += angleDiff(heading, want) * Math.min(1, feel.turn * dt)
       }
@@ -124,7 +148,8 @@ export function createController(world: WorldData): Controller {
       if (moving && idleMouse > 2) ctl.yaw += angleDiff(ctl.yaw, heading) * Math.min(1, dt * 0.6)
 
       let anim: PersonAnim = 'idle'
-      if (speed > feel.walk * 1.35) anim = 'run'
+      if (aim > 0.3) anim = 'aim'
+      else if (speed > feel.walk * 1.35) anim = 'run'
       else if (speed > 0.12) anim = 'walk'
       else if (!frozen && input.down('KeyC')) anim = 'crouch'
       return { position: { x: position.x, z: position.z }, heading, speed, anim }

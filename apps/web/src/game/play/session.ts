@@ -63,6 +63,7 @@ export function mount(el: HTMLElement): () => void {
   let loadTimer: ReturnType<typeof setTimeout> | null = null
 
   bridge.set({ screen: 'title', hasLife: readSave() !== null })
+  rt.audio.music('title')
 
   const save = () => {
     const g = rt.game
@@ -70,7 +71,13 @@ export function mount(el: HTMLElement): () => void {
     writeSave({ v: 1, name: playerName, stage: g.sim.state.stage, seed: SEED, save: g.sim.serialize() })
   }
 
+  // every entry into a life comes from a click: the gesture that lets WebAudio start
+  const wakeAudio = () => {
+    void rt.audio.resume().catch(() => {})
+  }
+
   const begin = (stage: LifeStageId, saved?: SaveData) => {
+    wakeAudio()
     host.setPaused(false)
     bridge.set({ screen: 'loading', loadingProgress: 0.15, summary: null, chapter: null })
     if (loadTimer) clearTimeout(loadTimer)
@@ -117,6 +124,7 @@ export function mount(el: HTMLElement): () => void {
 
   const uninstall = bridge.provide({
     newLife(name) {
+      wakeAudio()
       playerName = name.trim() || 'Teni'
       bridge.set({ screen: 'intro', notesUnlocked: [], notesNew: [] })
     },
@@ -174,6 +182,7 @@ export function mount(el: HTMLElement): () => void {
       rt.endLife()
       host.setPaused(false)
       input.releaseLock()
+      rt.audio.music('title')
       bridge.set({ screen: 'title', hasLife: readSave() !== null, summary: null, chapter: null })
     },
     choose(choiceId, optionId) {
@@ -199,6 +208,7 @@ export function mount(el: HTMLElement): () => void {
       const next = { ...bridge.get().settings, ...patch }
       bridge.set({ settings: next })
       if (patch.quality) rt.pipeline.setQuality(patch.quality)
+      if (patch.master !== undefined || patch.music !== undefined) rt.audio.setVolume(next.master, next.music)
     },
   })
 

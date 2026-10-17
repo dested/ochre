@@ -3,8 +3,9 @@
  * the world built once, input, and the current Game. Swappable lives on top of a world that stays.
  */
 import { PerspectiveCamera, Scene } from 'three'
+import { FIELD_NOTES } from '~/content/field-notes'
 import { bridge as pageBridge, type Bridge } from '../bridge'
-import type { LifeStageId, SaveData, WorldData, WorldView, RenderPipeline } from '../contracts'
+import { FIELD_NOTE_IDS, type GameAudio, type LifeStageId, type SaveData, type WorldData, type WorldView, type RenderPipeline } from '../contracts'
 import { createHost, type GameHost } from '../engine/host'
 import { createGame, type Game } from './game'
 import { createInput, type Input } from './input'
@@ -17,6 +18,7 @@ export type Runtime = {
   readonly camera: PerspectiveCamera
   readonly scene: Scene
   readonly pipeline: RenderPipeline
+  readonly audio: GameAudio
   world: WorldData | null
   view: WorldView | null
   game: Game | null
@@ -36,6 +38,12 @@ export function createRuntime(el: HTMLElement, opts: { bridge?: Bridge } = {}): 
   const scene = new Scene()
   const camera = new PerspectiveCamera(60, 1, 0.05, 4000)
   const input = createInput(host.canvas)
+  const audio = modules.createAudio()
+  const applyVolume = () => {
+    const s = bridge.get().settings
+    audio.setVolume(s.master, s.music)
+  }
+  applyVolume()
 
   const offResize = host.onResize((s) => {
     camera.aspect = s.width / s.height
@@ -50,11 +58,16 @@ export function createRuntime(el: HTMLElement, opts: { bridge?: Bridge } = {}): 
     camera,
     scene,
     pipeline,
+    audio,
     world: null,
     view: null,
     game: null,
     onChapterEnd: () => {},
-    noteTitle: () => null,
+    noteTitle: (id) => {
+      const ids: readonly string[] = FIELD_NOTE_IDS
+      if (!ids.includes(id)) return null
+      return Object.values(FIELD_NOTES).find((n) => n.id === id)?.title ?? null
+    },
     ensureWorld(seed) {
       if (rt.world && rt.world.seed === seed && rt.view) return rt.world
       if (rt.view) {
@@ -83,6 +96,7 @@ export function createRuntime(el: HTMLElement, opts: { bridge?: Bridge } = {}): 
           modules,
           input,
           bridge,
+          audio,
           viewport: () => ({ width: host.size.width, height: host.size.height }),
           settings: () => {
             const s = bridge.get().settings
@@ -104,6 +118,7 @@ export function createRuntime(el: HTMLElement, opts: { bridge?: Bridge } = {}): 
       rt.endLife()
       offResize()
       input.dispose()
+      audio.dispose()
       if (rt.view) {
         rt.view.root.removeFromParent()
         rt.view.dispose()

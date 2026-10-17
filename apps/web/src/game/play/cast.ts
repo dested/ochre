@@ -28,7 +28,15 @@ type PersonEntry = {
 }
 type AnimalEntry = { actor: AnimalActor; anim: AnimalAnim | null }
 
-export type PlayerPose = { x: number; z: number; heading: number; speed: number; anim: PersonAnim }
+export type PlayerPose = {
+  x: number
+  z: number
+  heading: number
+  speed: number
+  anim: PersonAnim
+  /** what the player's right hand holds, overriding the sim (the spear in hand or thrown) */
+  right: HeldItem | null
+}
 
 export type Cast = {
   readonly root: Object3D
@@ -77,9 +85,10 @@ export function createCast(world: WorldData, modules: Pick<Modules, 'createPerso
           a.setHeld('left', p.held.left)
           e.left = p.held.left
         }
-        if (p.held.right !== e.right) {
-          a.setHeld('right', p.held.right)
-          e.right = p.held.right
+        const right = pose?.right ?? p.held.right
+        if (right !== e.right) {
+          a.setHeld('right', right)
+          e.right = right
         }
         const talking = p.speech !== null && p.speech.until > state.clock.t
         if (talking !== e.talking) {

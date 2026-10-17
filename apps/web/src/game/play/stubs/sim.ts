@@ -193,7 +193,7 @@ export const createStubSim: CreateSim = (opts) => {
   }
 
   const animals: SimAnimal[] = []
-  const herd = world.poi('eland-plateau')
+  const herd = stage === 'youth' ? { x: 0, z: 0 } : world.poi('eland-plateau')
   for (let i = 0; i < 8; i++)
     animals.push({
       id: `eland-${i}`,
@@ -255,7 +255,7 @@ export const createStubSim: CreateSim = (opts) => {
     stage,
     chapter: { stage, beatId: `${stage}.start`, objective: objectiveFor(stage), finished: false },
     watching: null,
-    inventory: { shellfish: 0, corms: 0, silcrete: 0, firewood: 0, ochre: 0, gum: 0, beads: 0, point: 0, hafted: false },
+    inventory: { shellfish: 0, corms: 0, silcrete: 0, firewood: 0, ochre: 0, gum: 0, beads: 0, point: stage === 'youth' || stage === 'provider' ? 0.7 : 0, hafted: stage === 'youth' || stage === 'provider' },
     notes: [],
     timeScale: 72,
   }
@@ -456,6 +456,13 @@ export const createStubSim: CreateSim = (opts) => {
         } else if (verb === 'reach') {
           emit({ type: 'caption', caption: { id: 'reach', text: 'Look. Small, like you.', speaker: 'Ama', kind: 'speech', seconds: 4 } })
           emit({ type: 'note', noteId: 'shell-beads' })
+        }
+      } else if (cmd.type === 'spear-hit') {
+        const a = animals.find((x) => x.id === cmd.animalId)
+        if (a) {
+          a.wounded = true
+          a.anim = 'run'
+          emit({ type: 'caption', caption: { id: 'hit', text: 'A hit. Now follow.', speaker: 'Tuk', kind: 'speech', seconds: 3 } })
         }
       } else if (cmd.type === 'set-time-scale') {
         state.timeScale = cmd.scale

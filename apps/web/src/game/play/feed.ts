@@ -3,29 +3,11 @@
  * chapter cards, choices and minigames on the bridge, plus camera cues handed back to the game.
  */
 import type { Bridge, Toast } from '../bridge'
+import { SKILL_LABELS } from '~/content/skills'
 import type { CameraCue, Caption, SimEvent, SimState, SkillId } from '../contracts'
 
-const SKILL_NAME: Record<SkillId, string> = {
-  faces: 'Faces',
-  shellfish: 'Shellfish',
-  tides: 'Tides',
-  corms: 'Corms',
-  fire: 'Fire',
-  knapping: 'Knapping',
-  heat: 'Heat treatment',
-  hafting: 'Hafting',
-  tracking: 'Tracking',
-  spear: 'The spear',
-  beads: 'Beads',
-  ochre: 'Ochre',
-  engraving: 'Engraving',
-  hides: 'Hides',
-  medicine: 'Medicine',
-  stories: 'Stories',
-}
-
 export function skillName(s: SkillId): string {
-  return SKILL_NAME[s]
+  return SKILL_LABELS[s]
 }
 
 /** a readable fallback until content/field-notes lands: "heat-treatment" → "Heat treatment" */

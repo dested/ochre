@@ -8,6 +8,7 @@ import type { Bridge, NameTag, PromptState } from '../bridge'
 import type {
   CameraCue,
   ClockState,
+  GameAudio,
   Interaction,
   LifeStageId,
   RenderPipeline,
@@ -22,9 +23,12 @@ import { createCast, type Cast, type PlayerPose } from './cast'
 import { createController, type ControlSettings, type Controller } from './controller'
 import { createFeed, type Feed } from './feed'
 import { createHeldCamera, type HeldCamera } from './held-camera'
+import { createHunt, type Hunt } from './hunt'
 import type { Input } from './input'
 import type { Modules } from './modules'
 import { STAGE_FEEL } from './stages'
+import { createSteps } from './steps'
+import { createTracks } from './tracks'
 
 export type GameDeps = {
   scene: Scene
@@ -35,6 +39,7 @@ export type GameDeps = {
   modules: Modules
   input: Input
   bridge: Bridge
+  audio: GameAudio
   /** viewport in CSS pixels, for name tags */
   viewport(): { width: number; height: number }
   settings(): ControlSettings
@@ -49,6 +54,7 @@ export type Game = {
   readonly sim: Sim
   readonly cast: Cast
   readonly controller: Controller
+  readonly hunt: Hunt
   /** sim and player frozen (chapter card, menus) while the world keeps drawing */
   simPaused: boolean
   update(dt: number, elapsed: number): void
@@ -69,7 +75,7 @@ function smooth(a: number, b: number, x: number): number {
 }
 
 export function createGame(deps: GameDeps, opts: GameOptions): Game {
-  const { scene, camera, pipeline, world, view, modules, input, bridge } = deps
+  const { scene, camera, pipeline, world, view, modules, input, bridge, audio } = deps
   const sim = modules.createSim({
     seed: opts.seed,
     world,
@@ -81,6 +87,15 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   scene.add(cast.root)
   const controller = createController(world)
   const held: HeldCamera = createHeldCamera()
+  const hunt = createHunt({ world, scene, modules, sim, camera, cast, bridge, audio })
+  const spoor = modules.createSpoor(world)
+  scene.add(spoor.root)
+  const tracks = createTracks(sim, spoor)
+  const steps = createSteps()
+  let surfCooldown = 0
+  let lastStage: LifeStageId | null = null
+  const lastPos = { x: 0, z: 0 }
+  const sfxAt = new Vector3()
 
   let now = 0
   let mode: 'held' | 'third' | null = null
@@ -112,7 +127,10 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
 
   const feed: Feed = createFeed(bridge, {
     camera: (cue) => cameraCue(cue),
-    sfx: () => {},
+    sfx: (e) => {
+      if (e.at) audio.sfx(e.name, sfxAt.set(e.at.x, world.heightAt(e.at.x, e.at.z) + 0.5, e.at.z))
+      else audio.sfx(e.name)
+    },
     modal: () => input.releaseLock(),
     chapterEnd: (e) => {
       relationCache.clear()
@@ -140,7 +158,66 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   }
 
   const route = (events: SimEvent[]) => {
-    for (const e of events) feed.event(e, sim.state, relationOf)
+    for (const e of events) {
+      // UI moments the sim has no position for
+      if ((e.type === 'learned' && (e.personId === sim.state.playerId || e.fromId === sim.state.playerId)) || e.type === 'face-learned') audio.sfx('learn')
+      else if (e.type === 'note' && !bridge.get().notesUnlocked.includes(e.noteId)) audio.sfx('note')
+      else if (e.type === 'chapter-start') audio.sfx('chapter')
+      else if (e.type === 'life-summary') audio.music('summary')
+      feed.event(e, sim.state, relationOf)
+    }
+  }
+
+  /** stage 2: breaking surf deeper than 0.3 m knocks the child back up the shore */
+  const surfPush = (dt: number, player: SimPerson) => {
+    surfCooldown = Math.max(0, surfCooldown - dt)
+    if (sim.state.stage !== 'small' || surfCooldown > 0) return
+    const { x, z } = controller.position
+    const sea = sim.state.clock.seaLevel
+    // surf or anything deeper: a six-year-old doesn't wade out past the breakers
+    const surface = world.surfaceAt(x, z, sea)
+    if ((surface !== 'surf' && surface !== 'shallows' && surface !== 'deep-sea') || world.waterDepth(x, z, sea) <= 0.3) return
+    // uphill is against the ground normal's horizontal part
+    const n = world.normalAt(x, z)
+    let ux = -n.x
+    let uz = -n.z
+    const len = Math.hypot(ux, uz)
+    if (len < 1e-3) {
+      ux = 0
+      uz = -1
+    } else {
+      ux /= len
+      uz /= len
+    }
+    controller.push(ux * 4.8, uz * 4.8)
+    cameraCue({ kind: 'shake', strength: 0.7, seconds: 0.45 })
+    audio.sfx('wave-crash', sfxAt.set(x, sea, z))
+    surfCooldown = 2.5
+    const mother = player.motherId ? sim.state.people.find((p) => p.id === player.motherId) : undefined
+    const caller = mother?.alive ? mother.name : 'Ama'
+    feed.caption({ id: 'surf-call', text: 'Not so far!', speaker: caller, kind: 'speech', seconds: 2.5 })
+  }
+
+  const updateAudio = (player: SimPerson) => {
+    const st = sim.state
+    const p = mode === 'held' ? { x: camera.position.x, z: camera.position.z } : controller.position
+    let fireDistance = Infinity
+    for (const f of st.fires) {
+      if (f.intensity < 0.05) continue
+      fireDistance = Math.min(fireDistance, Math.hypot(f.x - p.x, f.z - p.z))
+    }
+    audio.update({
+      listener: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+      heading: mode === 'held' ? player.heading : controller.yaw,
+      seaDistance: world.shoreDistance(p.x, p.z, st.clock.seaLevel),
+      surf: Math.min(1, 0.35 + st.weather.wind * 0.5 + (st.weather.storm ? 0.3 : 0)),
+      fireDistance,
+      inCave: world.inCave(p.x, p.z),
+      daylight: st.clock.daylight,
+      wind: st.weather.wind,
+      rain: st.weather.rain,
+      muffle: mode === 'held' ? 0.7 : 0,
+    })
   }
 
   const focusPoint = (id: string): { x: number; z: number } | null => {
@@ -294,6 +371,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     sim,
     cast,
     controller,
+    hunt,
     simPaused: false,
     update(dt, elapsed) {
       now = elapsed
@@ -317,9 +395,23 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       const feel = STAGE_FEEL[sim.state.stage]
       let pose: PlayerPose | null = null
       if (mode === 'third') {
-        const out = controller.update(dt, input, feel, sim.state.clock.seaLevel, settings, !live)
-        pose = { x: out.position.x, z: out.position.z, heading: out.heading, speed: out.speed, anim: out.anim }
-        if (live) sim.command({ type: 'move', position: out.position, heading: out.heading, speed: out.speed, anim: out.anim })
+        const out = controller.update(dt, input, feel, sim.state.clock.seaLevel, settings, !live, hunt.aim)
+        const anim = hunt.throwing ? 'throw' : out.anim
+        pose = { x: out.position.x, z: out.position.z, heading: out.heading, speed: out.speed, anim, right: hunt.rightHand() }
+        if (live) {
+          sim.command({ type: 'move', position: out.position, heading: out.heading, speed: out.speed, anim })
+          surfPush(dt, player)
+          const moved = Math.hypot(out.position.x - lastPos.x, out.position.z - lastPos.z)
+          const stride = 0.55 + player.look.ageYears * 0.012
+          const step = steps.advance(Math.min(moved, 1), Math.min(0.85, stride), world.surfaceAt(out.position.x, out.position.z, sim.state.clock.seaLevel))
+          if (step) audio.sfx(step, sfxAt.set(out.position.x, world.heightAt(out.position.x, out.position.z), out.position.z))
+        }
+        lastPos.x = out.position.x
+        lastPos.z = out.position.z
+      }
+      if (sim.state.stage !== lastStage) {
+        lastStage = sim.state.stage
+        audio.music(lastStage)
       }
 
       if (screen === 'playing' && !game.simPaused && !modal) route(sim.step(dt))
@@ -337,9 +429,12 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
             controller.yaw += d * Math.min(1, dt * 2.5)
           }
         } else focus = null
-        controller.updateCamera(dt, camera, feel, 0)
-        if (live) updateInteract(dt, player)
+        controller.updateCamera(dt, camera, feel, hunt.aim)
+        const huntPrompt = hunt.update(dt, input, player, live)
+        if (huntPrompt) setPrompt(huntPrompt)
+        else if (live) updateInteract(dt, player)
         else setPrompt(null)
+        tracks.update(dt, controller.position)
       }
 
       if (shake.t < shake.seconds) {
@@ -367,6 +462,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
         updateHud(player)
       }
       feed.frame(now)
+      updateAudio(player)
 
       const focusPos = mode === 'held' ? camera.position : tmp.set(controller.position.x, world.heightAt(controller.position.x, controller.position.z), controller.position.z)
       view.update({
@@ -387,6 +483,9 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     player: findPlayer,
     dispose() {
       feed.reset()
+      hunt.dispose()
+      tracks.dispose()
+      spoor.root.removeFromParent()
       cast.dispose()
       pipeline.setDream(0)
       pipeline.setFade(0)

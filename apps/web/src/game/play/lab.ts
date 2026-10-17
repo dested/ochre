@@ -11,7 +11,10 @@ const TELEPORTS = ['hearth-main', 'shore-path-top', 'shore-mussels', 'corm-slope
 export type PlayLabHandles = {
   stage(s: LifeStageId): void
   teleport(poiId: string): void
+  teleportTo(x: number, z: number, heading?: number): void
   timeScale(scale: number): void
+  /** face the camera at an animal (and stand 20 m from it) for spear tests */
+  faceAnimal(id: string, distance?: number): void
   state(): unknown
 }
 
@@ -73,6 +76,18 @@ export function mount(el: HTMLElement): () => void {
       const poi = w.poi(id)
       rt.game.teleport(poi.x, poi.z + poi.radius * 0.5, 0)
     },
+    teleportTo(x, z, heading = 0) {
+      rt.game?.teleport(x, z, heading)
+    },
+    faceAnimal(id, distance = 20) {
+      const g = rt.game
+      const a = g?.sim.state.animals.find((x) => x.id === id)
+      if (!g || !a) return
+      const x = a.position.x - distance
+      g.teleport(x, a.position.z, Math.PI / 2)
+      g.controller.yaw = Math.PI / 2
+      g.controller.pitch = 0.05
+    },
     timeScale(scale) {
       rt.game?.sim.command({ type: 'set-time-scale', scale })
     },
@@ -86,6 +101,8 @@ export function mount(el: HTMLElement): () => void {
         hour: g.sim.state.clock.hour,
         seaLevel: g.sim.state.clock.seaLevel,
         prompt: bridge.get().prompt,
+        eland: g.sim.state.animals.filter((a) => a.kind === 'eland').map((a) => [a.id, a.wounded]),
+        spear: { aim: g.hunt.aim, state: g.hunt.spear.state, at: g.hunt.spear.stuckAt },
         known: g.sim.state.people.filter((q) => q.known).map((q) => q.id),
         camera: rt.camera.position.toArray(),
         fwd: rt.camera.getWorldDirection(new Vector3()).toArray(),
