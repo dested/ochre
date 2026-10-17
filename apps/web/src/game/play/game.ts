@@ -25,6 +25,7 @@ import type {
 } from '../contracts'
 import { createCast, type Cast, type PlayerPose } from './cast'
 import { createController, type ControlSettings, type Controller } from './controller'
+import { createObstacles } from './obstacles'
 import { createFeed, type Feed } from './feed'
 import { createHeldCamera, HELD_CONE, type HeldCamera } from './held-camera'
 import { createHunt, type Hunt } from './hunt'
@@ -214,7 +215,8 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   })
   const cast = createCast(world, modules)
   scene.add(cast.root)
-  const controller = createController(world)
+  const solids = createObstacles((x, z) => world.heightAt(x, z))
+  const controller = createController(world, solids)
   const held: HeldCamera = createHeldCamera()
   const hunt = createHunt({ world, scene, modules, sim, camera, cast, bridge, audio })
   const spoor = modules.createSpoor(world)
@@ -1033,6 +1035,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       if (hudTimer >= 0.25) {
         hudTimer = 0
         updateHud(player)
+        solids.refresh(view.root, controller.position.x, controller.position.z)
       }
       feed.frame(now)
       updateAudio(player)

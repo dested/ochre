@@ -5,8 +5,11 @@
 import { MathUtils, type PerspectiveCamera } from 'three'
 import type { PersonAnim, Vec2, WorldData } from '../contracts'
 import type { Input } from './input'
+import type { Obstacles } from './obstacles'
 import type { StageFeel } from './stages'
 
+/** the body's radius against rocks, metres */
+const BODY = 0.25
 /** collision samples along the camera boom */
 const CAM_STEPS = 14
 /** the camera's line to the player stays this far (m) from a lit fire */
@@ -70,7 +73,8 @@ function angleDiff(a: number, b: number): number {
   return d
 }
 
-export function createController(world: WorldData): Controller {
+/** solids: rocks push the body out; rocks, bushes and canopies keep the camera out of them */
+export function createController(world: WorldData, solids: Obstacles | null = null): Controller {
   const position: Vec2 = { x: 0, z: 0 }
   const vel = { x: 0, z: 0 }
   let heading = 0
@@ -173,6 +177,8 @@ export function createController(world: WorldData): Controller {
         vel.x = 0
         vel.z = 0
       }
+      // never sunk in a rock: step out of any that stands above the knees
+      solids?.pushOut(position, BODY)
       speed = Math.hypot(vel.x, vel.z)
       if (aim > 0.3) heading += angleDiff(heading, ctl.yaw) * Math.min(1, dt * 14)
       else if (pushT > 0) {
@@ -258,7 +264,7 @@ export function createController(world: WorldData): Controller {
         const x = px - fx * d * cp
         const z = pz - fz * d * cp
         const y = py + sp * d
-        if (world.heightAt(x, z) + 0.35 > y) {
+        if (world.heightAt(x, z) + 0.35 > y || solids?.blocks(px, py, pz, x, y, z)) {
           allowed = Math.max(0.6, d - want / steps)
           break
         }
