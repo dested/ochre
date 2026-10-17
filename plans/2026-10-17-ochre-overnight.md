@@ -426,6 +426,12 @@ controller, cameras and verbs that make each stage of life feel different; and t
   far ≥ 30000 (the sky dome scales to far). bx runs on the Intel UHD 770 iGPU, so its fps (10–18 in the world)
   isn't a mid-GPU number: report draw calls and triangles. Applies to: world, people, play.
 
+- (2026-10-17 01:45, lead) **ui item U6** (after U5): the UI in the real game. Play `/` through play's
+  `window.__game` QA handles (qaStage, qaSkipBeat, qaTeleport) and fix every ui issue you see over the live 3D frame:
+  caption timing and wrapping, toast stacking, hints in context, chapter card → fade timing, the pause screen over the
+  frozen frame, name tags over real lighting. Add a Continue card on the title (name, stage, age, that chapter's
+  painting) from the save. Send `blocked`/`question` lines to the lead for anything outside ui. Applies to: ui.
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: 2078087 (main, 01:15) · Gate: install 0, typecheck 0, test 0 at 2078087 · Deploy: 2078087 live at https://ochre.dested.com (CI 39016003224 green)
@@ -435,7 +441,7 @@ Board: down · Last pushed: 2078087 (main, 01:15) · Gate: install 0, typecheck 
 | world | opus-xhigh | world-gen, game/world, game/render | W1 | 2edee96 wip (lab washed out at 01:20, not yet ready) | working |
 | people | opus-xhigh | game/actors | P1 fix | c66a392 → fix sent 01:35 (budget 7 calls/97k tris per person, 40 cm face, garments, arms) | working |
 | sim | opus-high | sim | S2 | 2aa80e7 director in (24 beats, in place, heir); lab panel next. S1 854d192 passed | working |
-| ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | U5 | U3 bf4973b passed; 627cf52 lineage fix passed | working |
+| ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | U6 | U5 1fa2a6b passed; U3 bf4973b passed | working |
 | play | opus-high | game/play, game/audio, app/play.tsx | PL3 (director in; real world + people swapped) | PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
 
 Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); Drydock portal :4400 (Windows bun, log in
