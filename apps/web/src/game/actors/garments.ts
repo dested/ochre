@@ -1,0 +1,399 @@
+/**
+ * Hide clothing: wrap dresses, chest bands, aprons, karosses (a back cape, or a drape over one shoulder). Each
+ * is a grid offset from the body's envelope with soft folds, ragged edges and mottled hide colour. Skirts and
+ * flaps blend toward the thighs so they follow the legs; capes hang off the chest with a lagging "cape" bone.
+ */
+import { Color, Matrix4, Vector3 } from 'three'
+import type { BuildCtx } from './ctx'
+import type { TorsoShape } from './figure'
+import { B } from './rig'
+import { bump, clamp, fbm3, lerp, noise3, smooth, type GridPoint, type SkinFn, type SkinW } from './geo'
+import { CORD, OCHRE, hideColor, tone } from './looks'
+
+type Plan = {
+  wrap: boolean
+  chestBand: boolean
+  apron: boolean
+  cape: boolean
+  diagonal: boolean
+}
+
+/** what a person wears, from the garment field plus the modesty rules (adolescents and adults always covered) */
+export function garmentPlan(ctx: BuildCtx): Plan {
+  const { look, d } = ctx
+  const g = look.garment
+  const adultF = d.female && d.age >= 10.5
+  const plan: Plan = { wrap: false, chestBand: false, apron: false, cape: false, diagonal: false }
+  if (d.age < 2.5) return plan
+  const rng = ctx.rng.fork(0x9a7)
+  switch (g) {
+    case 'none':
+      plan.apron = true
+      break
+    case 'apron':
+      plan.apron = true
+      break
+    case 'wrap':
+      plan.wrap = true
+      break
+    case 'kaross':
+    case 'kaross-apron': {
+      if (d.female) plan.wrap = g === 'kaross' || rng.chance(0.5)
+      if (!plan.wrap) plan.apron = true
+      // women and old men wear the full back cape; men and youths the one-shoulder drape
+      if (d.female || d.age >= 45) plan.cape = true
+      else plan.diagonal = true
+      break
+    }
+  }
+  if (adultF && plan.apron && !plan.wrap) plan.chestBand = true
+  return plan
+}
+
+/* ─── shared helpers ───────────────────────────────────────────────────────────────────────────────────── */
+
+const tmpC = new Color()
+
+const BROWNING = new Color(0.6, 0.47, 0.36)
+
+/** mottled hide: pale suede with warm brown blotches, finer grain, worn darker edges */
+function hide(base: Color, p: Vector3, edge: number, seed: number, out: Color): Color {
+  const n = fbm3(p.x * 7, p.y * 7, p.z * 7, seed)
+  const n2 = fbm3(p.x * 17, p.y * 17, p.z * 17, seed ^ 0x51)
+  const fine = noise3(p.x * 45, p.y * 45, p.z * 45, seed ^ 0x77)
+  out.copy(base)
+  out.lerp(tmpC.copy(base).multiply(BROWNING), smooth(0.5, 0.64, n) * 0.75)
+  out.lerp(tmpC.copy(base).multiplyScalar(1.1), smooth(0.44, 0.3, n) * 0.6)
+  out.multiplyScalar(0.86 + 0.26 * n2 + 0.1 * (fine - 0.5))
+  if (edge > 0) out.lerp(tmpC.copy(base).multiply(BROWNING).multiplyScalar(0.8), edge * 0.7)
+  return out
+}
+
+/** a fur pelt: brown and cream patches */
+function fur(p: Vector3, seed: number, out: Color): Color {
+  const n = fbm3(p.x * 7, p.y * 5, p.z * 7, seed)
+  const fine = noise3(p.x * 60, p.y * 60, p.z * 60, seed ^ 0x33)
+  const dark = new Color('#4b3424')
+  const mid = new Color('#8a6644')
+  const cream = new Color('#cdb48a')
+  if (n < 0.36) out.copy(dark)
+  else if (n < 0.5) out.lerpColors(dark, mid, (n - 0.36) / 0.14)
+  else out.lerpColors(mid, cream, smooth(0.5, 0.64, n))
+  return out.multiplyScalar(0.85 + 0.3 * fine)
+}
+
+/** ragged edge offset in metres: noise plus pointed tabs */
+function ragged(u: number, seed: number, amp: number): number {
+  const n = noise3(u * 7.3, 0.5, 0.5, seed) - 0.5
+  const tabs = Math.abs(Math.sin(u * 23 + noise3(u * 3, 1.5, 0.5, seed) * 4)) ** 3
+  return amp * (n * 1.2 + tabs * 0.8)
+}
+
+/** skirt skinning: torso above the hips, then hips blended into the thighs by side */
+function skirtSkin(ctx: BuildCtx, ts: TorsoShape, hemY: number, k = 0.8): SkinFn {
+  const { d } = ctx
+  return (x, y, z): SkinW => {
+    if (y > d.hipY) return ts.skin(x, y, z)
+    const g = smooth(d.hipY, Math.min(hemY, d.hipY - d.thigh * 0.4), y) * k
+    const th = Math.atan2(x, z)
+    const wl = clamp(0.5 + 0.5 * Math.sin(th), 0, 1)
+    return { b: [B.hips, B.thighL, B.thighR], w: [1 - g, g * wl, g * (1 - wl)] }
+  }
+}
+
+/** a body-space radius for a skirt below the hips: hips and thighs hulled, flaring toward the hem */
+function skirtRadius(ctx: BuildCtx, ts: TorsoShape, th: number, y: number, hemY: number, flare: number): number {
+  const { d } = ctx
+  const atHip = ts.radius(th, d.hipY)
+  const t = clamp((d.hipY - y) / Math.max(0.01, d.hipY - hemY), 0, 1)
+  const legHull = d.hipX * Math.abs(Math.sin(th)) + d.legR * lerp(1, 0.85, t)
+  const r = Math.max(atHip, legHull * 1.06)
+  return r * (1 + flare * t ** 1.3)
+}
+
+/* ─── garments ─────────────────────────────────────────────────────────────────────────────────────────── */
+
+export function buildGarments(ctx: BuildCtx, ts: TorsoShape): void {
+  const plan = garmentPlan(ctx)
+  if (plan.wrap) buildWrap(ctx, ts)
+  if (plan.chestBand) buildChestBand(ctx, ts)
+  if (plan.apron) buildApron(ctx, ts)
+  if (plan.cape) buildCape(ctx, ts)
+  if (plan.diagonal) buildDiagonal(ctx, ts)
+}
+
+function buildWrap(ctx: BuildCtx, ts: TorsoShape): void {
+  const { d, look } = ctx
+  const H = d.stature
+  const base = hideColor(look.seed, 1)
+  const seed = (look.seed ^ 0x3a9) & 0xffff
+  const rng = ctx.rng.fork(0x3a9)
+  const kneeY = d.hipY - d.thigh
+  const hemBase = kneeY + d.thigh * rng.range(-0.05, 0.22)
+  const diag = rng.range(0.03, 0.08) * H * (rng.chance(0.5) ? 1 : -1)
+  const topFront = d.chestY + (d.shoulderY - d.chestY) * (d.female && d.age >= 10 ? 0.62 : 0.4)
+  const topBack = topFront + (d.shoulderY - d.chestY) * 0.15
+  const off = 0.006 * (H / 1.6)
+  const P = new Vector3()
+  const hemY = (th: number): number => hemBase + diag * Math.sin(th - 0.6) - ragged(th / (Math.PI * 2), seed, 0.035 * H)
+  // the top edge runs on a diagonal: high under the strap on the left, low under the right arm
+  const span = d.shoulderY - d.chestY
+  const lowK = d.female && d.age >= 10 ? 0.12 : 0.3
+  const topY = (th: number): number => {
+    const s = Math.sin(th)
+    const diagK = s > 0 ? 0.28 * s : lowK * s
+    return lerp(topFront, topBack, 0.5 - 0.5 * Math.cos(th)) + span * diagK + ragged(th / (Math.PI * 2) + 3.1, seed, 0.006 * H)
+  }
+  const vHip = 0.42
+  ctx.gear.at(new Matrix4(), skirtSkin(ctx, ts, hemBase, 0.85)).grid(
+    56,
+    22,
+    (u, v, out: GridPoint) => {
+      const th = 2 * Math.PI * u
+      const y0 = topY(th)
+      const y1 = hemY(th)
+      let y: number
+      let r: number
+      if (v <= vHip) {
+        y = lerp(y0, d.hipY, v / vHip)
+        r = ts.radius(th, y) + off * (1 + 0.6 * d.bust * bump(((y - d.chestY) / (0.04 * H)) ** 2))
+        // the cord cinches at the waist
+        r -= off * 0.6 * bump(((y - d.waistY) / (0.015 * H)) ** 2)
+      } else {
+        const t = (v - vHip) / (1 - vHip)
+        y = lerp(d.hipY, y1, t)
+        r = skirtRadius(ctx, ts, th, y, y1, 0.22) + off
+        r *= 1 + 0.06 * t * Math.sin(th * 9 + noise3(th, 2.5, 0.5, seed) * 5)
+      }
+      const s = Math.sin(th)
+      const c = Math.cos(th)
+      P.set(r * s, y, r * c)
+      out.x = P.x
+      out.y = P.y
+      out.z = P.z
+      const edge = Math.max(smooth(0.9, 1, v), smooth(0.05, 0, v))
+      hide(base, P, edge, seed, out.c)
+    },
+    { wrapU: true },
+  )
+  // the cord belt
+  cordRing(ctx, ts, d.waistY + 0.004 * H, off * 2.2, rigid3(ts, d.waistY))
+  // the strap over the left shoulder
+  shoulderStrap(ctx, ts, topFront + span * 0.26, topBack + span * 0.26, base, seed, 1)
+}
+
+function buildChestBand(ctx: BuildCtx, ts: TorsoShape): void {
+  const { d, look } = ctx
+  const H = d.stature
+  const base = hideColor(look.seed, 2)
+  const seed = (look.seed ^ 0x5c1) & 0xffff
+  const top = d.chestY + (d.shoulderY - d.chestY) * 0.6
+  const bot = d.chestY - (d.shoulderY - d.chestY) * 0.32
+  const off = 0.006 * (H / 1.6)
+  const P = new Vector3()
+  ctx.gear.at(new Matrix4(), ts.skin).grid(
+    48,
+    7,
+    (u, v, out) => {
+      const th = 2 * Math.PI * u
+      const yb = bot - ragged(u, seed, 0.02 * H)
+      const y = lerp(yb, top + (0.5 - 0.5 * Math.cos(th)) * 0.02 * H, v)
+      const r = ts.radius(th, y) + off * (1 + 0.6 * d.bust)
+      P.set(r * Math.sin(th), y, r * Math.cos(th))
+      out.x = P.x
+      out.y = P.y
+      out.z = P.z
+      hide(base, P, smooth(0.15, 0, v), seed, out.c)
+    },
+    { wrapU: true },
+  )
+  shoulderStrap(ctx, ts, top, top + (d.shoulderY - d.chestY) * 0.15, base, seed, 1)
+}
+
+function buildApron(ctx: BuildCtx, ts: TorsoShape): void {
+  const { d, look } = ctx
+  const H = d.stature
+  const seed = (look.seed ^ 0xa9) & 0xffff
+  const rng = ctx.rng.fork(0xa9)
+  const front = hideColor(look.seed, 3)
+  const back = hideColor(look.seed, 4)
+  const off = 0.007 * (H / 1.6)
+  const beltY = d.beltY
+  const P = new Vector3()
+  const child = d.age < 11
+  // two flaps: front (narrow, to mid-thigh) and back (wide, longer)
+  const flaps = [
+    { c: 0, half0: 0.62, half1: 0.5, len: d.thigh * (child ? 0.42 : rng.range(0.4, 0.55)), col: front, k: 0 },
+    { c: Math.PI, half0: 1.05, half1: 0.95, len: d.thigh * (child ? 0.5 : rng.range(0.6, 0.8)), col: back, k: 1 },
+  ]
+  for (const f of flaps) {
+    const hem = d.hipY - f.len
+    const skin: SkinFn = (_x, y) => {
+      const g = smooth(d.hipY, hem, y) * 0.7
+      return { b: [B.hips, B.thighL, B.thighR], w: [1 - g, g * 0.5, g * 0.5] }
+    }
+    ctx.gear.at(new Matrix4(), skin).grid(18, 14, (u, v, out) => {
+      const half = lerp(f.half0, f.half1, v)
+      const th = f.c + (u * 2 - 1) * half
+      const yEnd = hem - ragged(u + f.k * 5, seed, 0.03 * H)
+      const y = lerp(beltY, yEnd, v)
+      const r =
+        y > d.hipY
+          ? ts.radius(th, y) + off
+          : Math.max(ts.radius(th, d.hipY), d.hipX * Math.abs(Math.sin(th)) + d.legR) * 1.04 + off + (f.k === 0 ? 0.01 : 0.015) * H * smooth(d.hipY, hem, y)
+      P.set(r * Math.sin(th), y, r * Math.cos(th))
+      out.x = P.x
+      out.y = P.y
+      out.z = P.z
+      const edge = Math.max(smooth(0.85, 1, v), smooth(0.85, 1, Math.abs(u * 2 - 1)))
+      hide(f.col, P, edge, seed + f.k * 31, out.c)
+    })
+  }
+  cordRing(ctx, ts, beltY + 0.004 * H, off * 1.6, rigid3(ts, beltY))
+}
+
+function buildCape(ctx: BuildCtx, ts: TorsoShape): void {
+  const { d, look } = ctx
+  const H = d.stature
+  const seed = (look.seed ^ 0xca9e) & 0xffff
+  const rng = ctx.rng.fork(0xca9e)
+  const isFur = !d.female && d.age >= 45
+  const base = hideColor(look.seed, 5)
+  const off = 0.012 * (H / 1.6)
+  const kneeY = d.hipY - d.thigh
+  const hemBase = kneeY + d.thigh * rng.range(-0.35, 0.15)
+  const sJY = d.shoulderJointY
+  const wristY = sJY - d.upperArm - d.foreArm
+  const open0 = d.female ? 0.5 : 0.62
+  const open1 = d.female ? 1.0 : 1.15
+  const P = new Vector3()
+  const armSupport = (th: number, y: number): number => {
+    if (y > sJY + d.armR || y < wristY - d.wristR) return 0
+    const ax = d.shoulderX + (sJY - y) * 0.1
+    const ar = lerp(d.armR, d.wristR, clamp((sJY - y) / (d.upperArm + d.foreArm), 0, 1))
+    return ax * Math.abs(Math.sin(th)) + ar
+  }
+  const env = (th: number, y: number): number => Math.max(ts.radius(th, Math.min(y, d.topY - 0.001)), armSupport(th, y))
+  const capeSkin: SkinFn = (x, y, z): SkinW => {
+    const th = Math.atan2(x, z)
+    const wCape = smooth(d.chestY, hemBase, y) * 0.75
+    const side = bump(((Math.abs(th) - Math.PI / 2) / 0.6) ** 2)
+    const wArm = side * 0.45 * smooth(sJY + d.armR * 1.5, sJY - d.upperArm * 0.3, y) * (1 - smooth(wristY + d.foreArm * 0.3, wristY - 0.05, y))
+    const arm = x > 0 ? B.armL : B.armR
+    const rest = Math.max(0, 1 - wCape - wArm)
+    return { b: [B.chest, B.cape, arm], w: [rest, wCape, wArm] }
+  }
+  ctx.gear.at(new Matrix4(), capeSkin).grid(40, 26, (u, v, out) => {
+    const open = lerp(open0, open1, v)
+    const th = open + u * (Math.PI * 2 - 2 * open)
+    const hem = hemBase - ragged(u, seed, 0.04 * H) + 0.03 * H * Math.cos(th)
+    // over the shoulder (v < 0.18), then down the body
+    const vs = 0.18
+    let y: number
+    let r: number
+    if (v < vs) {
+      const t = v / vs
+      const r0 = d.neckR * 1.25 + off
+      const r1 = env(th, d.shoulderY) + off
+      const y0 = d.topY + d.neckR * 0.3
+      const y1 = d.shoulderY
+      r = lerp(r0, r1, Math.sin((t * Math.PI) / 2))
+      y = lerp(y0, y1, 1 - Math.cos((t * Math.PI) / 2))
+    } else {
+      const t = (v - vs) / (1 - vs)
+      y = lerp(d.shoulderY, hem, t)
+      const below = y < d.hipY ? skirtRadius(ctx, ts, th, y, hem, 0.25) : 0
+      r = Math.max(env(th, y), below) + off + 0.05 * H * t * t
+      r *= 1 + 0.03 * t * Math.sin(th * 7 + noise3(th, 0.5, 4.5, seed) * 4)
+    }
+    P.set(r * Math.sin(th), y, r * Math.cos(th))
+    out.x = P.x
+    out.y = P.y
+    out.z = P.z
+    const edge = Math.max(smooth(0.9, 1, v), smooth(0.9, 1, Math.abs(u * 2 - 1)))
+    if (isFur) fur(P, seed, out.c).lerp(tone(out.c, 0.6), edge * 0.5)
+    else hide(base, P, edge, seed, out.c)
+  })
+  void B.cape
+}
+
+function buildDiagonal(ctx: BuildCtx, ts: TorsoShape): void {
+  const { d, look } = ctx
+  const H = d.stature
+  const seed = (look.seed ^ 0xd1a9) & 0xffff
+  const base = hideColor(look.seed, 6)
+  const off = 0.011 * (H / 1.6)
+  const sJY = d.shoulderJointY
+  const TL = d.topY - d.hipY
+  const lowY = d.chestY - 0.2 * TL
+  const A = (d.topY + lowY) / 2
+  const Bv = (d.topY - lowY) / 2
+  const band = 0.46 * TL
+  const P = new Vector3()
+  const leftArm = (th: number, y: number): number => {
+    if (y > sJY + d.armR * 1.2 || y < sJY - d.upperArm * 0.55) return 0
+    return d.shoulderX * Math.max(0, Math.sin(th)) + d.armR * 1.05
+  }
+  const skin: SkinFn = (x, y, z): SkinW => {
+    const th = Math.atan2(x, z)
+    const w = 0.5 * bump(((th - Math.PI / 2) / 0.55) ** 2) * smooth(sJY + d.armR, sJY - d.upperArm * 0.25, y)
+    const t = ts.skin(x, y, z)
+    return { b: [...t.b, B.armL], w: [...t.w.map((k) => k * (1 - w)), w] }
+  }
+  ctx.gear.at(new Matrix4(), skin).grid(52, 12, (u, v, out) => {
+    const th = 2 * Math.PI * u
+    const s = Math.sin(th)
+    const top = A + Bv * s + ragged(u + 2, seed, 0.008 * H)
+    const bot = top - band * (1 + 0.25 * Math.max(0, -s)) - ragged(u, seed, 0.03 * H)
+    const y = lerp(bot, top, v)
+    let r = Math.max(ts.radius(th, Math.min(y, d.topY - 0.001)), leftArm(th, y)) + off
+    // over the top of the left shoulder the hide rides up toward the neck
+    if (y > d.shoulderY) r = Math.max(r, d.neckR * 1.3 + off)
+    r *= 1 + 0.02 * Math.sin(th * 6 + v * 2)
+    P.set(r * s, y, r * Math.cos(th))
+    out.x = P.x
+    out.y = P.y
+    out.z = P.z
+    hide(base, P, Math.max(smooth(0.85, 1, v), smooth(0.15, 0, v)), seed, out.c)
+  }, { wrapU: true })
+}
+
+/* ─── cords and straps ─────────────────────────────────────────────────────────────────────────────────── */
+
+function rigid3(ts: TorsoShape, y: number): SkinFn {
+  const w = ts.skin(0, y, 0)
+  return () => w
+}
+
+function cordRing(ctx: BuildCtx, ts: TorsoShape, y: number, off: number, skin: SkinFn): void {
+  const pts: Vector3[] = []
+  const n = 40
+  for (let i = 0; i <= n; i++) {
+    const th = (i / n) * Math.PI * 2
+    const r = ts.radius(th, y) + off
+    pts.push(new Vector3(r * Math.sin(th), y, r * Math.cos(th)))
+  }
+  const cr = ctx.d.stature * 0.0035
+  ctx.gear.at(new Matrix4(), skin).tube(pts, () => cr, (_t, a) => (Math.sin(a * 3) > 0 ? CORD : tone(CORD, 0.75)), 6)
+}
+
+function shoulderStrap(ctx: BuildCtx, ts: TorsoShape, yFront: number, yBack: number, base: Color, seed: number, side: 1 | -1): void {
+  const { d } = ctx
+  const H = d.stature
+  const x = side * d.shoulderW * 0.55
+  const pts: Vector3[] = []
+  const n = 14
+  for (let i = 0; i <= n; i++) {
+    const t = i / n
+    // front edge → over the shoulder → back edge, in the x = const plane
+    const a = lerp(0.15, Math.PI - 0.15, t)
+    const y = lerp(yFront, yBack, t) + Math.sin(a) * (d.topY - lerp(yFront, yBack, t) + 0.006 * H)
+    const th = Math.atan2(x, Math.cos(a))
+    const r = ts.radius(th, Math.min(y, d.topY - 0.002))
+    const zr = Math.cos(a) * Math.max(0.002, Math.sqrt(Math.max(0, r * r - x * x))) + Math.cos(a) * 0.008 * H
+    pts.push(new Vector3(x, y + 0.004 * H * Math.sin(a), zr))
+  }
+  const c = hide(base, new Vector3(0.3, 0.2, 0.1), 0, seed, new Color())
+  ctx.gear.at(new Matrix4(), ts.skin).tube(pts, () => H * 0.013, c, 8, { flatten: 0.3 })
+  void OCHRE
+}
