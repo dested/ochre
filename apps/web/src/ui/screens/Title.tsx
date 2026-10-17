@@ -9,12 +9,14 @@ import { STAGES } from '~/content/stages'
 import { CrossHatch, Wordmark } from '../motifs'
 import { jitter } from '../palette'
 import { MenuButton } from '../widgets'
+import { AboutScreen } from './About'
 
 export function TitleScreen() {
   const hasLife = useBridge((s) => s.hasLife)
   const notesCount = useBridge((s) => s.notesUnlocked.length)
   const [name, setName] = useState('Teni')
   const [picker, setPicker] = useState(false)
+  const [about, setAbout] = useState(false)
   const begin = () => bridge.actions.newLife(name.trim() || 'Teni')
 
   return (
@@ -29,7 +31,7 @@ export function TitleScreen() {
         }}
       />
 
-      {!picker && (
+      {!picker && !about && (
         <div className="absolute inset-y-0 left-[clamp(28px,7vw,120px)] flex flex-col justify-center">
           <div className="animate-ui-fade" style={{ animationDuration: '1800ms' }}>
             <Wordmark size={128} className="max-lg:hidden" />
@@ -71,15 +73,19 @@ export function TitleScreen() {
               Field Notes
               {notesCount > 0 && <span className="ml-3 font-sans text-[14px] text-bone-dim">{notesCount}</span>}
             </MenuButton>
+            <MenuButton onClick={() => setAbout(true)}>About this world</MenuButton>
           </nav>
         </div>
       )}
 
       {picker && <ChapterPicker onClose={() => setPicker(false)} />}
+      {about && <AboutScreen onClose={() => setAbout(false)} />}
 
-      <p className="pointer-events-none absolute bottom-5 left-[clamp(28px,7vw,120px)] font-sans text-[12px] text-bone/60 ui-halo-soft">
-        The southern Cape, about 80,000 years ago
-      </p>
+      {!about && (
+        <p className="pointer-events-none absolute bottom-5 left-[clamp(28px,7vw,120px)] font-sans text-[12px] text-bone/60 ui-halo-soft">
+          The southern Cape, about 80,000 years ago
+        </p>
+      )}
     </div>
   )
 }

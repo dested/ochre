@@ -85,7 +85,7 @@ export function SummaryScreen() {
             'linear-gradient(90deg, rgb(22 17 14 / 0.92) 0%, rgb(22 17 14 / 0.8) 38%, rgb(22 17 14 / 0.25) 70%, rgb(22 17 14 / 0.1) 100%)',
         }}
       />
-      <div className="absolute inset-y-0 left-[clamp(28px,7vw,120px)] flex w-[min(560px,84vw)] flex-col justify-center overflow-y-auto py-10">
+      <div className="ui-scale absolute inset-y-0 left-[clamp(28px,7vw,120px)] flex w-[min(560px,84vw)] flex-col justify-center overflow-y-auto py-10">
         <h1
           className="animate-ui-rise font-serif leading-none text-bone"
           style={{ fontSize: 'clamp(56px,6vw,96px)', fontVariationSettings: '"opsz" 144, "SOFT" 100', fontWeight: 480 }}>

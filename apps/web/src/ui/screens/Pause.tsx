@@ -23,8 +23,8 @@ export function PauseScreen() {
   return (
     <div className="fixed inset-0 animate-ui-fade">
       <div className="absolute inset-0 bg-soot/55 backdrop-blur-[3px]" />
-      <div className="absolute inset-y-0 left-0 w-[min(520px,90vw)] bg-gradient-to-r from-soot/90 via-soot/70 to-transparent" />
-      <div className="absolute inset-y-0 left-[clamp(28px,6vw,96px)] flex flex-col justify-center">
+      <div className="absolute inset-y-0 left-0 w-[calc(min(520px,90vw)*var(--ui-zoom))] bg-gradient-to-r from-soot/90 via-soot/70 to-transparent" />
+      <div className="ui-scale absolute inset-y-0 left-[clamp(28px,6vw,96px)] flex flex-col justify-center">
         <h2
           className="font-serif text-[clamp(40px,3.6vw,56px)] leading-none text-bone ui-halo-soft"
           style={{ fontVariationSettings: '"opsz" 96, "SOFT" 100', fontWeight: 480 }}>

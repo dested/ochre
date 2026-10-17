@@ -2,8 +2,10 @@
  * The OCHRE UI root. Renders by `bridge.screen`, reads only through `useBridge`, and calls only
  * `bridge.actions.*`. Safe to render on the server: DOM access happens only inside effects.
  */
+import { useEffect } from 'react'
 import { useBridge } from '~/game/bridge'
 import { UiDefs } from './defs'
+import { clearHints } from './hud/Hints'
 import { Hud } from './hud/Hud'
 import { MinigameHost } from './minigames/MinigameHost'
 import { ChapterCardScreen } from './screens/ChapterCard'
@@ -20,6 +22,10 @@ export function GameUI() {
   const screen = useBridge((s) => s.screen)
   const choice = useBridge((s) => s.choice)
   const minigame = useBridge((s) => s.minigame)
+  // the intro only plays for a new life: its control hints start fresh
+  useEffect(() => {
+    if (screen === 'intro') clearHints()
+  }, [screen])
   return (
     <>
       <UiDefs />

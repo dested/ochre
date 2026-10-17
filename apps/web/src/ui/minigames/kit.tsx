@@ -64,10 +64,10 @@ export function MinigameFrame({
       {done ?? (
         <>
           <div
-            className="pointer-events-none absolute left-0 top-0 h-[min(420px,55vh)] w-[min(820px,75vw)]"
+            className="pointer-events-none absolute left-0 top-0 h-[calc(min(420px,55vh)*var(--ui-zoom))] w-[calc(min(820px,75vw)*var(--ui-zoom))]"
             style={{ background: 'radial-gradient(ellipse at 0% 0%, rgb(22 17 14 / 0.6), transparent 70%)' }}
           />
-          <div className="pointer-events-none absolute left-[clamp(20px,3vw,44px)] top-[clamp(18px,3.4vh,36px)] max-w-[min(440px,60vw)]">
+          <div className="ui-scale pointer-events-none absolute left-[clamp(20px,3vw,44px)] top-[clamp(18px,3.4vh,36px)] max-w-[min(440px,60vw)]">
             <h2
               className="animate-ui-rise font-serif text-[clamp(30px,2.6vw,40px)] leading-none text-bone ui-halo"
               style={{ fontVariationSettings: '"opsz" 72, "SOFT" 100', fontWeight: 480 }}>
@@ -76,12 +76,12 @@ export function MinigameFrame({
             <CrossHatch width={170} height={12} className="mt-3" />
             <p className="mt-3 font-sans text-[15px] leading-snug text-bone/85 ui-halo">{hint}</p>
           </div>
-          <div className="absolute bottom-[clamp(18px,3.4vh,36px)] right-[clamp(20px,3vw,44px)] flex items-center gap-6">{actions}</div>
+          <div className="ui-scale absolute bottom-[clamp(18px,3.4vh,36px)] right-[clamp(20px,3vw,44px)] flex items-center gap-6">{actions}</div>
         </>
       )}
       <div className="pointer-events-none absolute inset-x-0 flex justify-center" style={{ bottom: lineBottom }}>
         {line && (
-          <p key={line.id} className="max-w-[min(760px,80vw)] animate-ui-rise text-center text-bone ui-halo" style={{ fontSize: 19, lineHeight: 1.4 }}>
+          <p key={line.id} className="ui-scale ui-wash max-w-[min(760px,80vw)] animate-ui-rise text-center text-bone ui-halo" style={{ fontSize: 19, lineHeight: 1.4 }}>
             {line.speaker ? (
               <>
                 <span className="mr-2.5 font-serif text-[17px] font-semibold text-amber" style={{ fontVariationSettings: '"opsz" 24, "SOFT" 50' }}>
@@ -121,7 +121,7 @@ export function ResultCard({
     return () => window.removeEventListener('keydown', key)
   }, [onContinue])
   return (
-    <div className="absolute bottom-[clamp(28px,7vh,72px)] left-[clamp(28px,7vw,120px)] isolate max-w-[min(520px,80vw)]">
+    <div className="ui-scale absolute bottom-[clamp(28px,7vh,72px)] left-[clamp(28px,7vw,120px)] isolate max-w-[min(520px,80vw)]">
       <div
         className="pointer-events-none absolute -inset-x-[30%] -inset-y-[45%] -z-10 animate-ui-fade"
         style={{ background: 'radial-gradient(closest-side, rgb(22 17 14 / 0.72), rgb(22 17 14 / 0.35) 60%, transparent)' }}

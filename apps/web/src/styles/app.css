@@ -79,8 +79,27 @@
   }
 }
 
+/* Game UI scale: the UI is laid out in px for 1280x800; big screens zoom its text blocks (never name tags, canvases
+   or full-screen backdrops) so it keeps its weight. --ui-zoom is also read where an offset must clear a zoomed block. */
+:root {
+  --ui-zoom: 1;
+}
+@media (min-width: 1600px) and (min-height: 960px) {
+  :root {
+    --ui-zoom: 1.2;
+  }
+}
+@media (min-width: 2400px) and (min-height: 1350px) {
+  :root {
+    --ui-zoom: 1.5;
+  }
+}
+
 /* Game UI helpers. Text over the painted world gets a soft dark halo, never a box. */
 @layer components {
+  .ui-scale {
+    zoom: var(--ui-zoom);
+  }
   .ui-halo {
     text-shadow:
       0 1px 2px rgb(22 17 14 / 0.85),

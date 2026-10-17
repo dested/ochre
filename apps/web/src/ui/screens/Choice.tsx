@@ -6,7 +6,7 @@ export function ChoiceDialog({ choice }: { choice: ChoiceState }) {
   return (
     <div className="pointer-events-auto fixed inset-0 flex animate-ui-fade items-end justify-center pb-[clamp(40px,12vh,140px)]">
       <div className="absolute inset-0 bg-gradient-to-t from-soot/85 via-soot/35 to-transparent" />
-      <div className="relative flex max-w-[min(980px,92vw)] flex-col items-center">
+      <div className="ui-scale relative flex max-w-[min(980px,92vw)] flex-col items-center">
         <h2
           className="text-center font-serif text-[clamp(26px,2.4vw,36px)] text-bone ui-halo"
           style={{ fontVariationSettings: '"opsz" 72, "SOFT" 100', fontWeight: 460 }}>

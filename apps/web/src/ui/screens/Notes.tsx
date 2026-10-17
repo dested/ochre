@@ -44,7 +44,7 @@ export function NotesScreen() {
       {note ? (
         <NoteDetail note={note} onBack={() => setOpen(null)} />
       ) : (
-        <div className="absolute inset-0 overflow-y-auto px-[clamp(24px,5vw,80px)] pb-12 pt-[clamp(24px,5vh,52px)]">
+        <div className="ui-scale absolute inset-0 overflow-y-auto px-[clamp(24px,5vw,80px)] pb-12 pt-[clamp(24px,5vh,52px)]">
           <div className="mb-[clamp(16px,3vh,32px)] flex items-end justify-between gap-6">
             <div>
               <h2
@@ -129,32 +129,34 @@ function NoteDetail({ note, onBack }: { note: FieldNote; onBack: () => void }) {
         />
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-soot max-lg:bg-gradient-to-b" />
       </div>
-      <div className="relative flex flex-col justify-center overflow-y-auto bg-soot px-[clamp(24px,4vw,64px)] py-10">
-        <h2
-          className="animate-ui-rise font-serif text-[clamp(34px,3vw,48px)] leading-[1.02] text-bone"
-          style={{ fontVariationSettings: '"opsz" 96, "SOFT" 100', fontWeight: 480 }}>
-          {note.title}
-        </h2>
-        <p className="mt-3 animate-ui-rise font-sans text-[14px] text-amber" style={{ animationDelay: '120ms' }}>
-          {note.site} · {note.date}
-        </p>
-        <CrossHatch width={180} height={13} className="mt-4" />
-        <p
-          className="mt-5 max-w-[56ch] animate-ui-rise font-sans text-[16.5px] leading-[1.62] text-bone/90"
-          style={{ animationDelay: '220ms' }}>
-          {note.body}
-        </p>
-        <div className="mt-6 max-w-[56ch] animate-ui-rise border-l-2 border-ochre-bright/70 pl-4" style={{ animationDelay: '320ms' }}>
-          <h3 className="font-serif text-[17px] text-bone" style={{ fontVariationSettings: '"opsz" 24, "SOFT" 60', fontWeight: 560 }}>
-            How we know
-          </h3>
-          <p className="mt-1 font-serif text-[15.5px] italic leading-relaxed text-bone/75" style={{ fontVariationSettings: '"opsz" 18' }}>
-            {note.evidence}
+      <div className="relative flex flex-col overflow-y-auto bg-soot px-[clamp(24px,4vw,64px)] py-10">
+        <div className="ui-scale my-auto">
+          <h2
+            className="animate-ui-rise font-serif text-[clamp(34px,3vw,48px)] leading-[1.02] text-bone"
+            style={{ fontVariationSettings: '"opsz" 96, "SOFT" 100', fontWeight: 480 }}>
+            {note.title}
+          </h2>
+          <p className="mt-3 animate-ui-rise font-sans text-[14px] text-amber" style={{ animationDelay: '120ms' }}>
+            {note.site} · {note.date}
           </p>
-        </div>
-        <div className="mt-8 flex items-center gap-5">
-          <HatchRule />
-          <TextButton onClick={onBack}>All notes</TextButton>
+          <CrossHatch width={180} height={13} className="mt-4" />
+          <p
+            className="mt-5 max-w-[56ch] animate-ui-rise font-sans text-[16.5px] leading-[1.62] text-bone/90"
+            style={{ animationDelay: '220ms' }}>
+            {note.body}
+          </p>
+          <div className="mt-6 max-w-[56ch] animate-ui-rise border-l-2 border-ochre-bright/70 pl-4" style={{ animationDelay: '320ms' }}>
+            <h3 className="font-serif text-[17px] text-bone" style={{ fontVariationSettings: '"opsz" 24, "SOFT" 60', fontWeight: 560 }}>
+              How we know
+            </h3>
+            <p className="mt-1 font-serif text-[15.5px] italic leading-relaxed text-bone/75" style={{ fontVariationSettings: '"opsz" 18' }}>
+              {note.evidence}
+            </p>
+          </div>
+          <div className="mt-8 flex items-center gap-5">
+            <HatchRule />
+            <TextButton onClick={onBack}>All notes</TextButton>
+          </div>
         </div>
       </div>
       <style>{`@keyframes ui-note-push{from{transform:scale(1.02)}to{transform:scale(1.12)}}`}</style>

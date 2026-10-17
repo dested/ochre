@@ -94,7 +94,11 @@ so cells stay slightly narrower than tall.
 ```
 
 Margins: `clamp(20px, 3vw, 44px)` sides, `clamp(18px, 3.4vh, 36px)` top. Menus sit in a left column at
-`clamp(28px, 7vw, 120px)`. Everything is checked at 1280×800.
+`clamp(28px, 7vw, 120px)`. Everything is laid out in px for 1280×800 and checked there and at 1920×1080.
+
+**Big screens** (`.ui-scale`, `--ui-zoom` in app.css): from 1600×960 the text blocks zoom 1.2, from 2400×1350 1.5.
+Put `.ui-scale` on a HUD block's inner wrapper or a screen's content column, never on name tags (projected px),
+canvases or full-screen backdrops; an offset that must clear a zoomed block multiplies by `var(--ui-zoom)`.
 
 ## HUD elements
 
@@ -108,6 +112,18 @@ Margins: `clamp(20px, 3vw, 44px)` sides, `clamp(18px, 3.4vh, 36px)` top. Menus s
 - **Prompt**: key cap ("E", "Click"), a hold ring around it, the label, and "hold"; disabled shows the reason in
   italic.
 - **Name tags**: name, relation, a small tick down to the head; warmer with the bond; a voice mark while speaking.
+- **Control hints** (`hud/Hints.tsx`): first-use lines above the dial, small keycaps and low-contrast words, one at
+  a time: watch ring > aiming > an enabled E prompt > move/look/run (not while held; the elder walks and has no
+  Shift) > Esc. Each shows once per life (`ochre:hints`, cleared when the intro starts) and fades after use or a
+  timeout. Derived from bridge state only.
+
+## Title, About and loading
+
+- The title's "About this world" opens `screens/About.tsx`: two paragraphs on Blombos and how the game uses the
+  research, then every Field Note's evidence line grouped (The coast; Stone, fire and the hunt; Ochre, beads and
+  marks; Growing up and living together). A new note must be added to a group there.
+- Loading shows the coming chapter's painting (slow push), the Blombos band engraving with real `loadingProgress`,
+  a rotating true line, and "Building the world · N%".
 
 ## Minigames
 
@@ -163,9 +179,9 @@ foreground layer (`title/key-fg.webp`) is a transparent cut-out of the key art's
 
 - `src/ui/GameUI.tsx`: the root; renders by `bridge.screen`.
 - `src/ui/hud/`: `Hud` (layout and idle logic), `Needs`, `Dial`, `Lines` (objective, captions), `Marks` (prompt,
-  watch ring, reticle, name tags), `Toasts`.
-- `src/ui/screens/`: title (+ chapter picker), intro, loading, chapter card, pause, settings, notes, lineage,
-  choice, summary.
+  watch ring, reticle, name tags), `Toasts`, `Hints` (first-use control hints).
+- `src/ui/screens/`: title (+ chapter picker, about), intro, loading, chapter card, pause, settings, notes,
+  lineage, choice, summary. `src/ui/format.ts`: ages ("a few months old" under 1, whole years after).
 - `src/ui/minigames/`: `MinigameHost` (dispatch, clamps quality, calls `minigameDone`), `kit.tsx` (frame over a
   painting, spoken line, result card, canvas loop), `Knapping` + `knap-geom.ts` (pure outline geometry and
   `assess`), `Engraving` (keeps the lines in localStorage `ochre:engraving`, shown on the summary as "The mark you

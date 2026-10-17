@@ -1,6 +1,11 @@
-/** Loading: the world is being built. The engraved band scratches itself in as the progress grows. */
+/**
+ * Loading: the painting of the stage you are about to play, with a slow push-in, while the world is built. The
+ * engraved band scratches itself in with the real progress (bridge.loadingProgress), and a line from the Field
+ * Notes turns over every few seconds.
+ */
 import { useEffect, useState } from 'react'
 import { useBridge } from '~/game/bridge'
+import { STAGES } from '~/content/stages'
 import { CrossHatch } from '../motifs'
 
 const LINES = [
@@ -13,6 +18,7 @@ const LINES = [
 
 export function LoadingScreen() {
   const progress = useBridge((s) => s.loadingProgress)
+  const stage = useBridge((s) => s.chapter?.stage ?? s.hud.stage)
   const [line, setLine] = useState(0)
   useEffect(() => {
     const t = setInterval(() => setLine((l) => (l + 1) % LINES.length), 5200)
@@ -22,11 +28,11 @@ export function LoadingScreen() {
   return (
     <div className="fixed inset-0 overflow-hidden bg-soot ui-grain">
       <div
-        className="absolute inset-0 bg-cover bg-center opacity-30 blur-[6px]"
-        style={{ backgroundImage: 'url(/art/title/key-bg.webp)', transform: 'scale(1.1)' }}
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: `url(${STAGES[stage].painting})`, animation: 'ui-load-push 30s linear both', opacity: 0.75 }}
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-soot via-soot/60 to-soot/30" />
-      <div className="absolute inset-x-0 bottom-[16vh] flex flex-col items-center gap-6">
+      <div className="absolute inset-0 bg-gradient-to-t from-soot via-soot/55 to-soot/10" />
+      <div className="ui-scale absolute inset-x-0 bottom-[16vh] flex flex-col items-center gap-6">
         <div className="relative h-[22px] w-[min(420px,70vw)]">
           <div className="absolute inset-0 opacity-20">
             <CrossHatch cells={30} height={22} />
@@ -37,11 +43,13 @@ export function LoadingScreen() {
         </div>
         <p
           key={line}
-          className="max-w-[560px] animate-ui-fade px-6 text-center font-serif text-[19px] italic text-bone/85"
+          className="max-w-[560px] animate-ui-fade px-6 text-center font-serif text-[19px] italic text-bone/85 ui-halo"
           style={{ fontVariationSettings: '"opsz" 24, "SOFT" 100' }}>
           {LINES[line]}
         </p>
+        <p className="font-sans text-[12px] tabular-nums text-bone/50">Building the world · {Math.round(p * 100)}%</p>
       </div>
+      <style>{`@keyframes ui-load-push{from{transform:scale(1.03)}to{transform:scale(1.12)}}`}</style>
     </div>
   )
 }

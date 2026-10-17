@@ -143,7 +143,7 @@ export function LineageScreen() {
         className="absolute inset-0 bg-cover bg-center opacity-[0.14] blur-[8px]"
         style={{ backgroundImage: 'url(/art/chapters/held.webp)', transform: 'scale(1.1)' }}
       />
-      <div className="absolute inset-0 overflow-y-auto px-[clamp(24px,5vw,80px)] pb-12 pt-[clamp(24px,5vh,52px)]">
+      <div className="ui-scale absolute inset-0 overflow-y-auto px-[clamp(24px,5vw,80px)] pb-12 pt-[clamp(24px,5vh,52px)]">
         <div className="mb-6 flex items-end justify-between gap-6">
           <div>
             <h2
