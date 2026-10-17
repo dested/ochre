@@ -383,6 +383,8 @@ export function mount(el: HTMLElement): () => void {
       qaSkipBeat: () => {
         const g = rt.game
         if (g) debugDirector(g.sim)?.completeBeat()
+        // an open minigame or choice stays modal and the sim stops stepping
+        bridge.set({ minigame: null, choice: null })
       },
       qaInteractions: () => {
         const g = rt.game

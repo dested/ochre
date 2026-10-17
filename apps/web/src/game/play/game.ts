@@ -803,6 +803,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     bridge.setHud({
       // the death plays without the HUD
       visible: closing === null,
+      sex: player.look.sex,
       name: player.name,
       // whole years from one, tenths for an infant
       ageYears: shownAge(player.look.ageYears),

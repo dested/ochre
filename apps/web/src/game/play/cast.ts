@@ -25,6 +25,7 @@ type PersonEntry = {
   carrying: string | null
   slot: CarrySlot | null
   talking: boolean
+  singing: boolean
 }
 type AnimalEntry = { actor: AnimalActor; anim: AnimalAnim | null }
 
@@ -82,6 +83,7 @@ export function createCast(
             carrying: null,
             slot: null,
             talking: false,
+            singing: false,
           }
           people.set(p.id, e)
         }
@@ -106,7 +108,14 @@ export function createCast(
           a.setHeld('right', right)
           e.right = right
         }
-        const talking = p.speech !== null && p.speech.until > state.clock.t
+        // a song ('♪') sings instead of talking
+        const speaking = p.speech !== null && p.speech.until > state.clock.t
+        const singing = speaking && p.speech?.text === '♪'
+        const talking = speaking && !singing
+        if (singing !== e.singing) {
+          a.setSinging?.(singing)
+          e.singing = singing
+        }
         if (talking !== e.talking) {
           a.setTalking(talking)
           e.talking = talking
