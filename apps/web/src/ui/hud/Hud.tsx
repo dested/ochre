@@ -10,7 +10,7 @@ import { useRecent, useRevealKey } from '../hooks'
 import { Dial } from './Dial'
 import { ControlHints } from './Hints'
 import { Captions, ObjectiveLine } from './Lines'
-import { GazeMark, NameTags, ObjectiveMarker, Prompt, Reticle, WatchRing } from './Marks'
+import { GazeMark, NameTags, ObjectiveMarker, Prompt, Reticle, WatchRing, shownTags } from './Marks'
 import { NeedGlyphs } from './Needs'
 import { Toasts } from './Toasts'
 
@@ -44,6 +44,12 @@ export function Hud({ dimmed = false, toasts }: { dimmed?: boolean; toasts: read
   )
   // the mark waits 4 s after a new objective, so the line is read before the arrow pulls the eye
   const markWaiting = useRecent(objective ? objective.id : 'none', 4000)
+  // a person target with its tag up: the diamond sits above the tag, not over the name
+  const target = objective?.target
+  const targetTagged =
+    target?.kind === 'person' &&
+    typeof window !== 'undefined' &&
+    shownTags(nameTags, { width: window.innerWidth, height: window.innerHeight }).has(target.id)
 
   const lines = (
     <div className="absolute bottom-[clamp(24px,5vh,56px)] left-1/2 -translate-x-1/2">
@@ -74,6 +80,7 @@ export function Hud({ dimmed = false, toasts }: { dimmed?: boolean; toasts: read
       <ObjectiveMarker
         mark={objectiveMark}
         show={!markWaiting && !choosing && objective !== null}
+        aboveTag={targetTagged}
       />
 
       <div className="absolute top-[clamp(18px,3.4vh,36px)] left-[clamp(20px,3vw,44px)]">

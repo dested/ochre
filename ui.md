@@ -119,7 +119,7 @@ canvases or full-screen backdrops; an offset that must clear a zoomed block mult
   while that person speaks, kin relations always. They fade out while a choice card is up. A head off the screen
   gets no tag (the 80 px edge clamp is only for heads near the edge).
 - **Objective mark** (`ObjectiveMarker`, from `objectiveMark`): on screen a small ochre diamond with a bone edge
-  floating over the target; off screen a small diamond with a chevron ahead of it, at the clamped edge point (kept
+  floating over the target (above the target's name tag when that tag is up, so it never covers the name); off screen a small diamond with a chevron ahead of it, at the clamped edge point (kept
   44 px inside) and turned toward the target. Both sit on a soft soot pool. It fades in 4 s after a new objective
   id (the line is read first), hides under a choice and fades out when the mark goes null. `/lab/ui` → Objective
   mark → orbit runs a mock target around and off the screen.

@@ -314,7 +314,20 @@ const MARK_POOL =
  * point turned toward it (angle clockwise from up) while off screen. `show` gates the fade; the last mark is kept
  * so a null fades out in place instead of vanishing.
  */
-export function ObjectiveMarker({ mark, show }: { mark: ObjectiveMark | null; show: boolean }) {
+/** how far the on-screen diamond rides above its point: clear of the head, or clear of the target's name tag */
+const MARK_LIFT = 18
+const MARK_LIFT_TAG = 82
+
+export function ObjectiveMarker({
+  mark,
+  show,
+  aboveTag = false,
+}: {
+  mark: ObjectiveMark | null
+  show: boolean
+  /** the target's name tag is up: sit above it rather than over its name */
+  aboveTag?: boolean
+}) {
   const last = useRef<ObjectiveMark | null>(null)
   if (mark) last.current = mark
   const m = mark ?? last.current
@@ -343,8 +356,8 @@ export function ObjectiveMarker({ mark, show }: { mark: ObjectiveMark | null; sh
           className="absolute inset-0"
           style={{
             opacity: m.onScreen ? 1 : 0,
-            transition: 'opacity 250ms ease',
-            translate: '0 -18px',
+            transition: 'opacity 250ms ease, translate 300ms ease',
+            translate: `0 -${aboveTag ? MARK_LIFT_TAG : MARK_LIFT}px`,
             background: MARK_POOL,
           }}>
           <g style={{ filter: 'url(#ui-brush-soft)' }}>
