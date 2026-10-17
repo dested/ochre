@@ -152,6 +152,20 @@ post chains under `packages/engine/src/look/`, the toon ramp) with a one-line cr
 3. `W3`: polish and performance: LOD, quality levels, the sea on the rocks, dawn lagoon mist, god rays at the cave
    mouth, a tracking-marks helper (`src/game/world/spoor.ts`: `createSpoor(world): { root; add(x, z, heading, age);
    clear() }` painted hoof prints on the ground), and anything the lead's review asks for.
+   **W3 order (03:20, lead, after W2 86a96f0 passed):**
+   1. **The shelf** (`w2s-shore.png`) reads as camouflage: flat colour patches with thick dark outlines. Give it relief:
+      stepped ledges 10–40 cm high along the bedding, joints as thin shadowed gaps (not outlines), darker wet rock and
+      a sheen in the bottom 2 m above the waterline, mussel beds as clustered blue-black bumps (not olive blobs), pools
+      that reflect the sky.
+   2. **The cave floor** (`w2s-cave-golden.png`) is a broad, empty sand plane. Dress it: shell midden heaps toward the
+      back, ash spreads around each hearth, grass and hide bedding at the sleep spots, a firewood pile, a knapping spot
+      with flakes and a hammerstone, a few ochre lumps, rocks against the walls, and gentle unevenness.
+   3. **The flame** (`n-seat-d.png`) is a white sheet with a hole in it. Use layered tongues: orange-red outside,
+      yellow inside, a small white core at the base, additive, no gap, with glowing embers under the wood.
+   4. **Triangles:** the cave view is 1.83M tris on high. Target ≤ 1M on high and ≤ 500k on medium for the cave, shore
+      and cove views (foliage LOD and distance culling first). Report calls and triangles for each.
+   5. A warmer gold in the sunset sky, nearer the concept. Then the rest of W3 as listed.
+   Ready after 1–3 with the same views; 4–5 can follow in a second ready.
 
 **Done when** (each item): your paths typecheck clean; `bun test src/world-gen` passes (write tests: every
 required POI exists, POIs are walkable, cave↔shore is connected on a walk grid, `heightAt` is deterministic);
@@ -542,7 +556,7 @@ Board: down · Last pushed: 927056d (main, 03:05) · Gate: install 0, typecheck 
 
 | Agent | Model | Owns | Item now | Last sha / artifact | Status |
 | --- | --- | --- | --- | --- | --- |
-| world | opus-xhigh | world-gen, game/world, game/render | W2 (atmosphere, coast drama, shelf, cave rock first; + night by the fire 02:55) | W2 WIP 2d3be72 (foliage, shelf under cave); W1 82b261e passed 02:20 | working |
+| world | opus-xhigh | world-gen, game/world, game/render | W3 (shelf relief, cave floor dressing, flame, tris ≤1M, gold sky) | W2 86a96f0 passed 03:20; W1 82b261e passed | working |
 | people | opus-xhigh | game/actors | P1b (acked 02:55, started) | P3 committed unreviewed (43423c3, d679045, 6798b36; ready after P1b); P2 afe56e2 passed | working |
 | sim | opus-high | sim | aside replaces the free-wait objective, then on call for PL3 | S5c 95e8327 passed (42 tests); S5b rest 69428c6 passed (41 tests; covers S5c 1–2); f683e42 superseded; S5b part 6aa3225 passed (held 18:20, follow walk); S5 209a09c passed (7 moments); S4 d0549fd passed; S2 071949a passed | working |
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | U7 fresh eyes on :4090 | chatter 830a7ab; U6 ce615bc passed; U5, U3 passed | working |
