@@ -30,6 +30,8 @@ export const STAGES: Record<LifeStageId, StageInfo> = {
     ageYears: 6,
     line: 'You learn by watching, on a shore wide and full of wonders',
     painting: '/art/chapters/small.webp',
+    // small.webp is a girl at the pools; the boy with the horn sticks leads the children's play
+    paintingMale: { src: '/art/notes/play.webp', mirror: false },
   },
   youth: {
     id: 'youth',
@@ -37,6 +39,8 @@ export const STAGES: Record<LifeStageId, StageInfo> = {
     ageYears: 14,
     line: 'Stone, fire and the first hunt, and becoming someone people need',
     painting: '/art/chapters/youth.webp',
+    // youth.webp is a girl with a spear; a young man sets silcrete in the fire (stone and fire)
+    paintingMale: { src: '/art/notes/heat-treatment.webp', mirror: false },
   },
   provider: {
     id: 'provider',
@@ -44,6 +48,8 @@ export const STAGES: Record<LifeStageId, StageInfo> = {
     ageYears: 26,
     line: 'Keeping the people you love alive through the seasons',
     painting: '/art/chapters/provider.webp',
+    // provider.webp is a mother with a baby on her back; two men stalk eland above the sea
+    paintingMale: { src: '/art/notes/hunting.webp', mirror: false },
   },
   elder: {
     id: 'elder',
