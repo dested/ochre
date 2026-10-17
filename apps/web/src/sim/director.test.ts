@@ -371,4 +371,22 @@ describe('director', () => {
     const running = sim.state.people.filter((p) => !p.isPlayer && Math.hypot(p.position.x - beach.x, p.position.z - beach.z) < 30)
     expect(running.length).toBeGreaterThanOrEqual(1)
   }, 60_000)
+
+  test('elder.walk opens on the elder standing at the path top, not still seated from the story', () => {
+    const sim = newSim('elder')
+    const dir = director(sim)
+    for (let i = 0; i < 20 && sim.state.chapter.beatId !== 'elder.story'; i++) {
+      dir.completeBeat()
+      steps(sim, 0.2)
+    }
+    for (let i = 0; i < 30 * 8 && player(sim).anim !== 'sit'; i++) sim.step(1 / 30)
+    expect(player(sim).anim).toBe('sit')
+    for (let i = 0; i < 20 && sim.state.chapter.beatId !== 'elder.walk'; i++) {
+      dir.completeBeat()
+      steps(sim, 0.2)
+    }
+    for (let i = 0; i < 30 * 8 && sim.state.chapter.objective?.text !== 'Walk down to the sea'; i++) sim.step(1 / 30)
+    expect(sim.state.chapter.objective?.text).toBe('Walk down to the sea')
+    expect(player(sim).anim).toBe('idle')
+  }, 60_000)
 })

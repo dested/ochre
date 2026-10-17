@@ -200,6 +200,10 @@ export function teleport(d: D, at: Vec2, heading: number): void {
   if (carrier) {
     pl.position = { x: q.x, z: q.z }
     pl.heading = heading
+  } else {
+    // arriving somewhere new, standing: no seat pose carried over from the last scene (seatPlayer sits again after)
+    pl.anim = 'idle'
+    pl.task = { kind: 'idle', targetId: null, target: null, until: null, skill: null }
   }
   emit(d, { type: 'teleport', position: { x: q.x, z: q.z }, heading })
 }
