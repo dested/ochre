@@ -184,7 +184,10 @@ void main() {
 	body = mix( body, vec3( dot( body, vec3( 0.3, 0.55, 0.15 ) ) ) * vec3( 0.86, 0.95, 1.0 ), uWeather.w * 0.55 + rainK * 0.2 );
 	// light through the crest of the swell
 	body += uShallow * uKeyColor * clamp( vWaveH * 1.4, 0.0, 1.0 ) * 0.12 * ( 1.0 - b2 );
-	vec3 col = mix( body, refl, fres );
+	// by night the water's own colour goes: what's left is ink-blue, and the sky in it
+	float nightK = uSkyState.z;
+	body = mix( body, vec3( dot( body, vec3( 0.3, 0.55, 0.15 ) ) ) * vec3( 0.62, 0.68, 1.0 ) * 0.7, nightK * 0.8 );
+	vec3 col = mix( body, refl, min( fres + nightK * 0.15, 0.6 ) );
 	// the sun's path: sparkles and a broad sheen
 	float spk = pow( max( dot( R, uKeyDir ), 0.0 ), 260.0 );
 	float sheen = pow( max( dot( R, uKeyDir ), 0.0 ), 60.0 );
