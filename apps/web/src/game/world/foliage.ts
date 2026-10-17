@@ -992,7 +992,8 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
       }
     }
   }
-  staticMesh(rockGeo(9, 1), rockMat, edge, 'path-stones', false, true)
+  // small and many: the coarsest rock is plenty
+  staticMesh(rockGeo(9, 0), rockMat, edge, 'path-stones', false, true)
 
   // ─── refill ────────────────────────────────────────────────────────────────────────────────────────────────
   const out: Place = { x: 0, z: 0, y: 0, s: 1, yaw: 0, r: 1, g: 1, b: 1, tilt: 0 }

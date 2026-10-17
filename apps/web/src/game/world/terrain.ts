@@ -14,7 +14,7 @@ import {
   Vector4,
   type Camera,
 } from 'three'
-import type { WorldData } from '../contracts'
+import type { Quality, WorldData } from '../contracts'
 import { patchPaint } from '../render/paint'
 import { LIGHT } from '../render/uniforms'
 import { createBaseField, MAT, type TerrainGrid } from '../../world-gen/terrain'
@@ -23,7 +23,8 @@ import { CELL, GRID_N, HALF, RIVER } from '../../world-gen/layout'
 const DETAIL = { x0: -640, x1: 640, z0: -768, z1: 512 } as const
 const TILE = 256
 const LODS = [2, 4, 8] as const
-const LOD_DIST = [380, 900] as const
+/** past the nearest edge of a tile: 2 m cells within the first distance, 4 m within the second, then 8 m */
+const LOD_DIST: Record<Quality, readonly [number, number]> = { high: [240, 640], medium: [180, 520], low: [120, 400] }
 const SKIRT = 5
 
 /** per grid vertex: splat weights A = sand, dune, fynbos, grass; B = rock, cliff, shelf, earth */
@@ -418,7 +419,7 @@ const TERRAIN_NORMAL = /* glsl */ `
 export type TerrainView = {
   root: Group
   material: MeshStandardMaterial
-  update(camera: Camera): void
+  update(camera: Camera, quality: Quality): void
   dispose(): void
 }
 
@@ -600,13 +601,14 @@ export function createTerrainView(world: WorldData, grid: TerrainGrid | null): T
   return {
     root,
     material,
-    update(camera: Camera) {
+    update(camera: Camera, quality: Quality) {
+      const ld = LOD_DIST[quality]
       camPos.setFromMatrixPosition(camera.matrixWorld)
       const camH = Math.max(0, camPos.y - world.heightAt(camPos.x, camPos.z))
       const bias = camH * 0.8
       for (const t of tiles) {
         const d = Math.max(0, Math.hypot(camPos.x - t.cx, camPos.z - t.cz) - TILE * 0.6) + bias
-        const lod = d < LOD_DIST[0] ? 0 : d < LOD_DIST[1] ? 1 : 2
+        const lod = d < ld[0] ? 0 : d < ld[1] ? 1 : 2
         for (let k = 0; k < t.lods.length; k++) {
           const m = t.lods[k]
           if (m) m.visible = k === lod

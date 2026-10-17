@@ -144,7 +144,7 @@ export const createWorldView: CreateWorldView = (data: WorldData, pipeline: Rend
       if (camera instanceof PerspectiveCamera) sky.scale.setScalar((camera.far * 0.9) / 10000)
       sky.updateMatrixWorld()
 
-      terrain.update(camera)
+      terrain.update(camera, q)
       foliage.update(frame.focus, camPos.x, camPos.z, q)
       sea.update(camera, clock.seaLevel, weather)
       fires.update(frame.fires, frame.focus)
