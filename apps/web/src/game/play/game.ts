@@ -27,6 +27,7 @@ import type {
 import { createCast, type Cast, type PlayerPose } from './cast'
 import { createController, type ControlSettings, type Controller } from './controller'
 import { createObstacles } from './obstacles'
+import { createOfferShell } from './offer-shell'
 import { createFeed, type Feed } from './feed'
 import { createHeldCamera, HELD_CONE, type HeldCamera } from './held-camera'
 import { createHunt, type Hunt } from './hunt'
@@ -222,6 +223,8 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   })
   const cast = createCast(world, modules)
   scene.add(cast.root)
+  const offerShell = createOfferShell()
+  scene.add(offerShell.object)
   const solids = createObstacles((x, z) => world.heightAt(x, z))
   const controller = createController(world, solids)
   const held: HeldCamera = createHeldCamera()
@@ -468,6 +471,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   }
 
   const updateHeld = (dt: number, player: SimPerson, settings: ControlSettings) => {
+    offerShell.show(null, 0)
     const carrier = player.carriedBy
       ? sim.state.people.find((q) => q.id === player.carriedBy)
       : undefined
@@ -545,6 +549,8 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       )
     held.attract = reach ? reachAt : null
     offerer = reach ? carrier.id : null
+    if (reach && carrierActor && carrier.held[hand] === 'shell')
+      offerShell.show(reachAt, carrier.heading)
     if (reach) {
       tmp2.copy(reachAt).sub(camera.position)
       const looking = fwd.angleTo(tmp2) < REACH_CONE
@@ -1079,6 +1085,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
 
       if (mode === 'held') updateHeld(dt, player, settings)
       else {
+        offerShell.show(null, 0)
         if (focus && now < focus.until) {
           const p = focusPoint(focus.targetId)
           if (p) {
@@ -1182,6 +1189,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       tracks.dispose()
       spoor.dispose()
       cast.dispose()
+      offerShell.dispose()
       pipeline.setDream(0)
       pipeline.setFade(0)
       bridge.setHud({ visible: false, watching: null })

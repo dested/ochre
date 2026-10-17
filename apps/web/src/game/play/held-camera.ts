@@ -58,6 +58,11 @@ export type HeldCamera = {
   ): void
 }
 
+/** how far p sits to the infant's shoulder side (+ her left, as `side`) of her head, metres */
+function lateral(p: Vector3, face: Vector3, heading: number): number {
+  return (p.x - face.x) * Math.cos(heading) - (p.z - face.z) * Math.sin(heading)
+}
+
 export function createHeldCamera(): HeldCamera {
   let phase = 0
   let smoothHeading = 0
@@ -129,8 +134,13 @@ export function createHeldCamera(): HeldCamera {
         pitchMin,
         pitchMax
       )
-      // on the back: beside her head, on the side the infant is turned to
-      if (cam.yaw > 0.15) side = 1
+      // on the back: beside her head, on the side the infant is turned to; while she offers something, on the
+      // side of her hand (aiming at a hand straight ahead would otherwise swing the view shoulder to shoulder)
+      if (cam.attract && face) {
+        const offered = lateral(cam.attract, face, carrierHeading)
+        if (offered > 0.04) side = 1
+        else if (offered < -0.04) side = -1
+      } else if (cam.yaw > 0.15) side = 1
       else if (cam.yaw < -0.15) side = -1
       sideEase += (side - sideEase) * Math.min(1, dt * 3)
       eyeWant.copy(eye)
