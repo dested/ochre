@@ -392,7 +392,7 @@ controller, cameras and verbs that make each stage of life feel different; and t
   `next`. One life stays one sim, so bonds, skills and notes carry over. `createSim({ stage })` is only for
   skip-to-chapter from the title. play keeps its 2 s fallback as a safety net. Applies to: sim, play.
 
-## Ledger (lead, updated 2026-10-17 00:40)
+## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: 60add27 (main) · Gate: typecheck green at 60add27 · Deploy: c61a551 live at https://ochre.dested.com (CI green)
 
@@ -400,13 +400,13 @@ Board: down · Last pushed: 60add27 (main) · Gate: typecheck green at 60add27 �
 | --- | --- | --- | --- | --- | --- |
 | world | opus-xhigh | world-gen, game/world, game/render | W1 | — | working (spawned 00:38) |
 | people | opus-xhigh | game/actors | P1 | — | working (spawned 00:39) |
-| sim | opus-high | sim | S1 | — | working (spawned 00:38) |
+| sim | opus-high | sim | S2 | S1 854d192 passed (spacing, hearth ring, child hysteresis, meal mix, hunt label → S2) | working |
 | ui | opus-high | ui, content, audio, public/art, index.html, ui.md | U3 | U2 8965c7c passed; lineage links fix pending | working |
-| play | opus-high | game/play, app/play.tsx | PL3 | PL2 a8b0786 passed; real sim in; lineage fields + tag declutter pending | working |
+| play | opus-high | game/play, app/play.tsx | PL3 | PL2 a8b0786 passed; 01970f3 lineage, 0e3a774 tag declutter done; waiting on modules | working |
 
 Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); Drydock portal :4400 (Windows bun, log in
 scratchpad drydock-portal.log)
 Images used: 40 / 200 (lead 2, ui 38)
 Waiting on Sal: none (needs-sal file: plans/2026-10-17-needs-sal.md)
 Escalations: none
-Next: watch commits; review each sample (W1, P1, S1, U1, PL1) as ready lines arrive; write the kit (cliffnotes, decisions).
+Next: review W1 and P1; push once ui's lineage fix makes HEAD green; updates.md.
