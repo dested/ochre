@@ -555,6 +555,7 @@ const youth: Chapter = {
       steps: [
         run((d) => {
           d.ctx.noAiHunts = true
+          skipTo(d, sun(d).rise + 1)
           const ridge = poi(d, 'silcrete-ridge')
           const h = hearth(d)
           const len = dist(ridge, h)
@@ -839,6 +840,8 @@ const provider: Chapter = {
       steps: [
         run((d) => {
           d.ctx.noAiHunts = false
+          // the chapter opens in full morning light, not the grey before dawn
+          skipTo(d, sun(d).rise + 1)
           seatPlayer(d, 0.5)
         }),
         ...fadeIn(2),
@@ -1070,7 +1073,10 @@ const elder: Chapter = {
     {
       id: 'elder.mark',
       steps: [
-        run((d) => seatPlayer(d, 0.4)),
+        run((d) => {
+          skipTo(d, sun(d).rise + 1.5)
+          seatPlayer(d, 0.4)
+        }),
         ...fadeIn(2),
         wait(1),
         obj('Engrave the ochre'),
