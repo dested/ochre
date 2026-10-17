@@ -631,8 +631,14 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
         }
       } else holdT = Math.max(0, holdT - dt * 2)
     }
+    // a "Tell the others" objective names its person as told-to; once told, the prompt reverts to ordinary talk
+    const telling =
+      it.verb === 'talk' &&
+      it.targetId === goal &&
+      (sim.state.chapter.objective?.text.startsWith('Tell ') ?? false)
+    const name = telling ? sim.state.people.find((q) => q.id === it.targetId)?.name : undefined
     setPrompt({
-      label: it.label,
+      label: name ? `Tell ${name}` : it.label,
       key: 'E',
       holdSeconds: it.holdSeconds,
       holdProgress: it.holdSeconds > 0 ? Math.min(1, holdT / it.holdSeconds) : 0,
