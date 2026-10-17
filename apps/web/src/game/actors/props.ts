@@ -23,12 +23,14 @@ export const FLAKE_REACH = 0.045
 export const POKER_REACH = 0.62
 
 /**
- * the items the hands show for an anim: what they hold, except that tending a fire with an empty right hand takes a
- * poker, and engraving takes both hands: the ochre slab in the left and a stone flake in the right (whatever else was
- * held is set down)
+ * the items the hands show for an anim: what they hold, except that the lying hold nothing, tending a fire with an
+ * empty right hand takes a poker, and engraving takes both hands: the ochre slab in the left and a stone flake in the
+ * right (whatever else was held is set down)
  */
 export function shownItems(anim: PersonAnim, held: readonly [HeldItem, HeldItem]): [PropItem, PropItem] {
   const [l, r] = held
+  // lying down, what was held is laid aside (a spear left in a dead or sleeping hand stands up off the ground)
+  if (anim === 'lie-dead' || anim === 'sleep') return ['none', 'none']
   if (anim === 'tend-fire' && r === 'none') return [l, 'poker']
   if (anim === 'engrave') return ['slab', 'flake']
   return [l, r]

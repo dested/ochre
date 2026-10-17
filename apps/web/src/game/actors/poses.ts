@@ -593,6 +593,45 @@ export function talkGestures(c: AnimCtx, s: PoseSpec, w: number): void {
   s.chest.y += w * 0.05 * Math.sin(t * 0.7 + c.jit * 3)
 }
 
+/* ─── song ───────────────────────────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * singing (the sim's '♪'): a slow sway from the waist across two beats, the chin up a little, and the hands keeping
+ * time, clapped in front of the chest when the anim leaves them idle and they hold nothing (the clapping songs round
+ * the fire)
+ */
+export function singGestures(c: AnimCtx, s: PoseSpec, handsFree: boolean): void {
+  const { d, t } = c
+  const H = d.stature
+  // about 76 beats a minute
+  const beat = frac(t * 1.27 + c.jit)
+  const sway = Math.sin(TAU * (t * 0.635 + c.jit))
+  s.spine.z += 0.035 * sway
+  s.chest.z += 0.02 * sway
+  s.chest.y += 0.03 * sway
+  s.head.z += 0.025 * sway
+  s.head.x -= 0.06
+  const l = s.arms[0]
+  const r = s.arms[1]
+  if (!l || !r || !handsFree || c.held[0] !== 'none' || c.held[1] !== 'none') return
+  // the clap lands on the beat: quick in, a moment together, slower out
+  const clap = beat < 0.12 ? smooth(0, 0.12, beat) : 1 - smooth(0.18, 0.6, beat)
+  for (let i = 0; i < 2; i++) {
+    const side = i === 0 ? 1 : -1
+    const a = i === 0 ? l : r
+    // riding the chest, so the hands meet in front of the breastbone however the body leans
+    a.ik = true
+    a.space = B.chest
+    a.wrist.set(side * lerp(0.085, 0.012, clap) * H, d.chestY + 0.012 * H * clap, d.chestDepth + 0.12 * H)
+    a.pole.set(side, -0.7, -0.3)
+    a.aim = true
+    a.aimAxis.set(0, 0.75, 0.65)
+    a.aimPalm.set(-side, 0, 0)
+    a.curl = 0.12
+    a.thumb = 0.2
+  }
+}
+
 /* ─── the dance ────────────────────────────────────────────────────────────────────────────────────────── */
 
 /** the healing dance: bent forward, short stamping steps, arms back; women clap the rhythm */
@@ -661,7 +700,7 @@ export function poseCrawl(c: AnimCtx, s: PoseSpec): void {
   const S = rig.shin
   const arm = (d.upperArm + d.foreArm) * 0.95 + d.palm * 0.6
   const kneeH = d.kneeR
-  const hipH = kneeH + T * 0.92 + 0.012 * d.stature
+  const hipH = kneeH + T * 0.92 + 0.018 * d.stature
   const torso = d.shoulderJointY - d.hipY
   // pitch the torso so the shoulders sit at arm's height
   const pitch = Math.acos(clamp((arm - hipH) / torso, -0.2, 0.96))
@@ -701,12 +740,16 @@ export function poseCrawl(c: AnimCtx, s: PoseSpec): void {
       leg.pole.set(side * 0.15, -1, 0.7)
     }
     if (a) {
+      // the palm flat on the ground, fingers ahead, the wrist half a hand's thickness up (bent back hard, the old way,
+      // the fingertips dug into the ground); in the swing the hand tips forward a little as it lifts
       a.ik = true
-      a.wrist.set(side * d.shoulderX * 1.1, d.palm * 0.5 + 0.04 * d.stature * aq.lift, shoulderZ + 0.02 * d.stature + aq.z)
+      a.wrist.set(side * d.shoulderX * 1.1, d.handW * 0.3 + 0.04 * d.stature * aq.lift, shoulderZ + 0.02 * d.stature + aq.z)
       a.pole.set(side * 0.3, 0, -1)
-      a.hand.set(-1.2, 0, 0)
-      a.curl = 0.15
-      a.thumb = 0.2
+      a.aim = true
+      a.aimAxis.set(-side, 0, 0)
+      a.aimPalm.set(0, -1, 0.35 * aq.lift)
+      a.curl = 0.06
+      a.thumb = 0.15
     }
   }
 }

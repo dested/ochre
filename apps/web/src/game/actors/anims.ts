@@ -28,6 +28,7 @@ import {
   poseTendFire,
   poseThrow,
   poseWave,
+  singGestures,
   talkGestures,
 } from './poses'
 
@@ -83,6 +84,8 @@ export type AnimCtx = {
   look: Vector3 | null
   /** 0..1 how much this person is talking */
   talk: number
+  /** 1 while singing (the actor cross-fades the switch) */
+  sing: number
 }
 
 /* ─── gait ─────────────────────────────────────────────────────────────────────────────────────────────── */
@@ -640,6 +643,9 @@ export function poseAnim(anim: PersonAnim, c: AnimCtx, s: PoseSpec): void {
   if (!lying && base !== 'held' && base !== 'crawl') {
     const w = base === 'talk' ? 0.8 + 0.2 * c.talk : 0.45 * c.talk
     if (w > 0.01) talkGestures(c, s, w)
+    // sitting, standing or squatting with nothing to do, the hands clap the time; at work they go on working
+    const idleHands = (base === 'sit' || base === 'idle' || base === 'talk' || base === 'crouch') && !moving && c.carrying !== 'arms' && c.carrying !== 'hip'
+    if (c.sing > 0) singGestures(c, s, idleHands)
   }
   // old age: a stoop, the head lifted to keep the gaze level, knees soft
   const e = c.d.elder

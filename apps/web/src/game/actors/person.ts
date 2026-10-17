@@ -10,7 +10,7 @@ import { Rng, mix32 } from '~/core/rng'
 import { gaitFor, poseAnim, type AnimCtx, type CarrySeat } from './anims'
 import type { BodyDims } from './body'
 import { buildPerson, type BuiltPerson } from './build'
-import { clamp } from './geo'
+import { clamp, smooth } from './geo'
 import { Solver, blendPose, copyPose, makePose, makeSpec, type PoseSpec, type RigInfo } from './pose'
 import { backSeat, gripPoint, shownItems } from './props'
 import { B } from './rig'
@@ -128,6 +128,8 @@ class PersonImpl implements PersonActor {
   private saccade = { yaw: 0, pitch: 0, next: 0 }
   private talking = false
   private talkW = 0
+  private singing = false
+  private singW = 0
   private blinkT = -1
   private nextBlink = 2
   private held: [HeldItem, HeldItem] = ['none', 'none']
@@ -232,6 +234,13 @@ class PersonImpl implements PersonActor {
 
   setTalking(on: boolean): void {
     this.talking = on
+  }
+
+  setSinging(on: boolean): void {
+    if (on === this.singing) return
+    this.singing = on
+    // the hands go from whatever the anim had them doing to keeping time: cross-fade the whole pose
+    this.startFade(0.4)
   }
 
   headPosition(out: Vector3): Vector3 {
@@ -367,6 +376,7 @@ class PersonImpl implements PersonActor {
     this.lookLayer(dt)
     this.blinkLayer(dt)
     this.talkW = damp(this.talkW, this.talking ? 1 : 0, 8, dt)
+    this.singW = damp(this.singW, this.singing ? 1 : 0, 5, dt)
 
     let look: Vector3 | null = null
     if (this.gaze) {
@@ -387,7 +397,8 @@ class PersonImpl implements PersonActor {
       jit: this.jit,
       runK: 0,
       look,
-      talk: this.talkW,
+      talk: this.talkW * (1 - this.singW),
+      sing: this.singing ? 1 : 0,
     }
     const anim = this.anim
     if (moving && gait.run > 0.02 && gait.run < 0.98) {
@@ -425,12 +436,23 @@ class PersonImpl implements PersonActor {
     s.head.x += this.headPitch * 0.7
     const cradled = this.cradleWatch()
     if (cradled) s.head.z += CRADLE_TILT * clamp(this.headPitch / Math.max(0.05, cradled.pitch), 0, 1)
-    if (this.talkW > 0.01) {
+    // a song wins over speech
+    const talk = this.talkW * (1 - this.singW)
+    if (talk > 0.01) {
       const t = this.t
       const syl = Math.max(0, Math.sin(t * 25) * 0.6 + Math.sin(t * 9.3 + 1) * 0.5 + Math.sin(t * 3.1) * 0.3)
-      s.jaw += this.talkW * (0.03 + 0.11 * Math.min(1, syl))
-      s.head.x += this.talkW * 0.025 * Math.sin(t * 5.2)
-      s.head.z += this.talkW * 0.02 * Math.sin(t * 2.3)
+      s.jaw += talk * (0.03 + 0.11 * Math.min(1, syl))
+      s.head.x += talk * 0.025 * Math.sin(t * 5.2)
+      s.head.z += talk * 0.02 * Math.sin(t * 2.3)
+    }
+    if (this.singW > 0.01) {
+      // long open vowels: the jaw eases between held notes, a phrase of about five seconds closing on a quick breath,
+      // a slight vibrato on the held note
+      const t = this.t + this.jit * 10
+      const ph = (t / 5.2) % 1
+      const breath = smooth(0.84, 0.88, ph) * (1 - smooth(0.95, 1, ph))
+      const vowel = 0.55 + 0.45 * Math.sin(t * 1.9 + Math.sin(t * 0.7))
+      s.jaw += this.singW * ((0.05 + 0.13 * vowel) * (1 - breath) + 0.004 * Math.sin(t * 34))
     }
     if (this.built.dims.age < 1.5) s.jaw += 0.03
   }

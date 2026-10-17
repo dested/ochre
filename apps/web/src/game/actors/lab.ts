@@ -432,6 +432,9 @@ export function mount(el: HTMLElement): () => void {
       talkBox.checked = on
       people.forEach((p) => p.setTalking(on))
     },
+    sing: (on: boolean) => {
+      people.forEach((p) => p.setSinging?.(on))
+    },
     carry: (slot: string) => {
       const s = SLOTS.find((x) => x === slot)
       if (s) setCarry(s)
