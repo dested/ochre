@@ -1319,7 +1319,7 @@ const GROUND_LINES = [
   'Walking, the hoof sits flat. Running, the toes dig in deep.',
 ] as const
 /** whispered on the trail, at these shares of the way in to the herd */
-const TRAIL_LINES = ['Dung. Still warm. They were here this morning.', 'See that stem? Bent, and still rising. Very close.', 'Slow now. Stop when I stop.'] as const
+const TRAIL_LINES = ['Dung. Still warm. They passed only a little while ago.', 'See that stem? Bent, and still rising. Very close.', 'Slow now. Stop when I stop.'] as const
 const TRAIL_AT = [0.15, 0.45, 0.75] as const
 /** the trail ends this close to a calm eland */
 const TRAIL_CLOSE = 32
