@@ -257,6 +257,10 @@ export function createDirector(host: DirectorHost, stage: LifeStageId, saved: Di
       const b = beat()
       return b?.talk ? b.talk(d, personId) : null
     },
+    free() {
+      const step = beat()?.steps[stepIndex]
+      return st.begun && !st.finished && step?.k === 'until' && step.free === true
+    },
   }
 
   const director: Director = {

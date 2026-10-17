@@ -14,6 +14,7 @@ import { interact, interactionsNear, playerOf, relationOf, updateSleepSkip } fro
 import { gaze, spoil, updateAge, updateBonds, updateFires, updateLearning, updateNeeds } from './life'
 import { PathService } from './path'
 import { decodeSave, encodeSave, type SavePayload } from './save'
+import { emptyMoments, showerOver, updateMoments } from './moments'
 import { emptyTalk, noticeRecent, updateChatter } from './talk'
 import { resetStage } from './setup'
 import { STAGE_EPOCH } from './time'
@@ -94,6 +95,7 @@ export function createSimWith(opts: SimOptions, flags: { director: boolean }): S
     director: null,
     pupil: null,
     talk: emptyTalk(),
+    moments: emptyMoments(),
   }
 
   resetStage(ctx, stage, buildBand(seed, stage, playerName))
@@ -110,6 +112,7 @@ export function createSimWith(opts: SimOptions, flags: { director: boolean }): S
     const t = state.clock.t + gameDt
     state.clock = clockAt(t, ctx.epoch)
     state.weather = weatherAt(seed, ctx.stage, state.clock)
+    showerOver(ctx)
     ctx.paths.pump(PATH_BUDGET)
     updateFires(ctx, gameDt)
     for (const p of state.people) {
@@ -149,6 +152,7 @@ export function createSimWith(opts: SimOptions, flags: { director: boolean }): S
     for (let i = 0; i < n; i++) substep(gameDt / n, dt / n)
     noticeRecent(ctx)
     director?.update(dt)
+    updateMoments(ctx)
     updateChatter(ctx, dt)
     returned = ctx.events.length
     return ctx.events

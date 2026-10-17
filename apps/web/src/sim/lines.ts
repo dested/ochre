@@ -90,7 +90,7 @@ const BANK: Record<TalkSpeaker, ReadonlyArray<readonly [string, Cond?]>> = {
     ['My knees know the rain before the sky does.', { weather: ['rain', 'storm', 'wind'] }],
     ['Come and sit. My stories do not walk to you.', { task: HEARTH, to: 'you' }],
     ['Feed the fire, child. It is always hungry, like you.', { task: ['tend-fire', 'socialize'], when: ['evening', 'night'] }],
-    ['A corm in the hand is worth two in the hill.', { task: ['dig-corms'] }],
+    ['Dig where the leaves are dry. The corm is fat under them.', { task: ['dig-corms'] }],
     ['I have eaten more mussels than there are stars.', { task: ['eat'] }],
     ['The red earth remembers. That is why we wear it.', {}],
     ['Your mother was louder than you at your age.', { stage: ['small'], to: 'you' }],
@@ -106,10 +106,10 @@ const BANK: Record<TalkSpeaker, ReadonlyArray<readonly [string, Cond?]>> = {
   // teasing
   kaya: [
     ['You have sand on your face. No, the other side.', { stage: ['small'], to: 'you' }],
-    ['Slow as a tortoise. I was there ages ago.', { stage: ['small'], to: 'you' }],
+    ['Slow as a tortoise. I was there long before you.', { stage: ['small'], to: 'you' }],
     ['I found more than you. Count them.', { task: ['gather-shellfish', 'dig-corms'], stage: YOUNG, to: 'you' }],
     ['Mother says I have to wait for you. So I am waiting.', { stage: ['small'], to: 'you' }],
-    ['Who are the beads for? You are going red.', { stage: ['youth'], to: 'you' }],
+    ['Who are the beads for? You go very quiet when I ask.', { stage: ['youth'], to: 'you' }],
     ['You look at that one from the lagoon a lot.', { stage: ['youth'], to: 'you' }],
     ['My children are wild. Yours too. It runs in us.', { stage: GROWN }],
     ['You snore. The whole cave knows it.', { stage: GROWN, to: 'you' }],

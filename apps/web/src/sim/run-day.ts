@@ -4,7 +4,7 @@
  */
 import type { LifeStageId, SimPerson, TaskKind } from '../game/contracts'
 import { LIFE_STAGES } from '../game/contracts'
-import { createSandboxSim as createSim } from './index'
+import { createSandboxSim as createSim, debugCtx } from './index'
 import { createWorldData } from '../world-gen'
 import { createTestWorld } from './test-world'
 
@@ -25,6 +25,8 @@ const stage: LifeStageId = isStage(stageArg) ? stageArg : 'small'
 const world = process.argv.includes('--fixture') ? createTestWorld(seed) : createWorldData(seed)
 const sim = createSim({ seed, world, stage, playerName: 'Teni' })
 const s = sim.state
+const ctx = debugCtx(sim)
+if (!ctx) throw new Error('no sim context')
 const CAST = new Set(['ama', 'tuk', 'oro', 'kaya', 'player', 'nehe'])
 
 const fmt = (h: number) => {
@@ -72,12 +74,13 @@ function nearestPoi(p: SimPerson): string {
   return bd < 30 ? best : `(${p.position.x.toFixed(0)}, ${p.position.z.toFixed(0)})`
 }
 
-console.log(`OCHRE sim · seed ${seed} · stage ${stage} · ${s.people.length} people · ${s.animals.length} animals · fixture world`)
+console.log(`OCHRE sim · seed ${seed} · stage ${stage} · ${s.people.length} people · ${s.animals.length} animals · ${process.argv.includes('--fixture') ? 'fixture' : 'world-gen'} world`)
 const last = new Map<string, string>()
 let lastHour = -1
 const dt = 10 / s.timeScale
 const end = days * 86_400
 let elapsedMs = 0
+let shownMoments = 0
 let steps = 0
 while (s.clock.t < end) {
   const t0 = performance.now()
@@ -91,10 +94,15 @@ while (s.clock.t < end) {
       const from = s.people.find((q) => q.id === e.fromId)
       console.log(`${day}   ★ ${p?.name ?? e.personId} learned ${e.skill}${from ? ` from ${from.name}` : ''}`)
     }
+    if (e.type === 'caption' && (e.caption.id.startsWith('moment-') || e.caption.id.startsWith('chat-'))) {
+      console.log(`${day}     “${e.caption.text}”${e.caption.speaker ? ` ${e.caption.speaker}` : ''}`)
+    }
     if (e.type === 'sfx' && (e.name === 'eland-snort' || e.name === 'hit')) {
       console.log(`${day}   ${e.name === 'hit' ? '✦ a spear finds an eland' : '~ the eland bolt'}`)
     }
   }
+  const mlog = ctx.moments.log
+  while (shownMoments < mlog.length) console.log(`${day}   ◇ ${(mlog[shownMoments++] ?? '').replace(/^D\d+ \d\d:\d\d /, '')}`)
   for (const p of s.people) {
     if (!CAST.has(p.id)) continue
     const d = p.task.kind === 'walk-to' ? `walk-to ${poiLabel(p.task.targetId) || '…'}` : p.task.kind

@@ -43,7 +43,7 @@ export type Extra = { i: Interaction; act: (d: D) => void }
 export type Step =
   | { k: 'do'; fn: (d: D) => void }
   | { k: 'wait'; s: number }
-  | { k: 'until'; test: (d: D) => boolean; tick?: (d: D) => void; max?: number }
+  | { k: 'until'; test: (d: D) => boolean; tick?: (d: D) => void; max?: number; free?: boolean }
   | { k: 'minigame'; game: MinigameId; then: (d: D, quality: number) => void }
   | { k: 'choice'; make: (d: D) => Choice; then: (d: D, optionId: string) => void }
   /** skip the next n steps unless test passes */
@@ -276,7 +276,9 @@ const textOf = (d: D, t: Text): string => (typeof t === 'string' ? t : t(d))
 
 export const run = (fn: (d: D) => void): Step => ({ k: 'do', fn })
 export const wait = (s: number): Step => ({ k: 'wait', s })
-export const until = (test: (d: D) => boolean, opts: { tick?: (d: D) => void; max?: number } = {}): Step => ({ k: 'until', test, ...opts })
+export const until = (test: (d: D) => boolean, opts: { tick?: (d: D) => void; max?: number; free?: boolean } = {}): Step => ({ k: 'until', test, ...opts })
+/** free days: the band lives its own life (and the unscripted moments may happen) until `test` */
+export const freeUntil = (test: (d: D) => boolean): Step => ({ k: 'until', test, free: true })
 export const say = (text: Text, who: Role | string | null = null, seconds?: number): Step =>
   run((d) => caption(d, textOf(d, text), who, undefined, seconds))
 export const song = (text: Text, seconds?: number): Step => run((d) => caption(d, textOf(d, text), null, 'song', seconds))

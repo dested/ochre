@@ -43,6 +43,7 @@ import {
   spot,
   sun,
   teleport,
+  freeUntil,
   until,
   unlockNote,
   wait,
@@ -898,7 +899,7 @@ const provider: Chapter = {
         wait(3),
         run((d) => order(d, 'child', null)),
         // free days until the whale
-        until((d) => d.ctx.state.clock.day >= 1 && hourNowGE(d, sun(d).rise + 0.05) && !d.ctx.sleepSkip),
+        freeUntil((d) => d.ctx.state.clock.day >= 1 && hourNowGE(d, sun(d).rise + 0.05) && !d.ctx.sleepSkip),
       ],
     },
     {
@@ -939,7 +940,7 @@ const provider: Chapter = {
         }),
         ...fadeIn(2),
         note('whale'),
-        until((d) => d.ctx.state.clock.day >= 2 && hourNowGE(d, 13) && !d.ctx.sleepSkip),
+        freeUntil((d) => d.ctx.state.clock.day >= 2 && hourNowGE(d, 13) && !d.ctx.sleepSkip),
       ],
       talk: (d, id) => {
         if (counter(d, `talk:${id}`) > 0 || talkedTo(d) >= 3) return null

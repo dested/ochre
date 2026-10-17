@@ -69,6 +69,9 @@ export function resetStage(ctx: SimCtx, stage: LifeStageId, people: SimPerson[])
   ctx.talk.recent = {}
   ctx.talk.talkedAt = {}
   ctx.talk.lastMeat = state.hearth.meat
+  ctx.moments.active = null
+  ctx.moments.rain = null
+  ctx.moments.fired = {}
   placeBand(ctx)
   state.animals.splice(0, state.animals.length)
   ctx.brains.clear()

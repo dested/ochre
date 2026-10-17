@@ -5,6 +5,7 @@ import type { ClockEpoch } from '../core/clock'
 import type { Rng } from '../core/rng'
 import type { CarrySlot, HeldItem, Interaction, LifeStageId, PersonAnim, SimEvent, SimState, SkillId, TaskKind, Vec2, WorldData } from '../game/contracts'
 import type { PathRequest, PathService } from './path'
+import type { MomentState } from './moments'
 import type { TalkState } from './talk'
 
 /** game seconds per substep at most (movement and decisions stay stable at ×600) */
@@ -176,6 +177,8 @@ export type DirectorHooks = {
   allows(i: Interaction): boolean
   /** a line a person says when the player talks to them during a beat, or null for their usual talk */
   talk(personId: string): string | null
+  /** the chapter is in free days (no beat running): the unscripted moments may happen */
+  free(): boolean
 }
 
 export type SimCtx = {
@@ -212,6 +215,8 @@ export type SimCtx = {
   pupil: string | null
   /** lines said today, what the band is talking about, chatter timing */
   talk: TalkState
+  /** the free days' unscripted moments */
+  moments: MomentState
 }
 
 /**

@@ -149,7 +149,7 @@ export function pickLine(ctx: SimCtx, p: SimPerson, to: 'you' | 'band'): TalkLin
   return best
 }
 
-function fill(ctx: SimCtx, text: string): string {
+export function fill(ctx: SimCtx, text: string): string {
   const pl = ctx.state.people.find((q) => q.id === ctx.state.playerId)
   return text.replace(/\{name\}/g, pl?.name ?? '')
 }
@@ -158,13 +158,17 @@ function captionSeconds(text: string): number {
   return Math.max(3, Math.min(7, text.split(/\s+/).length * 0.42 + 1.2))
 }
 
-/** a line said aloud: a caption with the speaker's name and a bubble over their head */
-function say(ctx: SimCtx, p: SimPerson, text: string, id: string): void {
+/** a line said aloud: a caption with the speaker's name and a bubble over their head (narration with no speaker) */
+export function speak(ctx: SimCtx, p: SimPerson | null, text: string, id: string): void {
   const s = ctx.state
   const seconds = captionSeconds(text)
-  p.speech = { text, until: s.clock.t + seconds * s.timeScale }
-  ctx.events.push({ type: 'caption', caption: { id, text, speaker: p.name, kind: 'speech', seconds } })
+  if (p) p.speech = { text, until: s.clock.t + seconds * s.timeScale }
+  ctx.events.push({ type: 'caption', caption: { id, text, speaker: p ? p.name : null, kind: p ? 'speech' : 'narration', seconds } })
   ctx.talk.quietUntil = Math.max(ctx.talk.quietUntil, ctx.talk.realT + seconds + 1)
+}
+
+function say(ctx: SimCtx, p: SimPerson, text: string, id: string): void {
+  speak(ctx, p, text, id)
 }
 
 /** the player talks to someone: the director's line for this beat if it has one, else the best unused line */

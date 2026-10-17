@@ -9,6 +9,7 @@ import { DEFAULT_TIME_SCALE } from '../core/clock'
 import { roleOf } from './ai'
 import { SKILL_LABEL } from './ctx'
 import { createSandboxSim, createSim, debugCtx, debugDirector } from './index'
+import { activeMoment, MOMENT_IDS, momentLabel, triggerMoment, type MomentId } from './moments'
 import { sunTimes } from './time'
 import { createWorldData } from '../world-gen'
 import { createTestWorld } from './test-world'
@@ -146,6 +147,20 @@ export function mount(root: HTMLElement): () => void {
     modeSel.appendChild(o)
   }
   stageRow.append(el('span', {}, 'Stage'), stageSel, modeSel, el('span', {}, 'Seed'), seedIn, restartBtn)
+  // moments: play any of them now, if its people are about (the free-day roll does it by itself too)
+  const momentRow = el('div', { display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' })
+  const momentSel = el('select', { background: '#2a221d', color: '#efe3c8', border: '1px solid #4a3c32', font: 'inherit', maxWidth: '240px' })
+  for (const id of MOMENT_IDS) {
+    const o = el('option', {}, momentLabel(id))
+    o.value = id
+    momentSel.appendChild(o)
+  }
+  const momentBtn = el('button', { padding: '3px 8px', background: '#2a221d', color: '#efe3c8', border: '1px solid #4a3c32', borderRadius: '3px', cursor: 'pointer', font: 'inherit' }, 'Play moment')
+  momentBtn.onclick = () => {
+    const id = MOMENT_IDS.find((x) => x === momentSel.value)
+    if (id) playMoment(id)
+  }
+  momentRow.append(el('span', {}, 'Moment'), momentSel, momentBtn)
   const directorBox = el('div', { background: '#241c17', padding: '8px', borderRadius: '4px', display: 'flex', flexDirection: 'column', gap: '6px' })
   const directorText = el('div', { whiteSpace: 'pre-line', color: '#e8d8b4' })
   const completeBtn = el('button', { padding: '3px 8px', background: '#5a3a22', color: '#efe3c8', border: '1px solid #7a5232', borderRadius: '3px', cursor: 'pointer', font: 'inherit', alignSelf: 'flex-start' }, 'Complete beat')
@@ -153,7 +168,7 @@ export function mount(root: HTMLElement): () => void {
   directorBox.append(directorText, completeBtn)
   const inspect = el('div', { whiteSpace: 'pre-line', background: '#201a16', padding: '8px', borderRadius: '4px', minHeight: '150px' })
   const logBox = el('div', { flex: '1', overflowY: 'auto', background: '#1c1713', padding: '6px', borderRadius: '4px', font: '11px/1.45 ui-monospace, monospace', color: '#cbbfa4' })
-  panel.append(title, clockBox, controls, stageRow, viewRow, directorBox, inspect, el('div', { color: '#a09070' }, 'Events'), logBox)
+  panel.append(title, clockBox, controls, stageRow, viewRow, momentRow, directorBox, inspect, el('div', { color: '#a09070' }, 'Events'), logBox)
 
   const ctx2d = canvas.getContext('2d')
   if (!ctx2d) throw new Error('no 2d context')
@@ -296,6 +311,14 @@ export function mount(root: HTMLElement): () => void {
 
   function person(id: string): SimPerson | undefined {
     return sim.state.people.find((p) => p.id === id)
+  }
+
+  function playMoment(id: MomentId): boolean {
+    const d = debugCtx(sim)
+    const ok = d ? triggerMoment(d, id) : false
+    addLog(ok ? `◇ moment: ${momentLabel(id)}` : `◇ ${momentLabel(id)} can't happen here now`)
+    logDirty = true
+    return ok
   }
 
   function addLog(line: string): void {
@@ -654,7 +677,12 @@ export function mount(root: HTMLElement): () => void {
       `Sea ${c.seaLevel >= 0 ? '+' : ''}${c.seaLevel.toFixed(2)} m · ${c.tideRange > 0.7 ? 'spring' : c.tideRange < 0.3 ? 'neap' : 'mid'} tide\n` +
       `Weather: cloud ${s.weather.cloud.toFixed(1)} · rain ${s.weather.rain.toFixed(1)} · wind ${s.weather.wind.toFixed(1)}${s.weather.storm ? ' · storm' : ''}\n` +
       `Hearth: shellfish ${h.shellfish} · corms ${h.corms} · meat ${h.meat} · wood ${h.firewood}\n` +
-      `Fires: ${s.fires.map((f) => f.intensity.toFixed(2)).join(' / ')} · stage ${s.stage} · ×${speed}`
+      `Fires: ${s.fires.map((f) => f.intensity.toFixed(2)).join(' / ')} · stage ${s.stage} · ×${speed}\n` +
+      `Moment: ${(() => {
+        const d = debugCtx(sim)
+        const m = d ? activeMoment(d) : null
+        return m ? momentLabel(m) : '—'
+      })()}`
 
     let text = 'Click someone to inspect them'
     if (selected?.kind === 'person') {
@@ -759,6 +787,9 @@ export function mount(root: HTMLElement): () => void {
       selected = p ? { kind: 'person', id: p.id } : null
     },
     view: (name: string) => setView(name),
+    /** play a moment now; false if its people aren't about */
+    moment: (id: MomentId) => playMoment(id),
+    moments: () => MOMENT_IDS,
     state: () => sim.state,
     completeBeat: () => completeBeat(),
     beat: () => sim.state.chapter.beatId,
