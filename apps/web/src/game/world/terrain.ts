@@ -321,7 +321,7 @@ const TERRAIN_ALBEDO = /* glsl */ `
 		vec4 sf = ocFacet( vOcWorld + 13.0, nW, 0.7 );
 		float near = smoothstep( 0.2, 0.05, px );
 		vec3 shelf = mix( ocLin( vec3( 0.26, 0.23, 0.2 ) ), ocLin( vec3( 0.46, 0.41, 0.34 ) ), bk.y * 0.7 + sf.w * 0.3 );
-		shelf = mix( shelf, ocLin( vec3( 0.42, 0.42, 0.4 ) ), step( 0.86, bk.y ) * 0.5 );
+		shelf = mix( shelf, ocLin( vec3( 0.42, 0.42, 0.4 ) ), step( 0.86, bk.y ) * 0.25 );
 		float joint = 1.0 - ocEdge( 0.07 + 0.05 * bk.z, bk.x + ( ocNoise( p * 3.0 ) - 0.5 ) * 0.05 );
 		float lowY = smoothstep( 1.0, -0.6, y );
 		// mussels along the joints and on the seaward blocks
@@ -382,8 +382,10 @@ const TERRAIN_ALBEDO = /* glsl */ `
 			float seam = smoothstep( 0.55, 0.85, sin( y * 2.4 + ocNoise( p * 0.5 ) * 2.0 ) * 0.5 + 0.5 ) * ( 1.0 - smoothstep( uOchre.z * 0.5, uOchre.z, od ) );
 			col = mix( col, ocLin( vec3( 0.61, 0.24, 0.13 ) ), seam * smoothstep( 0.2, 0.5, 1.0 - nW.y ) );
 		}
-		// wet: the swash zone and everything the sea covers, with a sheen of sky
+		// wet: the swash zone and everything the sea covers, with a sheen of sky; the shelf below the high-water
+		// line never dries between tides, and its weed and mussels glisten
 		float wet = smoothstep( uSeaLevel + 1.1, uSeaLevel + 0.15, y );
+		wet = max( wet, wb.z * smoothstep( 1.4, -0.6, y ) * ( 0.45 + 0.35 * weed + 0.2 * mus ) );
 		col = mix( col, col * vec3( 0.58, 0.6, 0.62 ), wet * ( 0.85 - 0.3 * wb.z ) );
 		vec3 vv = normalize( uCamPos - vOcWorld );
 		float grazing = pow( 1.0 - clamp( vv.y, 0.0, 1.0 ), 4.0 );
@@ -396,7 +398,7 @@ const TERRAIN_ALBEDO = /* glsl */ `
 		}
 		// the pools: clear water over the dark, weedy floor of the block, holding the sky only at a grazing look
 		col = mix( col, col * vec3( 0.42, 0.52, 0.55 ) + ocLin( vec3( 0.03, 0.07, 0.08 ) ), pool );
-		totalEmissiveRadiance += ( uSkyAmb * 0.75 + uKeyColor * 0.05 ) * pool * ( 0.06 + 0.55 * grazing * grazing );
+		totalEmissiveRadiance += ( uSkyAmb * 0.75 + uKeyColor * 0.04 ) * pool * ( 0.05 + 0.3 * grazing * grazing );
 		diffuseColor.rgb = col;
 	}
 `

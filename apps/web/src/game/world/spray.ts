@@ -11,7 +11,7 @@ import { LIGHT } from '../render/uniforms'
 import { STACKS } from '../../world-gen/layout'
 import { MAT, type TerrainGrid } from '../../world-gen/terrain'
 
-const PER = 22
+const PER = 34
 const MAX_SOURCES = 170
 
 const VERT = /* glsl */ `
@@ -39,7 +39,9 @@ void main() {
 	// only where the tide puts the rock at the waterline
 	float wl = aSrc.y - uSeaLevel;
 	strength *= smoothstep( - 1.6, - 0.5, wl ) * smoothstep( 3.2, 1.2, wl );
-	float life = ( 1.3 + 1.3 * aRnd.x ) * ( 0.7 + 0.5 * strength );
+	// most of a burst is white water thrown up and falling back; a third is spume, which hangs and drifts
+	float spume = step( aRnd.y, 0.33 );
+	float life = mix( 0.9 + 0.8 * aRnd.x, 2.2 + 1.6 * aRnd.x, spume ) * ( 0.7 + 0.5 * strength );
 	vA = 0.0;
 	vUv = aCorner;
 	vSeed = aRnd.z * 17.0 + aSrc.w * 5.0;
@@ -50,21 +52,23 @@ void main() {
 	}
 	vec2 o = aOut.xy;
 	vec2 side = vec2( - o.y, o.x );
-	float up = ( 3.0 + 9.0 * aRnd.w * aRnd.w ) * strength * aOut.z;
-	vec2 hv = ( o * ( 0.5 + 2.2 * aRnd.z ) - o * 2.6 + side * ( aRnd.x - 0.5 ) * 5.0 ) * ( 0.4 + 0.7 * strength );
-	// drag: velocity decays, gravity pulls
-	float k = 1.4;
+	// a fan: steep in the middle, leaning out to the sides
+	float fan = aRnd.x - 0.5;
+	float up = ( 4.0 + 10.0 * aRnd.w * aRnd.w ) * strength * aOut.z * ( 1.0 - abs( fan ) * 0.8 );
+	vec2 hv = ( o * ( 0.5 + 2.2 * aRnd.z ) - o * 2.6 + side * fan * 7.0 ) * ( 0.4 + 0.7 * strength );
+	// drag: velocity decays, gravity pulls; spume feels the air more
+	float k = mix( 1.1, 2.2, spume );
 	float dk = ( 1.0 - exp( - k * age ) ) / k;
 	vec3 p = vec3( aSrc.x, uSeaLevel + 0.4, aSrc.z );
 	p += vec3( hv.x, up, hv.y ) * dk;
-	p.y -= 4.0 * ( age - dk ) / k;
+	p.y -= mix( 5.5, 2.5, spume ) * ( age - dk ) / k;
 	p.y = max( p.y, uSeaLevel + 0.1 );
 	p.xz += uWind.xz * ( 0.6 + uWind.y * 4.0 ) * age * age * 0.5;
-	float size = ( 0.5 + 2.4 * age / life ) * ( 0.6 + 0.8 * strength ) * ( 0.7 + 0.6 * aRnd.y );
+	float size = mix( 0.22 + 0.55 * age / life, 0.5 + 1.6 * age / life, spume ) * ( 0.7 + 0.5 * strength ) * ( 0.7 + 0.6 * aRnd.z );
 	vec4 vp = viewMatrix * vec4( p, 1.0 );
 	vp.xy += aCorner * size;
 	gl_Position = projectionMatrix * vp;
-	vA = smoothstep( 0.0, 0.1, age ) * ( 1.0 - smoothstep( life * 0.35, life, age ) ) * strength;
+	vA = smoothstep( 0.0, 0.08, age ) * ( 1.0 - smoothstep( life * 0.45, life, age ) ) * min( 1.0, strength * 1.6 ) * mix( 1.0, 0.45, spume );
 	vAge = age / life;
 }
 `
@@ -82,11 +86,13 @@ void main() {
 	if ( vA < 0.01 ) discard;
 	float d = length( vUv );
 	float n = ocNoise( vUv * 2.4 + vSeed ) * 0.6 + ocNoise( vUv * 5.1 - vSeed ) * 0.4;
-	// a ragged dab, denser young, broken up as it drifts
-	float a = 1.0 - smoothstep( 0.35, 0.95, d + ( n - 0.5 ) * ( 0.5 + vAge * 0.6 ) );
-	a *= vA * mix( 0.85, 0.4, vAge );
+	// a ragged dab, crisp and dense young, broken up as it drifts
+	float a = 1.0 - smoothstep( 0.5 - vAge * 0.15, 0.85, d + ( n - 0.5 ) * ( 0.45 + vAge * 0.6 ) );
+	a *= vA * mix( 0.95, 0.45, vAge );
 	if ( a < 0.01 ) discard;
-	vec3 col = vec3( 0.95, 0.94, 0.9 ) * ( uSkyAmb * 0.8 + uKeyColor * ( 0.22 + 0.1 * vUv.y ) );
+	// white water: lit on top, a cool grey underneath
+	vec3 col = vec3( 0.96, 0.95, 0.92 ) * ( uSkyAmb * 0.85 + uKeyColor * ( 0.24 + 0.12 * vUv.y ) );
+	col *= 0.72 + 0.3 * ( vUv.y * 0.5 + 0.5 );
 	gl_FragColor = vec4( col, a );
 }
 `

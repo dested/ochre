@@ -75,6 +75,8 @@ function buildTextures(world: WorldData, grid: TerrainGrid | null): { height: Da
 
 const VERT = /* glsl */ `
 uniform sampler2D tHeight;
+uniform sampler2D tShore;
+uniform float uFresh;
 uniform vec3 uCenter;
 uniform float uLevel;
 uniform float uTime;
@@ -82,6 +84,7 @@ uniform float uWaveK;
 uniform float uHalf;
 varying vec3 vWorld;
 varying float vWaveH;
+varying float vRush;
 vec2 ocUv( vec2 xz ) { return ( xz + uHalf ) / ( 2.0 * uHalf ); }
 // Gerstner swells rolling in from the south-west
 vec3 ocWave( vec2 p, vec2 dir, float len, float amp, float t ) {
@@ -97,6 +100,21 @@ void main() {
 	float ground = texture2D( tHeight, ocUv( wp.xz ) ).r;
 	float depth = uLevel - ground;
 	float dist = length( position.xz );
+	vRush = 0.0;
+	// the surge: each swell runs up over the rocks and the sand, quick, and drains back slowly; every set its own
+	// height, the coast never all at once
+	if ( uFresh < 0.5 ) {
+		float sd = texture2D( tShore, ocUv( wp.xz ) ).r;
+		float ph = uTime / 10.5 - sd / 28.0 + sin( wp.x * 0.013 + wp.z * 0.007 ) * 1.3;
+		float f = fract( ph );
+		float set_ = 0.35 + 0.65 * fract( sin( floor( ph ) * 12.9898 + floor( wp.x / 90.0 ) * 4.1 ) * 43758.5453 );
+		float surge = smoothstep( 0.0, 0.12, f ) * ( 1.0 - smoothstep( 0.12, 0.62, f ) ) * set_;
+		float nearK = 1.0 - smoothstep( 4.0, 30.0, sd );
+		wp.y += surge * 0.32 * uWaveK * nearK;
+		// the uprush is white, churned water; it clears as it drains
+		vRush = surge * ( 1.0 - smoothstep( 0.1, 0.4, f ) ) * nearK;
+		depth = wp.y - ground;
+	}
 	float amp = smoothstep( 0.0, 4.0, depth ) * ( 1.0 - smoothstep( 120.0, 700.0, dist ) ) * uWaveK;
 	vec3 w = ocWave( wp.xz, normalize( vec2( -0.18, -1.0 ) ), 41.0, 0.34, uTime );
 	w += ocWave( wp.xz, normalize( vec2( 0.3, -1.0 ) ), 23.0, 0.17, uTime );
@@ -125,6 +143,7 @@ uniform float uFresh;
 uniform float uFoamK;
 varying vec3 vWorld;
 varying float vWaveH;
+varying float vRush;
 ${SKY_UNIFORMS_GLSL}
 ${NOISE_GLSL}
 ${SKY_GLSL}
@@ -201,7 +220,7 @@ void main() {
 		float lace = ocNoise( vWorld.xz * 0.8 + uTime * 0.2 ) * 0.6 + ocNoise( vWorld.xz * 2.4 - uTime * 0.3 ) * 0.4;
 		// at the waterline, breathing with the swash
 		float swash = 0.18 + 0.16 * sin( uTime * 0.9 + vWorld.x * 0.05 + vWorld.z * 0.03 );
-		float edge = 1.0 - smoothstep( swash * 0.4, swash + 0.25, depth );
+		float edge = 1.0 - smoothstep( swash * 0.25, swash * 0.5 + 0.1, depth );
 		foam = max( foam, edge * smoothstep( 0.3, 0.6, lace + edge * 0.35 ) );
 		// breaking bands marching in toward the shore
 		float d = sh.r;
@@ -213,7 +232,9 @@ void main() {
 		float trail = smoothstep( 0.45, 0.95, fract( phase ) ) * zone * 0.5 * smoothstep( 0.5, 0.8, lace );
 		foam = max( foam, trail );
 		// foam round the rocks of the shelf
-		foam = max( foam, smoothstep( 0.6, 0.0, depth ) * smoothstep( 0.45, 0.7, lace ) * 0.8 );
+		foam = max( foam, smoothstep( 0.3, 0.0, depth ) * smoothstep( 0.5, 0.72, lace ) * 0.6 );
+		// the surge's churned uprush, in lace
+		foam = max( foam, vRush * smoothstep( 0.6, 0.05, depth ) * smoothstep( 0.35, 0.65, lace ) );
 		// whitecaps on open water when it blows
 		float gale = clamp( ( uWind.y - 0.45 ) * 1.8 + uWeather.w * 0.75, 0.0, 1.0 );
 		if ( gale > 0.01 ) {
@@ -230,6 +251,8 @@ void main() {
 	float alpha = clamp( 1.0 - exp( - dd * 1.1 ), 0.0, 1.0 );
 	alpha = max( alpha, fres * 0.9 );
 	alpha = max( alpha, foam );
+	// a thin wash over the rock is glassy: mostly the sky in it, the rock clear beneath
+	alpha *= mix( 0.5, 1.0, smoothstep( 0.04, 0.5, depth ) );
 	alpha *= smoothstep( - 0.05, 0.06, depth );
 	gl_FragColor = vec4( col, alpha );
 }
