@@ -7,7 +7,7 @@
 import { Color, Matrix4, Quaternion, Vector3 } from 'three'
 import type { BuildCtx } from './ctx'
 import { B } from './rig'
-import { MeshBuilder, T, Rx, Rz, Ry, blend2, bump, clamp, lerp, mul, profile, rigid, smooth, type GridPoint, type SkinFn } from './geo'
+import { MeshBuilder, T, Rx, Rz, Ry, blend2, bump, clamp, lerp, mul, profile, rigid, smax, smooth, type GridPoint, type SkinFn } from './geo'
 import { IRIS, IRIS_RIM, PUPIL, lipColor, scleraColor, tone } from './looks'
 
 export type HeadShape = {
@@ -54,13 +54,14 @@ export function headShape(ctx: BuildCtx): HeadShape {
   const male = d.female ? 0 : d.puberty
 
   // width, front depth and back depth as multipliers on the unit circle's sqrt(1 − Y²)
+  // an adult face is about 1.35 times as long (hairline to chin) as it is wide at the cheekbones
   const kW = profile([
-    [-1, lerp(0.74, 0.71, m)],
-    [-0.6, lerp(0.79, 0.71, m) * (1 + (f.jaw - 1) * 0.5)],
-    [-0.2, lerp(0.8, 0.71, m)],
-    [0.2, lerp(0.8, 0.72, m)],
-    [0.6, lerp(0.8, 0.74, m)],
-    [1, lerp(0.76, 0.72, m)],
+    [-1, lerp(0.74, 0.68, m)],
+    [-0.6, lerp(0.79, 0.66, m) * (1 + (f.jaw - 1) * 0.5)],
+    [-0.2, lerp(0.8, 0.655, m)],
+    [0.2, lerp(0.8, 0.67, m)],
+    [0.6, lerp(0.8, 0.7, m)],
+    [1, lerp(0.76, 0.7, m)],
   ])
   const kF = profile([
     [-1, lerp(0.9, 1.05, m)],
@@ -95,9 +96,9 @@ export function headShape(ctx: BuildCtx): HeadShape {
     dsp += 0.035 * f.noseBridge * bump((X / 0.09) ** 2 + ((Y - eyeYn + 0.02) / 0.13) ** 2)
     // cheekbones: a high mass under the eyes; the cheeks below round on into the jaw
     dsp += 0.06 * f.cheekbones * m * bump(((ax - 0.42) / 0.17) ** 2 + ((Y - eyeYn + 0.17) / 0.11) ** 2)
-    dsp += 0.026 * m * bump(((ax - 0.4) / 0.2) ** 2 + ((Y - eyeYn + 0.42) / 0.2) ** 2)
-    // baby cheeks
-    dsp += (0.04 + 0.08 * d.chub) * bump(((ax - 0.36) / 0.2) ** 2 + ((Y - eyeYn + 0.4) / 0.2) ** 2)
+    dsp += 0.02 * m * bump(((ax - 0.4) / 0.2) ** 2 + ((Y - eyeYn + 0.42) / 0.2) ** 2)
+    // baby cheeks, gone by adulthood (an adult's lower face is the jaw, not fat)
+    dsp += (lerp(0.04, 0.008, m) + 0.08 * d.chub) * bump(((ax - 0.36) / 0.2) ** 2 + ((Y - eyeYn + 0.4) / 0.2) ** 2)
     // muzzle (the lips sit on it)
     dsp += lerp(0.05, 0.075, m) * bump((X / 0.33) ** 2 + ((Y - mouthYn) / 0.22) ** 2)
     // chin
@@ -286,12 +287,6 @@ export function buildHead(ctx: BuildCtx, hs: HeadShape): void {
 
   /* ── eyes ── */
   buildEyes(ctx, hs, ex, eyeYn)
-}
-
-/** a smooth maximum: max(a, b) with the crease rounded over k */
-function smax(a: number, b: number, k: number): number {
-  const h = Math.max(k - Math.abs(a - b), 0) / k
-  return Math.max(a, b) + h * h * k * 0.25
 }
 
 /**

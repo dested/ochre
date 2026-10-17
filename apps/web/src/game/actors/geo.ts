@@ -430,6 +430,11 @@ const WHITE = new Color(1, 1, 1)
 
 export const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v)
 export const lerp = (a: number, b: number, t: number): number => a + (b - a) * t
+/** a smooth maximum: max(a, b) with the crease rounded over k */
+export const smax = (a: number, b: number, k: number): number => {
+  const h = Math.max(k - Math.abs(a - b), 0) / k
+  return Math.max(a, b) + h * h * k * 0.25
+}
 export const smooth = (a: number, b: number, x: number): number => {
   const t = clamp((x - a) / (b - a), 0, 1)
   return t * t * (3 - 2 * t)

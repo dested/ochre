@@ -290,7 +290,8 @@ function buildHand(ctx: BuildCtx, s: 1 | -1, sx: number, wristY: number, handBon
     const spread = (i - 1.4) * 0.07
     const pts: Vector3[] = []
     for (let k = 0; k < n; k++) {
-      const t = k / (n - 1)
+      // samples pack toward the tip so it rounds off instead of coming to a point
+      const t = 1 - (1 - k / (n - 1)) ** 1.5
       // a relaxed curl toward the palm, more at the far joints
       const a = t * t * 0.9
       pts.push(new Vector3(sx - s * Math.sin(a) * len * 0.42 * t, knuckleY + palmH * 0.1 - Math.cos(a * 0.6) * len * t, z0 - spread * len * t))
@@ -307,15 +308,17 @@ function buildHand(ctx: BuildCtx, s: 1 | -1, sx: number, wristY: number, handBon
     const base = new Vector3(sx - s * thick * 0.35, wristY - palmH * 0.22, hw * 0.3)
     const pts: Vector3[] = []
     const tl = d.fingers * 0.88
-    for (let k = 0; k < n; k++) {
-      const t = k / (n - 1)
+    const nt = n + 2
+    for (let k = 0; k < nt; k++) {
+      const t = 1 - (1 - k / (nt - 1)) ** 1.6
       pts.push(new Vector3(base.x - s * thick * 0.75 * Math.sin(t * 1.4), base.y - tl * t * 0.78, base.z + tl * 0.42 * t - tl * 0.16 * t * t))
     }
+    // a broad base off the thenar pad, the knuckle, then a flat, rounded pad and nail
     const rad = (t: number): number => {
-      const tip = Math.sqrt(Math.max(0, 1 - Math.max(0, (t - 0.84) / 0.16) ** 2))
-      return hw * 0.14 * (1.3 - 0.45 * smooth(0, 0.6, t) + 0.06 * bump(((t - 0.55) / 0.08) ** 2)) * Math.max(0.12, tip)
+      const tip = Math.sqrt(Math.max(0, 1 - Math.max(0, (t - 0.8) / 0.2) ** 2))
+      return hw * 0.14 * (1.3 - 0.4 * smooth(0, 0.5, t) + 0.08 * bump(((t - 0.55) / 0.08) ** 2) + 0.05 * bump(((t - 0.8) / 0.1) ** 2)) * Math.max(0.2, tip)
     }
-    ctx.skin.at(new Matrix4(), rigid(thumbBone)).tube(pts, rad, (t) => (t > 0.82 ? nail : skinC), near ? 8 : 6)
+    ctx.skin.at(new Matrix4(), rigid(thumbBone)).tube(pts, rad, (t) => (t > 0.8 ? nail : skinC), near ? 8 : 6, { flatten: 0.85 })
   }
 }
 

@@ -7,7 +7,7 @@ import { Color, Matrix4, Vector3 } from 'three'
 import type { BuildCtx } from './ctx'
 import type { TorsoShape } from './figure'
 import { B } from './rig'
-import { bump, clamp, fbm3, lerp, noise3, smooth, type GridPoint, type SkinFn, type SkinW } from './geo'
+import { bump, clamp, fbm3, lerp, noise3, smax, smooth, type GridPoint, type SkinFn, type SkinW } from './geo'
 import { CORD, OCHRE, hideColor, tone } from './looks'
 
 type Plan = {
@@ -81,8 +81,8 @@ function hide(base: Color, p: Vector3, edge: number, seed: number, out: Color): 
   const n2 = fbm3(p.x * 17, p.y * 17, p.z * 17, seed ^ 0x51)
   const fine = noise3(p.x * 45, p.y * 45, p.z * 45, seed ^ 0x77)
   out.copy(base)
-  out.lerp(tmpC.copy(base).multiply(BROWNING), smooth(0.5, 0.66, n) * 0.85)
-  out.lerp(tmpC.copy(CREAM).lerp(base, 0.3), smooth(0.44, 0.27, n) * 0.8)
+  out.lerp(tmpC.copy(base).multiply(BROWNING), smooth(0.46, 0.62, n) * 0.9)
+  out.lerp(tmpC.copy(CREAM).lerp(base, 0.3), smooth(0.37, 0.22, n) * 0.75)
   out.multiplyScalar(0.86 + 0.26 * n2 + 0.1 * (fine - 0.5))
   if (edge > 0) out.lerp(tmpC.copy(base).multiply(BROWNING).multiplyScalar(0.8), edge * 0.7)
   return out
@@ -154,7 +154,7 @@ function buildSkirt(ctx: BuildCtx, ts: TorsoShape, kind: 'full' | 'side'): void 
   const seed = (look.seed ^ 0x5c17) & 0xffff
   const rng = ctx.rng.fork(0x5c17)
   // contrast with what is under it: a side overskirt goes pale over a darker wrap
-  const base = kind === 'side' ? hideColor(look.seed, 7).lerp(CREAM, 0.45) : hideColor(look.seed, 8).multiply(new Color(0.85, 0.78, 0.7))
+  const base = kind === 'side' ? hideColor(look.seed, 7).lerp(CREAM, 0.2) : hideColor(look.seed, 8).multiply(new Color(0.85, 0.78, 0.7))
   const kneeY = d.hipY - d.thigh
   const side = rng.chance(0.5) ? 1 : -1
   const hemHi = kind === 'side' ? kneeY + d.thigh * rng.range(0.35, 0.5) : kneeY + d.thigh * rng.range(0.32, 0.45)
@@ -436,7 +436,7 @@ function buildDiagonal(ctx: BuildCtx, ts: TorsoShape, sd: 1 | -1): void {
   const H = d.stature
   const seed = (look.seed ^ 0xd1a9) & 0xffff
   // a woman's drape over her wrap goes pale (cream suede), a man's stays the base hide
-  const base = d.female ? hideColor(look.seed, 6).lerp(CREAM, 0.5) : hideColor(look.seed, 6)
+  const base = d.female ? hideColor(look.seed, 6).lerp(CREAM, 0.22) : hideColor(look.seed, 6)
   const off = 0.011 * (H / 1.6)
   const sJY = d.shoulderJointY
   const TL = d.topY - d.hipY
@@ -446,8 +446,8 @@ function buildDiagonal(ctx: BuildCtx, ts: TorsoShape, sd: 1 | -1): void {
   const band = (d.female ? 0.36 : 0.46) * TL
   const P = new Vector3()
   const upperArm = (th: number, y: number): number => {
-    if (y > sJY + d.armR * 1.2 || y < sJY - d.upperArm * 0.55) return 0
-    return d.shoulderX * Math.max(0, sd * Math.sin(th)) + d.armR * 1.05
+    const win = smooth(sJY + d.armR * 1.6, sJY + d.armR * 0.8, y) * smooth(sJY - d.upperArm * 0.62, sJY - d.upperArm * 0.45, y)
+    return (d.shoulderX * Math.max(0, sd * Math.sin(th)) + d.armR * 1.05) * win
   }
   const skin: SkinFn = (x, y, z): SkinW => {
     const th = Math.atan2(x, z)
@@ -455,17 +455,19 @@ function buildDiagonal(ctx: BuildCtx, ts: TorsoShape, sd: 1 | -1): void {
     const t = ts.skin(x, y, z)
     return { b: [...t.b, sd > 0 ? B.armL : B.armR], w: [...t.w.map((k) => k * (1 - w)), w] }
   }
-  ctx.gear.at(new Matrix4(), skin).grid(52, 12, (u, v, out) => {
+  // close up (the held chapter looks past this shoulder) the drape gets the rows to round over it smoothly
+  const near = ctx.gear.q >= 1
+  ctx.gear.at(new Matrix4(), skin).grid(near ? 96 : 52, near ? 24 : 12, (u, v, out) => {
     const th = 2 * Math.PI * u
     const s = Math.sin(th)
     const top = A + Bv * s * sd + ragged(u + 2, seed, 0.008 * H)
     const bot = top - band * (1 + 0.25 * Math.max(0, -s * sd)) - ragged(u, seed, 0.045 * H)
     const y = lerp(bot, top, v)
-    let r = Math.max(ts.radius(th, Math.min(y, d.topY - 0.001)), upperArm(th, y)) + off
+    let r = smax(ts.radius(th, Math.min(y, d.topY - 0.001)), upperArm(th, y), 0.02 * H) + off
     // the free lower edge hangs away from the body a little, in soft folds
     r += 0.012 * H * (1 - v) ** 2 * (0.6 + 0.4 * Math.sin(th * 5 + noise3(th, 1.5, 0.5, seed) * 3))
-    // over the top of the left shoulder the hide rides up toward the neck
-    if (y > d.shoulderY) r = Math.max(r, d.neckR * 1.3 + off)
+    // over the top of the shoulder the hide rides up toward the neck
+    if (y > d.shoulderY - 0.02 * H) r = smax(r, (d.neckR * 1.3 + off) * smooth(d.shoulderY - 0.02 * H, d.shoulderY + 0.01 * H, y), 0.015 * H)
     r *= 1 + 0.02 * Math.sin(th * 6 + v * 2)
     P.set(r * s, y, r * Math.cos(th))
     out.x = P.x
@@ -510,7 +512,11 @@ function shoulderStrap(ctx: BuildCtx, ts: TorsoShape, yFront: number, yBack: num
     const zr = Math.cos(a) * Math.max(0.002, Math.sqrt(Math.max(0, r * r - x * x))) + Math.cos(a) * 0.008 * H
     pts.push(new Vector3(x, y + 0.004 * H * Math.sin(a), zr))
   }
-  const c = hide(base, new Vector3(0.3, 0.2, 0.1), 0, seed, new Color())
-  ctx.gear.at(new Matrix4(), ts.skin).tube(pts, () => H * 0.013, c, 8, { flatten: 0.3 })
+  // a flat band lying on the shoulder (rolled a quarter turn: the transported frame would stand it on edge), mottled
+  // along its length and a touch narrower where it tucks into the wrap
+  const P = new Vector3()
+  const colorAt = (t: number, a: number): Color => hide(base, P.set(0.3 + t * 0.35, 0.2 + 0.02 * Math.cos(a), 0.1), 0, seed, new Color())
+  const near = ctx.gear.q >= 1
+  ctx.gear.at(new Matrix4(), ts.skin).tube(pts, (t) => H * 0.015 * (0.8 + 0.2 * Math.sin(Math.PI * t)), colorAt, near ? 12 : 8, { flatten: 0.24, roll: Math.PI / 2 })
   void OCHRE
 }

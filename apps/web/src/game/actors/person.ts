@@ -523,7 +523,7 @@ class PersonImpl implements PersonActor {
         const blink = this.blinkT >= 0 ? Math.sin(Math.PI * Math.min(1, this.blinkT / 0.16)) : 0
         const sleepy = this.anim === 'sleep' || this.anim === 'lie-dead' ? 1 : 0
         const close = Math.max(blink, sleepy)
-        const follow = clamp(st.pitch * 0.7, -0.12, cradled ? 0.45 : 0.3)
+        const follow = clamp(st.pitch * 0.7, -0.12, 0.3)
         if (lid) lid.quaternion.setFromAxisAngle(AX, follow + close * (0.82 - follow))
       }
     }
