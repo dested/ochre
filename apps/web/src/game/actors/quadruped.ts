@@ -85,7 +85,7 @@ function specFor(kind: QuadKind, seed: number): Spec {
         dark: c('#3a2a20'),
         muzzle: c('#4e4038'),
         hoof: c('#26201c', 0.02),
-        dewlap: (male ? 0.2 : 0.1) * s,
+        dewlap: (male ? 0.25 : 0.12) * s,
         horns: (male ? 0.6 : 0.55) * s,
         hump: male ? 0.07 : 0.025,
         stripes: rng.int(7, 11),
@@ -438,7 +438,8 @@ function build(sp: Spec, g: Geo, seed: number, body: MeshBuilder, detail: MeshBu
       const ry = r * (1.05 + 0.45 * base)
       // the dewlap: the underside drops into a soft flap, deepest low on the neck, gone by the throat
       const dew = sp.dewlap * Math.sin(Math.PI * clamp((0.8 - v) / 0.85, 0, 1)) ** 1.3 * smooth(-0.5, -0.98, co)
-      const mane = sp.mane * 0.7 * r * smooth(-0.3, 0.7, co) * (1 - smooth(0.85, 1, v))
+      // the hyena's short crest of mane (the male lion's ruff is its own mesh below)
+      const mane = (sp.kind === 'lion' ? 0 : sp.mane) * 0.7 * r * smooth(-0.3, 0.7, co) * (1 - smooth(0.85, 1, v))
       const up = co * ry - dew + mane * Math.max(0, co)
       out.x = cx + s * (r + mane * 0.6)
       out.y = cy + nUp.y * up
@@ -448,17 +449,16 @@ function build(sp: Spec, g: Geo, seed: number, body: MeshBuilder, detail: MeshBu
       grain(o, out.x, out.y, out.z)
       if (sp.crest > 0) o.lerp(dark, sp.crest * 0.75 * smooth(0.9, 0.995, 1 - k))
       if (sp.dewlap > 0) o.lerp(dark, 0.3 * smooth(0.4, 1, dew / sp.dewlap))
-      if (sp.mane > 0.5) o.lerp(maneC, smooth(0.1, 0.5, mane / (r * 0.7)) * 0.85)
+      if (mane > 0 && sp.mane > 0.5) o.lerp(maneC, smooth(0.1, 0.5, mane / (r * 0.7)) * 0.85)
       spotted(o, out.x, out.y, out.z, 0.6)
     },
     { wrapU: true },
   )
   if (sp.dewlap > 0) {
-    // the dark tuft at the front of the dewlap
-    // the dark tuft at the dewlap's lowest point (where its flap is deepest), longer on bulls
-    const tuftAt = new Vector3().lerpVectors(n0, n1, 0.375).addScaledVector(nUp, -sp.neckR * 1.2 - sp.dewlap * 0.92)
+    // the dark tuft on the dewlap's edge where its flap is deepest, mostly sunk into the flap, longer on bulls
+    const tuftAt = new Vector3().lerpVectors(n0, n1, 0.375).addScaledVector(nUp, -sp.neckR * 1.05 - sp.dewlap)
     const tl = (sp.male ? 0.05 : 0.03) * Hs
-    body.at(T(tuftAt.x, tuftAt.y - tl * 0.5, tuftAt.z), rigid(NECK1)).ellipsoid(0.016 * Hs, tl, 0.026 * Hs, tone(dark, 0.9), 8, 6)
+    body.at(T(tuftAt.x, tuftAt.y + tl * 0.15, tuftAt.z), rigid(NECK1)).ellipsoid(0.014 * Hs, tl, 0.034 * Hs, tone(dark, 0.9), 8, 6)
   }
 
   /* head: a lathe along the face, cranium to muzzle; local +Z is the top of the head */
@@ -564,17 +564,55 @@ function build(sp: Spec, g: Geo, seed: number, body: MeshBuilder, detail: MeshBu
       body.at(frame(fb, hd, UP), rigid(HEAD)).ellipsoid(HR * 0.42, HR * 0.55, HR * 0.3, tone(dark, 1.2), 8, 6)
     }
   }
-  // the male lion's mane: a thick tube of hair from the shoulders over the neck to behind the cheeks
+  // the male lion's mane: a ruff of hair from the withers over the neck that swells behind the head and rolls round
+  // to a soft rim framing the face, fuller under the throat, lumpy, darkening toward the back
   if (sp.mane > 0.5) {
     const nm = g.bones[NECK2]?.at ?? nb
-    const path = catmull([n0.clone().addScaledVector(nd, -0.1 * sp.neckLen), nb.clone().addScaledVector(nUp, sp.neckR * 0.3), nm.clone().addScaledVector(nUp, sp.neckR * 0.3), ha.clone().addScaledVector(hd, -0.1 * HL)], 10)
-    const ma = new Color('#4a2e1c')
-    const mg = new Color('#9a6c3c')
-    body.at(T(0, 0, 0), neckSkin).tube(
-      path,
-      (t) => lerp(sp.neckR * 1.05, HR * 1.9, smooth(0.05, 0.8, t)),
-      (t, a) => mixc(ma, mg, 0.3 + 0.45 * smooth(0.45, 1, t) + 0.12 * Math.sin(a * 11 + t * 31)).multiplyScalar(0.92 + 0.16 * fbm3(a * 3, t * 9, 0, seed)),
-      14,
+    const behind = ha.clone().addScaledVector(hd, -0.1 * HL)
+    const path = catmull([n0.clone().addScaledVector(nd, -0.1 * sp.neckLen), nb.clone().addScaledVector(nUp, sp.neckR * 0.25), nm.clone().addScaledVector(nUp, sp.neckR * 0.2), behind], 12)
+    const ma = new Color('#3e2716')
+    const mm = new Color('#7a5030')
+    const mg = new Color('#a87a40')
+    const pt = new Vector3()
+    const tan = new Vector3()
+    const upv = new Vector3()
+    const X = new Vector3(1, 0, 0)
+    const endTan = new Vector3().subVectors(behind, path[path.length - 2] ?? nb).normalize()
+    body.at(T(0, 0, 0), neckSkin).grid(
+      26,
+      18,
+      (u, v, out) => {
+        // along the neck path for the first three quarters, then the rounded front over the head
+        const q = clamp((v - 0.7) / 0.3, 0, 1)
+        if (v < 0.7) {
+          const f = (v / 0.7) * (path.length - 1)
+          const k = Math.min(path.length - 2, Math.floor(f))
+          const a = path[k] ?? behind
+          const b = path[k + 1] ?? behind
+          pt.lerpVectors(a, b, f - k)
+          tan.subVectors(b, a).normalize()
+        } else pt.copy(behind).addScaledVector(hd, 0.3 * HL * q)
+        // the rings turn from the neck's line to the face's gradually, so the ruff never folds under the throat
+        if (v > 0.5) tan.copy(endTan).lerp(hd, smooth(0.5, 1, v)).normalize()
+        upv.crossVectors(tan, X).normalize()
+        // thick over the neck, fullest round the back of the head, then sloping in to a rim behind the eyes
+        let r = v < 0.7 ? lerp(sp.neckR * (1 + 0.3 * smooth(0, 0.3, v)), HR * 1.85, smooth(0.35, 0.7, v)) : HR * (0.96 + 0.89 * (1 - smooth(0, 1, q)))
+        const th = -u * Math.PI * 2
+        const sn = Math.sin(th)
+        const co = Math.cos(th)
+        // the throat and chest mane hangs fuller; tufts break the silhouette, settling down at the face rim
+        r *= 1 + 0.25 * Math.max(0, -co) * smooth(0.1, 0.6, v) * (1 - smooth(0.62, 0.95, v))
+        r *= 1 + 0.36 * (fbm3(Math.cos(th) * 2.6, Math.sin(th) * 2.6, v * 6, seed ^ 0x3a7e) - 0.5) * (1 - smooth(0.88, 1, v))
+        const wx = r * (0.9 + 0.1 * smooth(0.5, 0.8, v))
+        const wy = r * (1 + 0.15 * smooth(0.2, 0.7, v))
+        out.x = pt.x + X.x * sn * wx
+        out.y = pt.y + upv.y * co * wy
+        out.z = pt.z + upv.z * co * wy
+        const o = out.c.copy(ma).lerp(mm, smooth(0.2, 0.75, v)).lerp(mg, smooth(0.8, 1, v))
+        if (v < 0.85) o.lerp(ma, 0.4 * Math.max(0, -co))
+        o.multiplyScalar(0.86 + 0.28 * fbm3(Math.cos(th) * 4, Math.sin(th) * 4, v * 9, seed ^ 0x51a))
+      },
+      { wrapU: true },
     )
   }
 
