@@ -675,6 +675,17 @@ controller, cameras and verbs that make each stage of life feel different; and t
   lines about choosing silcrete (the fine grain, the clear ring when you knock it, the fire under the sand that makes
   it flake true), at the walk start, the first collect and the third. A test asserts the youth.track gap.
 
+- (2026-10-17 04:58, lead) **Fix round F3** (ui's recheck at a10f6ba, every F2 item passed; shots
+  `/w/junk/sim-80k/ui/shots/f2/`). **play:** (1) phantom name tags: "Nedi" floats over Ama's chest and over bare rock
+  while Nedi stands 5–21 m behind the camera; "Neri" sits in the sky on small.follow (`held-faces-1.png`,
+  `held-faces-oro.png`, `small-mark-on.png`). Cull a tag when its head is behind the camera (camera-space z ≥ −0.1)
+  and when the line from the camera to the head is blocked (a coarse check is enough: terrain height samples along
+  the line, plus the cave shell if it has a raycast). (2) held.faces starts at 2/4 because Nedi counts as seen though
+  nobody looked at her; likely the same behind-the-camera projection in the gaze test. Only faces in front of the
+  camera, inside the cone and unblocked count. **sim:** (3) from Begin a life, held.shell lands at full night on the
+  beach and the frame is near black apart from the shell (`held-shell-prompt.png`). held.shell happens in light:
+  either before sunset + 0.25 h, or, when later, by the hearth so the fire lights her hand.
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: a10f6ba (main, 04:46) · Gate: install 0, typecheck 0, test 0 (69), build 0 at a10f6ba · Deploy: a10f6ba live (CI 39029964936 green, /healthz ok)
