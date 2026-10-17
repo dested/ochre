@@ -45,6 +45,8 @@ export function createHost(container: HTMLElement, opts: HostOptions = {}): Game
     antialias: false,
     powerPreference: 'high-performance',
     stencil: false,
+    // the world spans 0.1 m details to 20 km mountains; reversed depth (EXT_clip_control) stops waterline flicker
+    reversedDepthBuffer: true,
   })
   renderer.info.autoReset = false
 
