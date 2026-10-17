@@ -4,13 +4,14 @@
  * breathing, the cape's lag), solve, and fade from the previous anim's last pose. `object` is the caller's: a
  * carried child's visible rig moves into the carrier's sling while its `object` stays wherever the caller puts it.
  */
-import { Group, Matrix4, Object3D, Quaternion, Vector3 } from 'three'
+import { Euler, Group, Matrix4, Object3D, Quaternion, Vector3 } from 'three'
 import type { CarrySlot, CreatePerson, Hand, HeldItem, PersonActor, PersonAnim, PersonLook, Vec3 } from '../contracts'
 import { Rng, mix32 } from '~/core/rng'
-import { ARMS_RECLINE, gaitFor, poseAnim, type AnimCtx, type CarrySeat } from './anims'
+import { gaitFor, poseAnim, type AnimCtx, type CarrySeat } from './anims'
+import type { BodyDims } from './body'
 import { buildPerson, type BuiltPerson } from './build'
 import { clamp } from './geo'
-import { Solver, blendPose, copyPose, makePose, makeSpec, type PoseSpec } from './pose'
+import { Solver, blendPose, copyPose, makePose, makeSpec, type PoseSpec, type RigInfo } from './pose'
 import { backSeat, gripPoint } from './props'
 import { B } from './rig'
 
@@ -19,12 +20,80 @@ const _v = new Vector3()
 const _v2 = new Vector3()
 const _m = new Matrix4()
 const _q = new Quaternion()
+const _e = new Euler()
 const AX = new Vector3(1, 0, 0)
 const AY = new Vector3(0, 1, 0)
 
-/** arms carry: the child's eyes this far below and out in front of the carrier's (scaled by the carrier's size) */
-const ARMS_EYE_DROP = 0.30
-const ARMS_EYE_OUT = 0.36
+/** the cradled child's eyes from the carrier's, metres (scaled with her height), and her head's tilt toward it */
+const CRADLE_GAP = 0.28
+const CRADLE_TILT = 0.07
+
+type Cradle = { seat: CarrySeat; root: Vector3; q: Quaternion }
+
+/**
+ * the cradle (02:10), in the carrier's bind body space: her left upper arm swings forward so the forearm crosses
+ * the chest at chest height; the child lies along it on its back, the back of its head in the crook of the elbow,
+ * its face turned up to hers; she turns her head part way and bows it until its eyes are CRADLE_GAP from hers
+ */
+function cradle(d: BodyDims, rig: RigInfo, cd: BodyDims): Cradle | null {
+  const neckB = rig.bind[B.neck]
+  const headB = rig.bind[B.head]
+  const shB = rig.bind[B.armL]
+  if (!neckB || !headB || !shB) return null
+  const k = clamp(d.stature / 1.6, 0.75, 1.1)
+  const gap = CRADLE_GAP * k
+  // low and a little out, so the child lies close and she bows well over it rather than peering down past her nose
+  const elbow = shB.clone().addScaledVector(new Vector3(0.22, -0.84, 0.48).normalize(), rig.upperArm)
+  const eye0 = new Vector3(0, d.headCy + d.eyeY, d.eyeZ + d.eyeR)
+  const cHead = new Vector3(0, cd.headCy, cd.headZ)
+  const cEye = new Vector3(0, cd.headCy + cd.eyeY, cd.eyeZ + cd.eyeR)
+  const headR = cd.eyeZ + cd.eyeR - cd.headZ
+  // the forearm's line toward the elbow, which is the child's hips-to-head, its head end raised
+  const along = new Vector3(0.93, 0.36, -0.1)
+  const face = new Vector3(-0.4, 0.88, -0.25).normalize()
+  const spine = new Vector3()
+  const q = new Quaternion()
+  const root = new Vector3()
+  const eye = new Vector3()
+  const hers = new Vector3()
+  let yaw = 0
+  let pitch = 0
+  // her eyes with the look layer's split of the turn and bow between neck (0.4, 0.3) and head (0.6, 0.7)
+  const bowed = (p: number, out: Vector3): Vector3 => {
+    out.copy(eye0).sub(headB).applyQuaternion(_q.setFromEuler(_e.set(p * 0.7, yaw * 0.6, CRADLE_TILT, 'YXZ')))
+    out.add(headB).sub(neckB).applyQuaternion(_q.setFromEuler(_e.set(p * 0.3, yaw * 0.4, 0, 'YXZ')))
+    return out.add(neckB)
+  }
+  const place = (): void => {
+    spine.copy(along).addScaledVector(face, -along.dot(face)).normalize()
+    q.setFromRotationMatrix(_m.makeBasis(_v.crossVectors(spine, face), spine, face))
+    // the back of its head on the forearm just inside the crook, clear of her upper arm
+    root.copy(elbow).addScaledVector(face, rig.stature * 0.022 + headR).addScaledVector(spine, -0.035 * k)
+    root.sub(_v.copy(cHead).applyQuaternion(q))
+    eye.copy(cEye).applyQuaternion(q).add(root)
+  }
+  for (let it = 0; it < 4; it++) {
+    place()
+    yaw = clamp(0.6 * Math.atan2(eye.x - eye0.x, Math.max(0.05, eye.z - eye0.z)), 0, 0.55)
+    let lo = 0
+    let hi = 0.95
+    for (let j = 0; j < 18; j++) {
+      const mid = (lo + hi) / 2
+      if (bowed(mid, hers).distanceTo(eye) > gap) lo = mid
+      else hi = mid
+    }
+    pitch = (lo + hi) / 2
+    face.copy(bowed(pitch, hers)).sub(eye).normalize()
+  }
+  place()
+  const hip = root.clone().add(new Vector3(0, cd.hipY, 0).applyQuaternion(q))
+  const back = cd.hipDepth * 0.9
+  // the forearm runs under its back from the crook to the wrist beneath its bottom
+  const under = hip.clone().addScaledVector(face, -(back + rig.stature * 0.022))
+  const grip = elbow.clone().addScaledVector(under.sub(elbow).normalize(), rig.foreArm)
+  const seat: CarrySeat = { hip, spine, face, len: cd.stature - cd.hipY, back, belly: cd.chestDepth * 0.55, elbow, grip, yaw, pitch }
+  return { seat, root, q }
+}
 
 const damp = (cur: number, target: number, rate: number, dt: number): number => cur + (target - cur) * (1 - Math.exp(-rate * dt))
 
@@ -231,19 +300,12 @@ class PersonImpl implements PersonActor {
       this.attach.position.copy(seat).sub(hipsBind)
       this.attach.quaternion.setFromAxisAngle(AY, -Math.PI / 2 + 0.7)
     } else {
-      // held up face to face: the child's eyes ~40 cm out from the carrier's and a little below (the stage-1 shot)
       chest.add(this.attach)
-      const k = clamp(d.stature / 1.6, 0.75, 1.1)
-      const up = cd.headCy + cd.eyeY - cd.hipY
-      const fwd = cd.eyeZ + cd.eyeR
-      const hip = new Vector3(
-        0,
-        d.headCy + d.eyeY - ARMS_EYE_DROP * k - up * Math.cos(ARMS_RECLINE),
-        d.eyeZ + d.eyeR + ARMS_EYE_OUT * k + fwd - up * Math.sin(ARMS_RECLINE),
-      )
-      this.seat = { hip, up, back: cd.hipDepth * 0.9, armpitUp: cd.shoulderJointY - cd.hipY - cd.armR * 1.4, chestW: cd.chestW }
-      this.attach.position.set(hip.x, hip.y - cd.hipY, hip.z).sub(chestBind)
-      this.attach.quaternion.setFromAxisAngle(AY, Math.PI)
+      const cr = cradle(d, this.built.rig, cd)
+      if (!cr) return
+      this.seat = cr.seat
+      this.attach.position.copy(cr.root).sub(chestBind)
+      this.attach.quaternion.copy(cr.q)
     }
   }
 
@@ -357,6 +419,8 @@ class PersonImpl implements PersonActor {
     s.head.y += this.headYaw * 0.6
     s.neck.x += this.headPitch * 0.3
     s.head.x += this.headPitch * 0.7
+    const cradled = this.cradleWatch()
+    if (cradled) s.head.z += CRADLE_TILT * clamp(this.headPitch / Math.max(0.05, cradled.pitch), 0, 1)
     if (this.talkW > 0.01) {
       const t = this.t
       const syl = Math.max(0, Math.sin(t * 25) * 0.6 + Math.sin(t * 9.3 + 1) * 0.5 + Math.sin(t * 3.1) * 0.3)
@@ -371,7 +435,11 @@ class PersonImpl implements PersonActor {
     let wantYaw = 0
     let wantPitch = 0
     const chest = this.built.bones[B.chest]
-    if (this.gaze && chest) {
+    const cradled = this.cradleWatch()
+    if (cradled) {
+      wantYaw = cradled.yaw
+      wantPitch = cradled.pitch
+    } else if (this.gaze && chest) {
       chest.updateWorldMatrix(true, false)
       _m.copy(chest.matrixWorld).invert()
       _v.copy(this.gaze).applyMatrix4(_m)
@@ -391,6 +459,14 @@ class PersonImpl implements PersonActor {
       this.saccade.yaw = this.gaze ? this.rng.range(-0.03, 0.03) : this.rng.range(-0.18, 0.18)
       this.saccade.pitch = this.gaze ? this.rng.range(-0.02, 0.02) : this.rng.range(-0.08, 0.06)
     }
+  }
+
+  /** the cradle seat while she watches the child in her arms (her own gaze, or a look-at target on its face) */
+  private cradleWatch(): CarrySeat | null {
+    const c = this.carrying
+    if (!this.seat || !c || c.slot !== 'arms' || !this.gaze) return null
+    if (this.target && this.target.distanceTo(c.child.headPosition(_v2)) > 0.15) return null
+    return this.seat
   }
 
   private blinkLayer(dt: number): void {
@@ -421,6 +497,7 @@ class PersonImpl implements PersonActor {
     const headBind = this.built.rig.bind[B.head]
     if (head && headBind) {
       let haveTarget = false
+      const cradled = this.cradleWatch() !== null
       if (this.gaze) {
         head.updateWorldMatrix(true, false)
         _m.copy(head.matrixWorld).invert()
@@ -435,7 +512,7 @@ class PersonImpl implements PersonActor {
           _v.set(side * d.eyeX, d.headCy + d.eyeY, d.eyeZ).sub(headBind)
           _v.subVectors(_v2, _v)
           yaw += clamp(Math.atan2(_v.x, Math.max(0.02, _v.z)), -0.5, 0.5)
-          pitch += clamp(-Math.atan2(_v.y, Math.max(0.02, Math.hypot(_v.x, _v.z))), -0.35, 0.4)
+          pitch += clamp(-Math.atan2(_v.y, Math.max(0.02, Math.hypot(_v.x, _v.z))), -0.35, cradled ? 0.7 : 0.4)
         }
         st.yaw = damp(st.yaw, yaw, 22, dt)
         st.pitch = damp(st.pitch, pitch, 22, dt)
@@ -446,7 +523,7 @@ class PersonImpl implements PersonActor {
         const blink = this.blinkT >= 0 ? Math.sin(Math.PI * Math.min(1, this.blinkT / 0.16)) : 0
         const sleepy = this.anim === 'sleep' || this.anim === 'lie-dead' ? 1 : 0
         const close = Math.max(blink, sleepy)
-        const follow = clamp(st.pitch * 0.7, -0.12, 0.3)
+        const follow = clamp(st.pitch * 0.7, -0.12, cradled ? 0.45 : 0.3)
         if (lid) lid.quaternion.setFromAxisAngle(AX, follow + close * (0.82 - follow))
       }
     }

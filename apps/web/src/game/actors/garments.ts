@@ -15,7 +15,12 @@ type Plan = {
   chestBand: boolean
   apron: boolean
   cape: boolean
-  diagonal: boolean
+  /** a hide drape over one shoulder: +1 the left, −1 the right, 0 none */
+  diagonal: 0 | 1 | -1
+  /** a wrap skirt of soft hide over the hips: 'full' all round, 'side' an overskirt round one hip */
+  skirt: 'none' | 'full' | 'side'
+  /** a small hide pouch on the belt */
+  pouch: boolean
 }
 
 /** what a person wears, from the garment field plus the modesty rules (adolescents and adults always covered) */
@@ -23,7 +28,7 @@ export function garmentPlan(ctx: BuildCtx): Plan {
   const { look, d } = ctx
   const g = look.garment
   const adultF = d.female && d.age >= 10.5
-  const plan: Plan = { wrap: false, chestBand: false, apron: false, cape: false, diagonal: false }
+  const plan: Plan = { wrap: false, chestBand: false, apron: false, cape: false, diagonal: 0, skirt: 'none', pouch: false }
   if (d.age < 2.5) return plan
   const rng = ctx.rng.fork(0x9a7)
   switch (g) {
@@ -42,11 +47,24 @@ export function garmentPlan(ctx: BuildCtx): Plan {
       if (!plan.wrap) plan.apron = true
       // women and old men wear the full back cape; men and youths the one-shoulder drape
       if (d.female || d.age >= 45) plan.cape = true
-      else plan.diagonal = true
+      else plan.diagonal = 1
       break
     }
   }
   if (adultF && plan.apron && !plan.wrap) plan.chestBand = true
+  // layers: grown women add an overskirt round one hip and, without a back cape, a drape over the right shoulder
+  // (the wrap's strap is on the left); grown men trade the apron for a wrap skirt; every adult carries a pouch
+  if (d.age >= 14) {
+    if (d.female && plan.wrap) {
+      plan.skirt = 'side'
+      if (!plan.cape) plan.diagonal = -1
+    }
+    if (!d.female && plan.apron) {
+      plan.apron = false
+      plan.skirt = 'full'
+    }
+    plan.pouch = rng.chance(0.85)
+  }
   return plan
 }
 
@@ -55,15 +73,16 @@ export function garmentPlan(ctx: BuildCtx): Plan {
 const tmpC = new Color()
 
 const BROWNING = new Color(0.6, 0.47, 0.36)
+const CREAM = new Color('#dcc6a0')
 
-/** mottled hide: pale suede with warm brown blotches, finer grain, worn darker edges */
+/** mottled hide: from cream patches through the base suede to warm brown blotches, finer grain, worn darker edges */
 function hide(base: Color, p: Vector3, edge: number, seed: number, out: Color): Color {
-  const n = fbm3(p.x * 7, p.y * 7, p.z * 7, seed)
+  const n = fbm3(p.x * 6, p.y * 6, p.z * 6, seed)
   const n2 = fbm3(p.x * 17, p.y * 17, p.z * 17, seed ^ 0x51)
   const fine = noise3(p.x * 45, p.y * 45, p.z * 45, seed ^ 0x77)
   out.copy(base)
-  out.lerp(tmpC.copy(base).multiply(BROWNING), smooth(0.5, 0.64, n) * 0.75)
-  out.lerp(tmpC.copy(base).multiplyScalar(1.1), smooth(0.44, 0.3, n) * 0.6)
+  out.lerp(tmpC.copy(base).multiply(BROWNING), smooth(0.5, 0.66, n) * 0.85)
+  out.lerp(tmpC.copy(CREAM).lerp(base, 0.3), smooth(0.44, 0.27, n) * 0.8)
   out.multiplyScalar(0.86 + 0.26 * n2 + 0.1 * (fine - 0.5))
   if (edge > 0) out.lerp(tmpC.copy(base).multiply(BROWNING).multiplyScalar(0.8), edge * 0.7)
   return out
@@ -118,8 +137,103 @@ export function buildGarments(ctx: BuildCtx, ts: TorsoShape): void {
   if (plan.wrap) buildWrap(ctx, ts)
   if (plan.chestBand) buildChestBand(ctx, ts)
   if (plan.apron) buildApron(ctx, ts)
+  if (plan.skirt !== 'none') buildSkirt(ctx, ts, plan.skirt)
   if (plan.cape) buildCape(ctx, ts)
-  if (plan.diagonal) buildDiagonal(ctx, ts)
+  if (plan.diagonal !== 0) buildDiagonal(ctx, ts, plan.diagonal)
+  if (plan.pouch) buildPouch(ctx, ts, plan)
+}
+
+/**
+ * A wrap skirt of soft hide from the belt: 'full' goes all round with an overlap at the front, 'side' is an
+ * overskirt round one hip, open on the other, so the layers under it show. Its hem runs on a long diagonal, ragged
+ * and tabbed, and it hangs in uneven folds.
+ */
+function buildSkirt(ctx: BuildCtx, ts: TorsoShape, kind: 'full' | 'side'): void {
+  const { d, look } = ctx
+  const H = d.stature
+  const seed = (look.seed ^ 0x5c17) & 0xffff
+  const rng = ctx.rng.fork(0x5c17)
+  // contrast with what is under it: a side overskirt goes pale over a darker wrap
+  const base = kind === 'side' ? hideColor(look.seed, 7).lerp(CREAM, 0.45) : hideColor(look.seed, 8).multiply(new Color(0.85, 0.78, 0.7))
+  const kneeY = d.hipY - d.thigh
+  const side = rng.chance(0.5) ? 1 : -1
+  const hemHi = kind === 'side' ? kneeY + d.thigh * rng.range(0.35, 0.5) : kneeY + d.thigh * rng.range(0.32, 0.45)
+  const hemLo = kind === 'side' ? kneeY - d.shin * rng.range(0.05, 0.2) : kneeY + d.thigh * rng.range(0.05, 0.16)
+  const topY = kind === 'side' ? d.beltY - 0.01 * H : d.beltY + 0.004 * H
+  const off = (kind === 'side' ? 0.022 : 0.009) * (H / 1.6)
+  const centre = kind === 'side' ? side * Math.PI * 0.55 : 0
+  const half = kind === 'side' ? Math.PI * rng.range(0.55, 0.68) : Math.PI * 1.06
+  const P = new Vector3()
+  ctx.gear.at(new Matrix4(), skirtSkin(ctx, ts, hemLo, 0.85)).grid(kind === 'full' ? 60 : 40, 18, (u, v, out) => {
+    const th = centre + (u * 2 - 1) * half
+    // the long diagonal: low on one side, high on the other, plus ragged tabs
+    const k = 0.5 + 0.5 * Math.sin(th * side - 0.4)
+    const hem = lerp(hemHi, hemLo, k) - ragged(u * (half / Math.PI), seed, 0.045 * H)
+    const y = lerp(topY, hem, v ** 0.95)
+    // a side overskirt is tied snug at the belt and stands off the wrap under it only lower down
+    const t = smooth(topY, hem, y)
+    const o = kind === 'side' ? lerp(0.011 * (H / 1.6), off, smooth(0, 0.25, t)) : off
+    let r = y > d.hipY ? ts.radius(th, y) + o : skirtRadius(ctx, ts, th, y, hem, kind === 'full' ? 0.3 : 0.38) + o
+    // uneven folds that deepen toward the hem; a full skirt's overlap stands a little proud at the front
+    r *= 1 + (0.035 + 0.07 * t) * Math.sin(th * 7 + noise3(th * 1.3, 0.5, 2.5, seed) * 6) * t
+    if (kind === 'full') r += 0.006 * H * smooth(0.82, 1, u)
+    P.set(r * Math.sin(th), y, r * Math.cos(th))
+    out.x = P.x
+    out.y = P.y
+    out.z = P.z
+    const edge = Math.max(smooth(0.88, 1, v), kind === 'side' ? smooth(0.9, 1, Math.abs(u * 2 - 1)) : 0)
+    hide(base, P, edge, seed, out.c)
+    // a fold's inner valley takes a little shade
+    out.c.multiplyScalar(0.92 + 0.08 * Math.sin(th * 7 + noise3(th * 1.3, 0.5, 2.5, seed) * 6))
+  })
+  cordRing(ctx, ts, topY - 0.004 * H, (kind === 'side' ? 0.011 * (H / 1.6) : off) + 0.003 * H, rigid3(ts, topY))
+}
+
+/** a small soft pouch hanging from the belt on one hip, tied with a cord */
+function buildPouch(ctx: BuildCtx, ts: TorsoShape, plan: Plan): void {
+  const { d, look } = ctx
+  const H = d.stature
+  const seed = (look.seed ^ 0x9c4) & 0xffff
+  const rng = ctx.rng.fork(0x9c4)
+  const base = hideColor(look.seed, 9).multiply(new Color(0.8, 0.72, 0.62))
+  const side = plan.diagonal === -1 ? 1 : rng.chance(0.5) ? 1 : -1
+  const th = side * rng.range(1.15, 1.45)
+  const beltY = plan.skirt === 'none' ? d.beltY : d.beltY + 0.004 * H
+  const ph = 0.07 * H
+  const pr = 0.026 * H
+  const R = ts.radius(th, beltY) + (plan.skirt === 'side' || plan.wrap ? 0.026 : 0.014) * H + pr * 0.55
+  const cx = R * Math.sin(th)
+  const cz = R * Math.cos(th)
+  const P = new Vector3()
+  const skin: SkinFn = () => ({ b: [B.hips, side > 0 ? B.thighL : B.thighR], w: [0.8, 0.2] })
+  ctx.gear.at(new Matrix4().makeTranslation(cx, beltY - ph * 0.55, cz).multiply(new Matrix4().makeRotationY(th)), skin).lathe({
+    y0: -ph * 0.5,
+    y1: ph * 0.5,
+    // a teardrop sack: full at the bottom, gathered at the neck, a frilled mouth above the tie
+    r: (y) => {
+      const t = (y + ph * 0.5) / ph
+      const body = Math.sin(Math.PI * Math.min(1, t * 1.25)) ** 0.7 * (1 - 0.25 * t)
+      const neck = lerp(1, 0.32, smooth(0.62, 0.8, t)) + 0.35 * smooth(0.82, 1, t)
+      return pr * Math.max(0.05, body * neck)
+    },
+    depth: 0.62,
+    segs: ctx.gear.q >= 1 ? 12 : 7,
+    rings: ctx.gear.q >= 1 ? 10 : 5,
+    color: (y, a, v) => {
+      P.set(cx + v.x, beltY + v.y, cz + v.z)
+      // the gathered neck and frill darken; soft vertical creases round the sack
+      return hide(base, P, smooth(0.6, 1, (y + ph * 0.5) / ph), seed, new Color()).multiplyScalar(0.9 + 0.1 * Math.sin(a * 5))
+    },
+  })
+  // the tie
+  const ty = beltY - ph * 0.55 + ph * 0.24
+  const pts: Vector3[] = []
+  for (let i = 0; i <= 10; i++) {
+    const a = (i / 10) * Math.PI * 2
+    pts.push(new Vector3(cx + Math.cos(a) * pr * 0.36, ty, cz + Math.sin(a) * pr * 0.26))
+  }
+  ctx.gear.at(new Matrix4(), skin).tube(pts, () => 0.0028 * H, CORD, 5)
+  void clamp
 }
 
 function buildWrap(ctx: BuildCtx, ts: TorsoShape): void {
@@ -317,36 +431,39 @@ function buildCape(ctx: BuildCtx, ts: TorsoShape): void {
   void B.cape
 }
 
-function buildDiagonal(ctx: BuildCtx, ts: TorsoShape): void {
+function buildDiagonal(ctx: BuildCtx, ts: TorsoShape, sd: 1 | -1): void {
   const { d, look } = ctx
   const H = d.stature
   const seed = (look.seed ^ 0xd1a9) & 0xffff
-  const base = hideColor(look.seed, 6)
+  // a woman's drape over her wrap goes pale (cream suede), a man's stays the base hide
+  const base = d.female ? hideColor(look.seed, 6).lerp(CREAM, 0.5) : hideColor(look.seed, 6)
   const off = 0.011 * (H / 1.6)
   const sJY = d.shoulderJointY
   const TL = d.topY - d.hipY
   const lowY = d.chestY - 0.2 * TL
   const A = (d.topY + lowY) / 2
   const Bv = (d.topY - lowY) / 2
-  const band = 0.46 * TL
+  const band = (d.female ? 0.36 : 0.46) * TL
   const P = new Vector3()
-  const leftArm = (th: number, y: number): number => {
+  const upperArm = (th: number, y: number): number => {
     if (y > sJY + d.armR * 1.2 || y < sJY - d.upperArm * 0.55) return 0
-    return d.shoulderX * Math.max(0, Math.sin(th)) + d.armR * 1.05
+    return d.shoulderX * Math.max(0, sd * Math.sin(th)) + d.armR * 1.05
   }
   const skin: SkinFn = (x, y, z): SkinW => {
     const th = Math.atan2(x, z)
-    const w = 0.5 * bump(((th - Math.PI / 2) / 0.55) ** 2) * smooth(sJY + d.armR, sJY - d.upperArm * 0.25, y)
+    const w = 0.5 * bump(((th - (sd * Math.PI) / 2) / 0.55) ** 2) * smooth(sJY + d.armR, sJY - d.upperArm * 0.25, y)
     const t = ts.skin(x, y, z)
-    return { b: [...t.b, B.armL], w: [...t.w.map((k) => k * (1 - w)), w] }
+    return { b: [...t.b, sd > 0 ? B.armL : B.armR], w: [...t.w.map((k) => k * (1 - w)), w] }
   }
   ctx.gear.at(new Matrix4(), skin).grid(52, 12, (u, v, out) => {
     const th = 2 * Math.PI * u
     const s = Math.sin(th)
-    const top = A + Bv * s + ragged(u + 2, seed, 0.008 * H)
-    const bot = top - band * (1 + 0.25 * Math.max(0, -s)) - ragged(u, seed, 0.03 * H)
+    const top = A + Bv * s * sd + ragged(u + 2, seed, 0.008 * H)
+    const bot = top - band * (1 + 0.25 * Math.max(0, -s * sd)) - ragged(u, seed, 0.045 * H)
     const y = lerp(bot, top, v)
-    let r = Math.max(ts.radius(th, Math.min(y, d.topY - 0.001)), leftArm(th, y)) + off
+    let r = Math.max(ts.radius(th, Math.min(y, d.topY - 0.001)), upperArm(th, y)) + off
+    // the free lower edge hangs away from the body a little, in soft folds
+    r += 0.012 * H * (1 - v) ** 2 * (0.6 + 0.4 * Math.sin(th * 5 + noise3(th, 1.5, 0.5, seed) * 3))
     // over the top of the left shoulder the hide rides up toward the neck
     if (y > d.shoulderY) r = Math.max(r, d.neckR * 1.3 + off)
     r *= 1 + 0.02 * Math.sin(th * 6 + v * 2)

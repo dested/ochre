@@ -34,20 +34,28 @@ import {
 const TAU = Math.PI * 2
 const frac = (x: number): number => x - Math.floor(x)
 
-/** how far an arms-carried child leans back from upright, radians */
-export const ARMS_RECLINE = 0.12
-
-/** an arms-carried child's seat, in the carrier's bind body space (riding on the chest bone) */
+/**
+ * an arms-carried child's cradle, in the carrier's bind body space (riding on the chest bone): the child lies
+ * along the carrier's left forearm, head in the crook of the elbow
+ */
 export type CarrySeat = {
   /** the child's hip joint */
   hip: Vector3
-  /** the child's eyes above its hips */
-  up: number
-  /** the child's back, behind its hip joint (away from the carrier) */
+  /** unit: from the child's hips toward its head */
+  spine: Vector3
+  /** unit: the way the child's chest faces (up, toward the carrier's face) */
+  face: Vector3
+  /** the child's hips to the crown of its head */
+  len: number
+  /** the child's back behind its spine, and its belly in front of it */
   back: number
-  /** the child's armpits above its hips, and its chest width */
-  armpitUp: number
-  chestW: number
+  belly: number
+  /** the carrier's left elbow, the crook the child's head lies in, and her left wrist under its bottom */
+  elbow: Vector3
+  grip: Vector3
+  /** the carrier's head turn and bow toward the child (the look layer holds them while she watches it) */
+  yaw: number
+  pitch: number
 }
 
 export type AnimCtx = {
@@ -350,28 +358,30 @@ function carryArms(c: AnimCtx, s: PoseSpec): void {
     s.hip.x += 0.015 * H
     s.spine.z -= 0.05
   } else if (c.seat) {
-    // held up face to face: the hands under the child's arms, palms on its ribs, fingers round its back
+    // the cradle: the left forearm runs under the child's back, elbow crook at its head, hand under its bottom;
+    // the right hand rests over its belly and thighs, well clear of its face (its eyes are the stage-1 camera)
     const st = c.seat
-    const pitY = st.hip.y + st.armpitUp
-    for (const a of [l, r]) {
-      const side = a === l ? 1 : -1
-      a.ik = true
-      a.space = B.chest
-      // the fingers run (0, 0.4, 0.9) from the wrist; the palm's middle sits just under the armpit
-      a.wrist.set(side * (st.chestW * 0.5 + 0.012 * H), pitY - 0.4 * 0.55 * d.palm - 0.01 * H, st.hip.z - 0.9 * 0.55 * d.palm)
-      a.pole.set(side * 0.8, -1, -0.3)
-      a.aim = true
-      // hand +Z for fingers along (0, 0.4, 0.9) with the palm inward: Z = X × (−fingers)
-      a.aimAxis.set(side * 0.12, 0.9, -0.4)
-      a.aimPalm.set(-side, 0, 0)
-      a.curl = 0.25
-      a.thumb = 0.1
-    }
-    // leaning back a touch against the weight, the head tipped toward the child
+    l.ik = true
+    l.space = B.chest
+    l.wrist.copy(st.grip)
+    const sh = c.rig.bind[B.armL]
+    if (sh) l.pole.subVectors(st.elbow, sh).normalize()
+    else l.pole.set(0.9, -0.75, 0.3)
+    l.hand.set(-0.25, 0, 0)
+    l.curl = 0.5
+    l.thumb = 0.25
+    r.ik = true
+    r.space = B.chest
+    r.wrist.copy(st.hip).addScaledVector(st.spine, st.len * 0.06).addScaledVector(st.face, st.belly + 0.03 * H)
+    r.pole.set(-0.9, -0.8, 0.1)
+    r.hand.set(0.35, 0, 0)
+    r.curl = 0.35
+    r.thumb = 0.15
+    // leaning back a touch against the weight; the head holds still on the child (the look layer bows it there)
     s.hipRot.x -= 0.03
-    s.spine.x -= 0.04
-    s.chest.x -= 0.03
-    s.head.z += 0.08
+    s.spine.x -= 0.03
+    s.neck.set(0, 0, 0)
+    s.head.set(0.008 * Math.sin(c.t * 0.29 + 1), 0.015 * Math.sin(c.t * 0.21), 0)
   } else {
     // a load in front
     for (const a of [l, r]) {
@@ -394,12 +404,13 @@ function poseHeld(c: AnimCtx, s: PoseSpec): void {
   const slot = c.carriedIn ?? 'back'
   s.hip.set(0, rig.hipY, 0)
   if (slot === 'arms') {
-    // held up under the arms, face to face with the carrier
-    s.hipRot.set(-ARMS_RECLINE, 0, 0)
-    s.spine.set(0.04, 0, 0)
+    // cradled: the cradle frame already turns the face to the carrier's, so the back curls softly and the neck
+    // takes it back out (the head stays where the cradle put it) and barely moves
+    s.hipRot.set(0, 0, 0)
+    s.spine.set(0.03, 0, 0)
     s.chest.set(0.02, 0, 0)
-    s.neck.set(-0.02, 0.06 * Math.sin(t * 0.31), 0)
-    s.head.set(0.02 + 0.04 * Math.sin(t * 0.53), 0.1 * Math.sin(t * 0.23 + 1), 0.04 * Math.sin(t * 0.41))
+    s.neck.set(-0.05, 0.05 * Math.sin(t * 0.31), 0)
+    s.head.set(0.02 * Math.sin(t * 0.53), 0.06 * Math.sin(t * 0.23 + 1), 0.03 * Math.sin(t * 0.41))
   } else {
     s.hipRot.set(0.05, 0, 0)
     s.spine.set(0.08, 0, 0)
@@ -417,17 +428,18 @@ function poseHeld(c: AnimCtx, s: PoseSpec): void {
       leg.ankle.set(side * rig.hipX * 3.2, rig.hipY - legL * 0.55, legL * 0.45)
       leg.pole.set(side * 1.2, 0.2, 0.6)
     } else {
-      // held up under the arms: the legs hang, knees soft and a little apart
-      leg.ankle.set(side * rig.hipX * 1.9, rig.hipY - legL * 0.78, legL * 0.32 + 0.04 * legL * Math.sin(t * 1.1 + side))
-      leg.pole.set(side * 0.5, 0.3, 1)
+      // cradled: the legs drawn up, knees bent and a little apart, feet kicking now and then
+      leg.ankle.set(side * rig.hipX * 2.1, rig.hipY - legL * 0.42, legL * 0.5 + 0.05 * legL * Math.sin(t * 1.1 + side))
+      leg.pole.set(side * 0.4, 0.5, 1)
     }
     leg.pitch = 0.3
     leg.yaw = 0.3
     a.ik = false
-    a.flex = slot === 'back' ? 0.9 + 0.1 * Math.sin(t * 0.9 + side) : slot === 'arms' ? 1.25 + 0.2 * Math.sin(t * 0.7 + side * 2) : 0.6
-    a.abduct = slot === 'arms' ? 0.25 : 0.4
+    // cradled, the hands rest on the chest and the arms stay out of its own eyes' way (the stage-1 camera)
+    a.flex = slot === 'back' ? 0.9 + 0.1 * Math.sin(t * 0.9 + side) : slot === 'arms' ? 0.3 + 0.1 * Math.sin(t * 0.7 + side * 2) : 0.6
+    a.abduct = slot === 'arms' ? 0.3 : 0.4
     a.twist = 0.3
-    a.elbow = slot === 'arms' ? 0.55 + 0.25 * Math.sin(t * 0.9 + side) : 0.9
+    a.elbow = slot === 'arms' ? 1.75 + 0.15 * Math.sin(t * 0.9 + side) : 0.9
     a.curl = 0.55
   }
 }

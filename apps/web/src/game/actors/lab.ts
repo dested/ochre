@@ -172,6 +172,8 @@ export function mount(el: HTMLElement): () => void {
   }
   const lineup = (): void => {
     closeIdx = null
+    cradleView = null
+    camera.near = 0.05
     camera.fov = 35
     camera.updateProjectionMatrix()
     camera.position.set(0, 1.05, 6.4)
@@ -189,10 +191,12 @@ export function mount(el: HTMLElement): () => void {
     const p = people[i]
     if (!p) return
     closeIdx = i
+    cradleView = null
     closeDist = dist
     closeTurn = turn
     closeDy = dy
     if (anim === 'walk' || anim === 'run') setAnim('idle')
+    camera.near = 0.05
     camera.fov = 40
     camera.updateProjectionMatrix()
     frameClose()
@@ -209,6 +213,35 @@ export function mount(el: HTMLElement): () => void {
     const fwd = new Vector3(Math.sin(yaw), 0, Math.cos(yaw))
     camera.position.copy(head).addScaledVector(fwd, closeDist).add(new Vector3(-0.06, 0.02, 0).multiplyScalar(closeDist / 0.4))
     controls.target.copy(head)
+    controls.update()
+  }
+  /** the arms carry, framed each frame: from beside Ama (swung `turn` radians from her front toward her left), or
+   * from the child's eyes up to hers at the held camera's 60° (stage 1) */
+  let cradleView: { mode: 'side' | 'child'; turn: number; dist: number } | null = null
+  const viewCradle = (mode: 'side' | 'child', turn = 1.2, dist = mode === 'child' ? 0 : 0.9): void => {
+    closeIdx = null
+    cradleView = { mode, turn, dist }
+    camera.fov = mode === 'child' ? 60 : 40
+    // play's near plane, which also clips the child's own brow and lids out of its eyes' view
+    camera.near = mode === 'child' ? 0.1 : 0.05
+    camera.updateProjectionMatrix()
+    frameCradle()
+  }
+  const frameCradle = (): void => {
+    if (!cradleView || !ama) return
+    const a = ama.headPosition(new Vector3())
+    const c = infant.headPosition(new Vector3())
+    if (cradleView.mode === 'child') {
+      // at the eye midpoint (inside the child's own nose bridge) unless asked to sit out in front of it
+      camera.position.copy(c).addScaledVector(a.clone().sub(c).normalize(), cradleView.dist)
+      controls.target.copy(a)
+    } else {
+      const yaw = ama.object.rotation.y + cradleView.turn
+      const mid = a.clone().lerp(c, 0.6)
+      mid.y -= 0.06
+      camera.position.copy(mid).add(new Vector3(Math.sin(yaw), 0.12, Math.cos(yaw)).multiplyScalar(cradleView.dist))
+      controls.target.copy(mid)
+    }
     controls.update()
   }
   const setAge = (years: number): void => {
@@ -370,11 +403,40 @@ export function mount(el: HTMLElement): () => void {
       const a = ama.headPosition(new Vector3())
       return a.distanceTo(infant.headPosition(new Vector3()))
     },
+    /** both eye midpoints in the carrier's body frame (+X its left, +Z forward), in cm */
+    carryEyes: () => {
+      if (!ama) return null
+      const cm = (v: Vector3) => [v.x, v.y, v.z].map((n) => Math.round(n * 100))
+      return {
+        carrier: cm(ama.object.worldToLocal(ama.headPosition(new Vector3()))),
+        child: cm(ama.object.worldToLocal(infant.headPosition(new Vector3()))),
+      }
+    },
+    cradle: viewCradle,
+    /** hide everyone but Ama and the infant (clean carry shots) */
+    solo: (on: boolean) => {
+      for (const p of people) if (p !== ama && p !== infant) p.object.visible = !on
+    },
     /** free camera for screenshots: eye position and target */
     cam: (px: number, py: number, pz: number, tx: number, ty: number, tz: number) => {
       closeIdx = null
+      cradleView = null
       camera.position.set(px, py, pz)
       controls.target.set(tx, ty, tz)
+      controls.update()
+    },
+    /** frame person i's hand from `dist` metres, on the hand's outer side, a little in front */
+    hand: (i: number, side: 'left' | 'right', dist = 0.3) => {
+      const p = people[i]
+      if (!p) return
+      closeIdx = null
+      cradleView = null
+      const h = p.handPosition(side, new Vector3())
+      const yaw = p.object.rotation.y
+      const out = side === 'left' ? 1 : -1
+      const dir = new Vector3(Math.cos(yaw) * out + Math.sin(yaw) * 0.8, 0.15, -Math.sin(yaw) * out + Math.cos(yaw) * 0.8).normalize()
+      camera.position.copy(h).addScaledVector(dir, dist)
+      controls.target.copy(h)
       controls.update()
     },
     count: () => people.length + crowd.length,
@@ -393,6 +455,20 @@ export function mount(el: HTMLElement): () => void {
         }
       })
       return out
+    },
+    /** show or hide mesh k (0 skin, 1 gear, 2 detail) at every level of person i and anything it carries */
+    part: (i: number, k: number, on: boolean) => {
+      people[i]?.object.traverse((o) => {
+        if (!(o instanceof LOD)) return
+        for (const lv of o.levels) {
+          const meshes: Mesh[] = []
+          lv.object.traverse((m) => {
+            if (m instanceof Mesh) meshes.push(m)
+          })
+          const m = meshes[k]
+          if (m) m.visible = on
+        }
+      })
     },
     /** mean CPU ms per frame for the actors' update and for render submission since the last call, and the fps */
     perf: () => {
@@ -437,6 +513,7 @@ export function mount(el: HTMLElement): () => void {
     for (const w of crowd) w.actor.update(dt)
     const t1 = performance.now()
     if (closeIdx !== null && !walking) frameClose()
+    else if (cradleView) frameCradle()
     controls.update()
     renderer.render(scene, camera)
     const t2 = performance.now()

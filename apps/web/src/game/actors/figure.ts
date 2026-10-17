@@ -145,6 +145,8 @@ export function buildArms(ctx: BuildCtx): void {
   const rng = ctx.rng.fork(0xa53)
   const lit = skinC.clone().multiply(new Color(1.04, 1.02, 1))
   const elbowC = tone(skinC, 0.86)
+  // how much muscle shapes the arm: a working adult's arms, more for men, little for children
+  const muscle = smooth(6, 18, d.age) * (0.65 + 0.35 * d.build + (d.female ? 0 : 0.45 * d.puberty)) * (1 - 0.35 * d.elder)
   for (const s of [1, -1] as const) {
     const L = s > 0
     const sx = s * d.shoulderX
@@ -212,10 +214,22 @@ export function buildArms(ctx: BuildCtx): void {
         const wk = smooth(wristY + fa * 0.6, wristY, y)
         v.z *= 1 + 0.32 * wk
         v.x *= 1 - 0.12 * wk
-        // biceps at the front of the upper arm, the elbow point at the back
         const c = Math.cos(th)
-        if (y > elbowY && y < sy) v.z += d.armR * 0.1 * Math.max(0, c) * bump(((y - (elbowY + ua * 0.45)) / (ua * 0.22)) ** 2)
+        const out = Math.max(0, Math.sin(th) * s)
+        // the deltoid caps the shoulder on the outside, front and back, and tapers into the upper arm
+        const delt = bump(((y - (sy - ua * 0.1)) / (ua * 0.24)) ** 2) * (0.35 + 0.65 * out)
+        v.x += s * d.armR * 0.3 * muscle * delt * out
+        v.z += d.armR * 0.12 * muscle * delt * c
+        // biceps at the front, triceps behind, the elbow point at the back
+        if (y > elbowY && y < sy) {
+          v.z += d.armR * 0.13 * muscle * Math.max(0, c) * bump(((y - (elbowY + ua * 0.42)) / (ua * 0.22)) ** 2)
+          v.z += d.armR * 0.1 * muscle * Math.min(0, c) * bump(((y - (elbowY + ua * 0.62)) / (ua * 0.25)) ** 2)
+        }
         if (c < 0) v.z += d.elbowR * 0.18 * c * bump(((y - elbowY) / (d.elbowR * 0.8)) ** 2)
+        // the forearm swells just below the elbow on the outer-front (brachioradialis) and narrows to the wrist
+        const fore = bump(((y - (elbowY - fa * 0.2)) / (fa * 0.2)) ** 2) * Math.max(0, 0.6 * c + 0.8 * Math.sin(th) * s)
+        v.x += s * d.foreR * 0.14 * muscle * fore * out
+        v.z += d.foreR * 0.1 * muscle * fore * Math.max(0, c)
       },
     })
     buildHand(ctx, s, sx, wristY, handBone, L ? B.fingersL : B.fingersR, L ? B.thumbL : B.thumbR)
@@ -225,42 +239,83 @@ export function buildArms(ctx: BuildCtx): void {
 
 function buildHand(ctx: BuildCtx, s: 1 | -1, sx: number, wristY: number, handBone: number, fingersBone: number, thumbBone: number): void {
   const { d, skinC } = ctx
+  const near = ctx.skin.q >= 1
   const palmC = mixc(skinC, new Color('#c49a7c'), 0.35)
-  const knuckle = tone(skinC, 0.88)
+  const knuckle = tone(skinC, 0.86)
+  const nail = mixc(skinC, new Color('#d9b49a'), 0.4)
   const hw = d.handW
   const palmH = d.palm
   const thick = hw * 0.24
-  // palm faces inward (−s·X); its broad side spans Z
+  /*
+   * the palm: a soft slab, palm facing in (−s·X), its broad side along Z, wider at the knuckles than the wrist,
+   * the thenar pad swelling toward the thumb and a knuckle ridge across the back
+   */
   const palmColor = (_y: number, th: number): Color => (Math.sin(th) * s < -0.3 ? palmC : skinC)
-  ctx.skin.at(T(sx, wristY - palmH * 0.5, 0), rigid(handBone)).box(thick, palmH * 0.55, hw * 0.5, palmColor, 3.2, 16, 10)
-  // fingers: four, slightly curved, front (index) to back (little)
-  const lens = [0.94, 1, 0.94, 0.76]
+  const y0 = -palmH * 0.56
+  const y1 = palmH * 0.56
+  ctx.skin.at(T(sx, wristY - palmH * 0.5, 0), rigid(handBone)).lathe({
+    y0,
+    y1,
+    r: (y) => {
+      const t = (y - y0) / (y1 - y0)
+      const cap = Math.sqrt(Math.max(0, 1 - Math.max(0, (0.12 - t) / 0.12) ** 2)) * Math.sqrt(Math.max(0, 1 - Math.max(0, (t - 0.88) / 0.12) ** 2))
+      return thick * lerp(0.82, 1, smooth(0.9, 0.5, t)) * Math.max(0.05, cap)
+    },
+    depth: (hw * 0.5) / thick,
+    sq: 2.3,
+    segs: near ? 20 : 12,
+    rings: near ? 14 : 8,
+    color: palmColor,
+    deform: (v, th, y) => {
+      const t = (y - y0) / (y1 - y0)
+      // knuckles wider than the wrist
+      v.z *= lerp(1.02, 0.84, smooth(0.15, 0.95, t))
+      const inner = Math.max(0, -Math.sin(th) * s)
+      const back = Math.max(0, Math.sin(th) * s)
+      // the thenar pad: palm side, toward the thumb (+Z), upper half
+      v.x -= s * thick * 0.35 * inner * bump(((t - 0.62) / 0.28) ** 2) * smooth(-0.2, 0.8, v.z / (hw * 0.5))
+      // the hollow of the palm, and the knuckle ridge across the back
+      v.x += s * thick * 0.18 * inner * bump(((t - 0.45) / 0.2) ** 2) * bump((v.z / (hw * 0.3)) ** 2)
+      v.x += s * thick * 0.14 * back * bump(((t - 0.06) / 0.08) ** 2)
+    },
+  })
+  // fingers: four, gently curled, spread a little, each with knuckle, joints and a rounded tip
+  const lens = [0.92, 1, 0.95, 0.76]
   const knuckleY = wristY - palmH
+  const n = near ? 9 : 5
   for (let i = 0; i < 4; i++) {
-    const z = hw * (0.34 - i * 0.225)
+    const z0 = hw * (0.33 - i * 0.22)
     const len = d.fingers * (lens[i] ?? 1)
     const fr = hw * (i === 3 ? 0.085 : 0.1)
+    const spread = (i - 1.4) * 0.07
     const pts: Vector3[] = []
-    const n = 6
     for (let k = 0; k < n; k++) {
       const t = k / (n - 1)
-      // a relaxed curl toward the palm
-      const a = t * 0.55
-      pts.push(new Vector3(sx - s * Math.sin(a) * len * 0.35 * t, knuckleY + palmH * 0.08 - Math.cos(a * 0.5) * len * t, z))
+      // a relaxed curl toward the palm, more at the far joints
+      const a = t * t * 0.9
+      pts.push(new Vector3(sx - s * Math.sin(a) * len * 0.42 * t, knuckleY + palmH * 0.1 - Math.cos(a * 0.6) * len * t, z0 - spread * len * t))
     }
-    ctx.skin.at(new Matrix4(), rigid(fingersBone)).tube(pts, (t) => fr * (1 - 0.25 * t), (t) => (t < 0.15 ? knuckle : skinC), 8, { flatten: 0.9 })
+    const rad = (t: number): number => {
+      const joints = 1 + 0.12 * bump(((t - 0.02) / 0.08) ** 2) + 0.07 * bump(((t - 0.47) / 0.07) ** 2) + 0.05 * bump(((t - 0.76) / 0.06) ** 2)
+      const tip = Math.sqrt(Math.max(0, 1 - Math.max(0, (t - 0.86) / 0.14) ** 2))
+      return fr * (1 - 0.22 * t) * joints * Math.max(0.12, tip)
+    }
+    ctx.skin.at(new Matrix4(), rigid(fingersBone)).tube(pts, rad, (t) => (t < 0.08 ? knuckle : t > 0.84 ? nail : skinC), near ? 8 : 6, { flatten: 0.88 })
   }
-  // thumb: from the inner-front of the palm, down and forward
+  // thumb: from the thenar pad, out toward the front and down, two joints and a broad tip
   {
-    const base = new Vector3(sx - s * thick * 0.4, wristY - palmH * 0.25, hw * 0.38)
+    const base = new Vector3(sx - s * thick * 0.35, wristY - palmH * 0.22, hw * 0.3)
     const pts: Vector3[] = []
-    const n = 6
-    const tl = d.fingers * 0.85
+    const tl = d.fingers * 0.88
     for (let k = 0; k < n; k++) {
       const t = k / (n - 1)
-      pts.push(new Vector3(base.x - s * thick * 0.6 * t, base.y - tl * t * 0.82, base.z + tl * 0.35 * t - tl * 0.12 * t * t))
+      pts.push(new Vector3(base.x - s * thick * 0.75 * Math.sin(t * 1.4), base.y - tl * t * 0.78, base.z + tl * 0.42 * t - tl * 0.16 * t * t))
     }
-    ctx.skin.at(new Matrix4(), rigid(thumbBone)).tube(pts, (t) => hw * 0.13 * (1 - 0.25 * t), skinC, 8)
+    const rad = (t: number): number => {
+      const tip = Math.sqrt(Math.max(0, 1 - Math.max(0, (t - 0.84) / 0.16) ** 2))
+      return hw * 0.14 * (1.3 - 0.45 * smooth(0, 0.6, t) + 0.06 * bump(((t - 0.55) / 0.08) ** 2)) * Math.max(0.12, tip)
+    }
+    ctx.skin.at(new Matrix4(), rigid(thumbBone)).tube(pts, rad, (t) => (t > 0.82 ? nail : skinC), near ? 8 : 6)
   }
 }
 
