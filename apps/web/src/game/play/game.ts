@@ -116,6 +116,9 @@ function describe(e: SimEvent): string {
 
 const INTERACT_RADIUS = 2.5
 const TAG_RANGE = 25
+/** in third person a head nearer the camera than this has no tag, fading out from TAG_NEAR_FADE, metres */
+const TAG_NEAR_HIDE = 1.8
+const TAG_NEAR_FADE = 2.5
 const GAZE_CONE = (9 * Math.PI) / 180
 /**
  * a chapter's opening (until the player moves, turns or this many seconds pass): its first objective with a
@@ -833,6 +836,8 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       const d = tmp.distanceTo(camera.position)
       // the face filling an infant's view gets no tag: the face toast carries that moment
       if (d > TAG_RANGE || (heldStage && d < HELD_FACE_RANGE)) continue
+      // a head this close is right there: its tag would project high off it, over whatever is behind
+      if (!heldStage && d < TAG_NEAR_HIDE) continue
       head.copy(tmp)
       head.y += 0.1
       // the tag's anchor sits TAG_ABOVE over the head top (about 0.1 m above the eyes)
@@ -864,7 +869,9 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
           Math.max(TAG_MARGIN + TAG_TALL, ((1 - tmp.y) / 2) * height)
         ),
         bond: q.bond,
-        opacity: 1 - smooth(heldStage ? 3 : 12, heldStage ? 7 : TAG_RANGE, d),
+        opacity:
+          (1 - smooth(heldStage ? 3 : 12, heldStage ? 7 : TAG_RANGE, d)) *
+          (heldStage ? 1 : smooth(TAG_NEAR_HIDE, TAG_NEAR_FADE, d)),
         speaking,
       }
       if (hidden > OCC_HIDE) fading.push({ ...tag, opacity: 0 })
