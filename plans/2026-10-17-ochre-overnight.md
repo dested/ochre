@@ -608,7 +608,10 @@ controller, cameras and verbs that make each stage of life feel different; and t
   hand inside the view, and the prompt enables when the gaze is on it. (4) Mouse look turns only a few degrees per
   long drag (`05-facing2.png`). Make sure look uses raw `movementX/Y`, never scaled by dt or frame rate. (5) Name tags
   float about 90 px above heads (`05-tide-a.png`): anchor them 0.15 m above the head top. (6) After telling, the prompt
-  still says "Talk to Bise"; it reverts to ordinary talk.
+  still says "Talk to Bise"; it reverts to ordinary talk. (7) elder.walk: the objective diamond sits on the player's
+  body when the point target is straight ahead (`09-walk-b.png`; point targets project at ground + 1 m in
+  `objectiveMarkNow`, game.ts ~850). Project the player's screen box (feet to head top + 0.2 m, ±0.35 m wide); when an
+  on-screen mark falls inside it, move the mark to just above the box's top edge.
   **sim:** the whale was still at night in ui's run at 478ad65 (`06-whale-a.png`). Check daylight holds on every path
   into provider.whale (normal flow, the Chapters menu, the QA jump).
 
