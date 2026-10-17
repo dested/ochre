@@ -666,7 +666,7 @@ controller, cameras and verbs that make each stage of life feel different; and t
 
 ## Ledger (lead, updated 2026-10-17 01:05)
 
-Board: down · Last pushed: cca08b3 (main, 04:24) · Gate: install 0, typecheck 0, test 0 (68), build 0 at cca08b3 · Deploy: cca08b3 live (CI 39028574081 green, /healthz ok)
+Board: down · Last pushed: a10f6ba (main, 04:46) · Gate: install 0, typecheck 0, test 0 (69), build 0 at a10f6ba · Deploy: CI pending (previous cca08b3 live, CI 39028574081)
 
 | Agent | Model | Owns | Item now | Last sha / artifact | Status |
 | --- | --- | --- | --- | --- | --- |
@@ -676,7 +676,7 @@ Board: down · Last pushed: cca08b3 (main, 04:24) · Gate: install 0, typecheck 
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | on call: held.* recheck after F2 rebuild | 8ca2317 male small/youth/provider cards passed 04:42; f491768 male elder/summary painting passed 04:39; recheck #9/#11 passed 04:37 (663f793 captions under hidden HUD, 6e14e84 scrollbars); F1 mark 23acc39 passed; U7 passed (bdc3b86); chatter 830a7ab; U6 ce615bc passed; U5, U3 passed | working |
 | play | opus-high | game/play, game/audio, app/play.tsx | F2 held opening (acked 04:21) | F1 play 7e42a4a passed (all 9; dd47469 summary hang fixed); PL3 runs 1–2 reached the summary, no errors; 8c75080 aim, 8f774e0 tags, 7a6f0e5 spoor passed; 9a7684d passed (E verb, seated camera); PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
 
-Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); QA server :4090 (prod build of c0edcb6, log /w/junk/sim-80k/qa-server.log); Drydock portal :4400 (Windows bun, log in
+Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); QA server :4090 (prod build of a10f6ba, log /w/junk/sim-80k/qa-server.log); Drydock portal :4400 (Windows bun, log in
 scratchpad drydock-portal.log)
 Images used: 47 / 200 (lead 2, ui 45). OpenAI credit exhausted 01:05; generation stopped (needs-sal Check 2)
 Waiting on Sal: none (needs-sal file: plans/2026-10-17-needs-sal.md)
