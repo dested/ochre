@@ -305,7 +305,18 @@ Add `e2e/*.spec.ts`; screenshot only stable views; `bun run test:e2e:update` to 
 
 ## Status
 
-- **Done** — SSR + hydration (server and client-nav prefetch), auth (email/pw), tRPC posts demo, logging, /healthz, 404/error handling, favicon/robots, flash-free dark mode + toggle, scroll restoration, immutable asset caching, init script (rename + per-project port), Playwright e2e + screenshot baselines. Monorepo (`apps/web`, optional `apps/mobile`, optional `apps/desktop`), `project.json` identity + `surfaces`, `init --mobile|--desktop|--desktop-only` / `sync` / `add:mobile|add:desktop`, `@app/tokens`, Electron desktop surface with tRPC over IPC (`@app/trpc-ipc`) and unpacked releases, Drydock seed, Expo SDK 57 mobile app with auth + posts + two native example modules. Express 5 + Prisma 7. superjson (wire + SSR state), zod 4, `noUncheckedIndexedAccess`, `prisma migrate` workflow, `bun:test` unit tests.
-- **Not built** — email verification, OAuth providers, rate limiting, CI, per-route head/meta, Android.
-- **Unverified** — first dev-client build on the Mac/iPad (Gate 3), EAS builds, Drydock deploy of a workspace (needs Drydock's fix).
-- **Next:** whatever the cloned product needs — this is a base.
+- **Built (overnight 2026-10-17):** OCHRE playable end to end at `/`: title → Begin a life → four painted intro cards →
+  five chapters (Held, Small, Coming of age, Provider, Elder) → life summary → Continue as heir. The Chapters menu jumps to
+  any stage. 29 director beats (held.faces/sea/shell/night · small.follow/watch/gather/dig/tide/play/fire/afternoon ·
+  youth.stone/knap/heat/haft/throw/track/share/gathering/afternoon · provider.steps/teach/storm/whale ·
+  elder.walk/story/mark/evening). Procedural world (cliff cave, shelf, cove, dunes, plateau, tide, weather, day/night,
+  moon), painted-light post chain, procedural people from infant to elder with ~20 anims, animals (eland herd, right
+  whale), sim (band AI, needs, watch-to-learn skills, food/fire, chapters, save), HUD/captions/Field Notes codex/lineage/
+  minigames, procedural WebAudio. Labs at `/lab/{world,people,sim,ui,play}`. Deploys through Drydock to
+  https://ochre.dested.com on push to main (the workspace Dockerfile works).
+- **Starter base kept:** SSR + hydration, better-auth, tRPC, Prisma 7 + migrations, logging, /healthz, e2e harness,
+  optional mobile/desktop surfaces (not used by OCHRE).
+- **Not built:** voiceover (no ElevenLabs key), new concept art (OpenAI credit exhausted), mobile, a real-GPU perf pass,
+  accounts and cloud saves (saves are local), Steam packaging.
+- **Unverified:** feel with a real mouse, audio by ear, fps on a real GPU.
+- **Next:** `plans/2026-10-17-needs-sal.md` (decisions, checks, known issues).
