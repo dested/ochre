@@ -75,6 +75,18 @@ export type HudState = {
   aiming: boolean
 }
 
+/** the objective's target projected by the play session (~15 Hz); ui draws a mark on it, or an edge arrow when off screen */
+export type ObjectiveMark = {
+  /** css pixels; clamped to the screen edge when off screen */
+  x: number
+  y: number
+  onScreen: boolean
+  /** radians in screen space toward the target (0 = up), for the edge arrow */
+  angle: number
+  /** metres from the player */
+  distance: number
+}
+
 export type ChoiceState = {
   id: string
   prompt: string
@@ -121,6 +133,8 @@ export type BridgeState = {
   /** captions currently on screen, oldest first (the session expires them) */
   captions: Caption[]
   objective: Objective | null
+  /** null when the objective has no target, the target is within 6 m, or during held/cinematic beats */
+  objectiveMark: ObjectiveMark | null
   prompt: PromptState | null
   toasts: Toast[]
   nameTags: NameTag[]
@@ -183,6 +197,7 @@ export const INITIAL_BRIDGE_STATE: BridgeState = {
   },
   captions: [],
   objective: null,
+  objectiveMark: null,
   prompt: null,
   toasts: [],
   nameTags: [],

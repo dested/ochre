@@ -500,7 +500,17 @@ export type Caption = {
   seconds: number
 }
 
-export type Objective = { id: string; text: string; done: number | null; total: number | null }
+/** where an objective points: a person (tracked as they move) or a fixed spot; play projects it, ui draws the mark */
+export type ObjectiveTarget = { kind: 'person'; id: string } | { kind: 'point'; at: Vec2 }
+
+export type Objective = {
+  id: string
+  text: string
+  done: number | null
+  total: number | null
+  /** the sim sets it when the objective has a place to go (follow Ama, back to the sand, the next person to tell) */
+  target?: ObjectiveTarget | null
+}
 
 export type Choice = {
   id: string
