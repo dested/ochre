@@ -86,6 +86,8 @@ export function createController(world: WorldData, solids: Obstacles | null = nu
   let zoom = 1
   let swayT = 0
   let seat = 0
+  /** how far the camera rides up over a rock or bush, eased */
+  let lift = 0
   const camTarget = { x: 0, y: 0, z: 0 }
   let snapCamera = true
   let lastSea = -Infinity
@@ -278,6 +280,10 @@ export function createController(world: WorldData, solids: Obstacles | null = nu
       let cy = py + sp * camDist
       // never under the ground, and never under the sea's surface (waves ride ~0.4 m above sea level)
       cy = Math.max(cy, world.heightAt(cx, cz) + 0.3, lastSea + 0.45)
+      // ride over the rocks and bushes under the camera (eased, so a bush's edge doesn't pop)
+      const over = solids ? Math.max(0, solids.floorAt(cx, cz) - cy) : 0
+      lift = over > lift ? over : lift + (over - lift) * Math.min(1, dt * 3)
+      cy += lift
       if (inCave) cy = Math.min(cy, ground + 3.2)
 
       swayT += dt
