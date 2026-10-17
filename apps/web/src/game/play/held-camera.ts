@@ -8,11 +8,16 @@ import type { CarrySlot } from '../contracts'
 import type { ControlSettings } from './controller'
 
 const CONE = (70 * Math.PI) / 180
+/** seconds of a resting mouse before an offered thing draws the gaze, and how fast it does */
+const ATTRACT_IDLE = 0.8
+const ATTRACT_RATE = 1.2
 
 export type HeldCamera = {
   /** relative to the carrier's heading */
   yaw: number
   pitch: number
+  /** something offered to the infant: once the mouse rests, the gaze drifts toward it */
+  attract: Vector3 | null
   reset(): void
   update(
     dt: number,
@@ -33,12 +38,14 @@ export function createHeldCamera(): HeldCamera {
   let smoothHeading = 0
   let first = true
   let lastSlot: CarrySlot | null = null
+  let idle = 0
   const eyeSmooth = new Vector3()
   const look = new Vector3()
 
   const cam: HeldCamera = {
     yaw: 0,
     pitch: 0.08,
+    attract: null,
     reset() {
       lastSlot = null
       first = true
@@ -60,6 +67,22 @@ export function createHeldCamera(): HeldCamera {
           cam.pitch = MathUtils.clamp(-Math.atan2(dy, Math.hypot(dx, dz)), -0.9, 1.0)
         }
         lastSlot = slot
+      }
+      if (input.mouse.dx !== 0 || input.mouse.dy !== 0) idle = 0
+      else idle += dt
+      if (cam.attract && idle > ATTRACT_IDLE) {
+        const dx = cam.attract.x - eye.x
+        const dz = cam.attract.z - eye.z
+        let ty = Math.atan2(dx, dz) - facing
+        ty = MathUtils.clamp(Math.atan2(Math.sin(ty), Math.cos(ty)), -CONE, CONE)
+        const tp = MathUtils.clamp(
+          -Math.atan2(cam.attract.y - eye.y, Math.hypot(dx, dz)),
+          -0.9,
+          1.0
+        )
+        const step = Math.min(1, dt * ATTRACT_RATE)
+        cam.yaw += (ty - cam.yaw) * step
+        cam.pitch += (tp - cam.pitch) * step
       }
       const k = 0.0019 * settings.sensitivity
       cam.yaw = MathUtils.clamp(cam.yaw - input.mouse.dx * k, -CONE, CONE)

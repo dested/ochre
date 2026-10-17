@@ -359,10 +359,16 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     // reach: LMB while looking roughly at what she offers
     const list = sim.interactionsNear(player.position, INTERACT_RADIUS)
     const reach = list.find((i) => i.verb === 'reach' && i.enabled)
+    held.attract = reach
+      ? reachAt.set(
+          reach.position.x,
+          world.heightAt(reach.position.x, reach.position.z) + 0.8,
+          reach.position.z
+        )
+      : null
     if (reach) {
-      const y = world.heightAt(reach.position.x, reach.position.z) + 0.8
-      tmp2.set(reach.position.x, y, reach.position.z).sub(camera.position)
-      const looking = fwd.angleTo(tmp2) < 0.45
+      tmp2.copy(reachAt).sub(camera.position)
+      const looking = fwd.angleTo(tmp2) < 0.5
       setPrompt({
         label: looking ? 'Reach' : 'Look at what she offers',
         key: 'LMB',
@@ -457,6 +463,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     return false
   }
   const hiddenFor = new Map<string, number>()
+  const reachAt = new Vector3()
   const selfHead = new Vector3()
   const litFires: Vec2[] = []
   let lastTagsAt = 0
