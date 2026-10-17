@@ -193,6 +193,30 @@ natural adult proportions and hides.
    test (`/lab/people?crowd=25` walking in circles) to prove the budget. Ready with shots.
 3. `P3`: the animals with their anims; `/lab/people?animals=1` lineup and a herd of 12 eland walking/grazing/running.
    Ready with shots.
+4. `P1b` (02:20, **outranks P3; do it before any more P3 work**). Commit your P3 progress first only if your paths
+   typecheck. Reference: `apps/web/public/art/concept/people-lineup.png`; current state:
+   `/w/junk/sim-80k/people/p1-ama-closeup.png`. The held chapter opens on Ama's face at 25–30 cm; it is the first
+   thing a player sees, so the face carries the game.
+   - **Nose:** one broad nose. The bridge rises softly from between the eyes, wide alar wings blend into the cheeks,
+     nostrils are dark shading underneath, and the tip is soft. No separate balls. Adult projection 2–2.5 cm.
+   - **Jaw and chin:** a wider, rounded jaw with the angle under the ear and a soft round chin, not a shield taper.
+     Jaw width about 80% of cheekbone width for women; men broader. Tuk has a short dark beard, Oro a grey one.
+   - **Lips:** two full lips with a dark parting line, a cupid's bow on the upper and a fuller lower lip, in a darker
+     warm brown than the skin, corners tucked in.
+   - **Eyes and brow:** eyes sit in sockets under a soft brow ridge, with an upper-lid crease. Irises a little
+     smaller and less white showing. The catch-light is a small dot, not a disc.
+   - **Cheekbones:** high mass under the eyes; the cheeks round into the jaw.
+   - **Skin:** warm. Use wrap or red-shifted terminator lighting so the shadow side goes red-brown, not grey. Add a
+     faint sheen on forehead, nose and cheekbones, and red ochre stripes on adult faces, arms and shins as in the concept.
+   - **Hair:** the hairline follows the skull; locs and twists grow from the scalp, never a helmet edge.
+   - **Garments:** layered soft hides with ragged, irregular hems. A cape over one shoulder, a wrap skirt with a cord
+     belt and a small pouch. Mottled hide from cream to brown (vertex colour or texture), asymmetric. Nothing rigid.
+   - **Arms and hands:** shaped arms (deltoid, forearm taper), not tubes. Hands have at least a separate thumb and a
+     fingered mitt (four fingers at L0). Shell bracelets.
+   - **Carry:** the 02:10 cradle (Standing answers).
+   - **Budget:** 3 calls per person holds. L0 may grow to 80k tris; L1 and L2 stay as they are.
+   - Ready with shots: Ama at 30 cm front and 3/4 under the golden key, the lineup beside the concept, the cradle from
+     the side and from the child's eye, and one hand close-up.
 
 **Done when** (each item): your paths typecheck clean; shots taken and compared with the concept lineup; the
 crowd test holds 60 fps on `?stats=1`.
@@ -479,7 +503,7 @@ Board: down · Last pushed: f48612e (main, 02:05) · Gate: install 0, typecheck 
 | Agent | Model | Owns | Item now | Last sha / artifact | Status |
 | --- | --- | --- | --- | --- | --- |
 | world | opus-xhigh | world-gen, game/world, game/render | W2 (atmosphere, coast drama, shelf, cave rock first) | W1 82b261e passed 02:20 | working |
-| people | opus-xhigh | game/actors | P1 fix (resent 02:10; outranks P3) | c66a392 → fix sent 01:35 (budget 7 calls/97k tris per person, 40 cm face, garments, arms) | working |
+| people | opus-xhigh | game/actors | P1b (written into the brief 02:20; outranks P3; P3 WIP uncommitted) | c66a392 → fix sent 01:35 (budget 7 calls/97k tris per person, 40 cm face, garments, arms) | working |
 | sim | opus-high | sim | S5b (free waits per chapter, first steps in provider, honey payoff) | S5 209a09c passed (7 moments); S4 d0549fd passed; S2 071949a passed | working |
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | on call for PL3 findings | U6 ce615bc passed; U5, U3 passed | idle |
 | play | opus-high | game/play, game/audio, app/play.tsx | PL3 (director in; real world + people swapped) | PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
