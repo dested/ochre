@@ -2,6 +2,18 @@
 
 > Terse, newest-first log: what was asked → what was done. One entry per finished task.
 
+## 2026-10-17 — OCHRE overnight build (bosun, 5 agents)
+
+Ask: an 80,000-years-ago life sim, "live their lives… understand… look incredible", decided and demoed by morning.
+Done: OCHRE on the sal-starter fork. world-gen + painted-light render (world), procedural people and animals (people), sim +
+director with 29 beats over five life stages (sim), play session/controls/cameras/audio (play), UI/HUD/Field Notes/art
+(ui). Every push gated (install, typecheck, test, build, each on its own exit code) and deployed by Drydock to
+https://ochre.dested.com; code final at 1270b6b. people's last actors work (right whale, lying/squat garment drapes,
+sleep pose, eyes) is uncommitted in the tree: its commit was denied by the permission classifier (needs-sal Check 4).
+NOT verified: feel with a real mouse, audio by ear, fps on a real GPU.
+Touched: apps/web/src/{game,sim,world-gen,core,ui,content,app}, apps/web/public/art, plans/, cliffnotes.md, decisions.md,
+ui.md, verify.md
+
 ## 2026-10-07 — desktop surface (Electron) for sal-git
 
 Ask: Phase 0 of sal-git's plan (G:/code/sal-git/plans/2026-10-07-sal-git.md): an optional, thin Electron surface so sal-git can be a `--desktop-only` fork.
