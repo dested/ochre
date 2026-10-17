@@ -614,6 +614,8 @@ controller, cameras and verbs that make each stage of life feel different; and t
   on-screen mark falls inside it, move the mark to just above the box's top edge.
   (8) When a fade reaches full black, drop the captions on screen (lines said during or after the black stay). The
   story caption ("You tell them how the moon pulls...") still shows when elder.walk fades in (ui's recheck).
+  (9, QA only) In `session.ts` qaSkipBeat, after completeBeat: `bridge.set({ minigame: null, choice: null })`. An
+  open engraving minigame otherwise stays modal and stops the sim stepping (sim traced it, S6 item 5).
   **sim:** the whale was still at night in ui's run at 478ad65 (`06-whale-a.png`). Check daylight holds on every path
   into provider.whale (normal flow, the Chapters menu, the QA jump).
 
