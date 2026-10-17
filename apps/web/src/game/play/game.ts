@@ -145,6 +145,8 @@ const TAG_ABOVE = 0.15
 const REACH_CONE = 0.35
 /** an interaction this close to the objective's point is the beat's work, metres */
 const GOAL_NEAR = 6
+/** the objective's person is offered from this far (the sim's own interact reach), metres */
+const GOAL_REACH = 4
 const DARK_RANGE = 10
 /** the objective mark hides inside this distance, metres */
 const MARK_NEAR = 6
@@ -631,14 +633,19 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   const updateInteract = (dt: number, player: SimPerson) => {
     const list = sim.interactionsNear(player.position, INTERACT_RADIUS)
     // the beat wins: its own verb (dir:*), its objective's person, the work at its objective's place.
-    // Talking to whoever walks beside you comes after work; Eat only when hungry or nothing else works
-    const target = sim.state.chapter.objective?.target
+    // While an objective stands, Eat and Give food come last and nobody else's chatter is offered in place of
+    // its person; without one, Eat only when hungry, and talking comes after work
+    const objective = sim.state.chapter.objective
+    const target = objective?.target
     const goal = target?.kind === 'person' ? target.id : null
     const place = target?.kind === 'point' ? target.at : null
     const atPlace = (i: Interaction) =>
       place !== null &&
       i.verb !== 'talk' &&
       Math.hypot(i.position.x - place.x, i.position.z - place.z) < GOAL_NEAR
+    const serves = (i: Interaction) =>
+      i.id.startsWith('dir:') || (i.targetKind === 'person' && i.targetId === goal) || atPlace(i)
+    const food = (i: Interaction) => i.verb === 'eat' || i.verb === 'give'
     const hungry = player.needs.fed < 0.5
     // someone already talked to this beat steps back, so the prompt moves on to the next person (or the work)
     const beatNow = sim.state.chapter.beatId
@@ -647,17 +654,30 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       talked.clear()
     }
     const fresh = (i: Interaction) => i.verb !== 'talk' || !talked.has(i.targetId)
-    const it =
-      list.find((i) => i.enabled && i.id.startsWith('dir:')) ??
-      list.find((i) => i.enabled && i.targetKind === 'person' && i.targetId === goal) ??
-      list.find((i) => i.enabled && atPlace(i)) ??
-      (hungry ? list.find((i) => i.enabled && i.verb === 'eat') : undefined) ??
-      list.find((i) => i.enabled && i.verb !== 'eat' && i.verb !== 'talk') ??
-      list.find((i) => i.enabled && i.verb !== 'eat' && fresh(i)) ??
-      list.find((i) => i.enabled && i.verb !== 'eat') ??
-      list.find((i) => i.enabled) ??
-      list[0] ??
-      null
+    const toGoal = goal
+      ? sim
+          .interactionsNear(player.position, GOAL_REACH)
+          .find((i) => i.enabled && i.targetKind === 'person' && i.targetId === goal)
+      : undefined
+    const others = (i: Interaction) => !food(i) && !(goal !== null && i.verb === 'talk')
+    const it = objective
+      ? (list.find((i) => i.enabled && i.id.startsWith('dir:')) ??
+        toGoal ??
+        list.find((i) => i.enabled && atPlace(i)) ??
+        list.find((i) => serves(i)) ??
+        list.find((i) => i.enabled && others(i) && i.verb !== 'talk') ??
+        list.find((i) => i.enabled && others(i) && fresh(i)) ??
+        list.find((i) => i.enabled && others(i)) ??
+        list.find((i) => i.enabled && food(i)) ??
+        null)
+      : (list.find((i) => i.enabled && i.id.startsWith('dir:')) ??
+        (hungry ? list.find((i) => i.enabled && i.verb === 'eat') : undefined) ??
+        list.find((i) => i.enabled && i.verb !== 'eat' && i.verb !== 'talk') ??
+        list.find((i) => i.enabled && i.verb !== 'eat' && fresh(i)) ??
+        list.find((i) => i.enabled && i.verb !== 'eat') ??
+        list.find((i) => i.enabled) ??
+        list[0] ??
+        null)
     if (!it) {
       currentInteraction = null
       holdT = 0
