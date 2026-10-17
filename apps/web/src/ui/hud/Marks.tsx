@@ -127,8 +127,8 @@ export function NameTags({ tags }: { tags: readonly NameTag[] }) {
             key={t.id}
             className="ui-wash ui-wash-tight absolute left-0 top-0 flex flex-col items-center"
             style={{
-              // positions arrive at ~15 Hz: glide between them so tags don't step
-              transform: `translate(${t.x}px, ${t.y}px) translate(-50%, -100%)`,
+              // positions arrive at ~15 Hz: glide between them so tags don't step; keep them clear of the screen edge
+              transform: `translate(clamp(80px, ${t.x}px, calc(100vw - 80px)), clamp(64px, ${t.y}px, 100vh)) translate(-50%, -100%)`,
               opacity: Math.min(1, Math.max(0, t.opacity)),
               transition: 'opacity 300ms ease, transform 70ms linear',
             }}>

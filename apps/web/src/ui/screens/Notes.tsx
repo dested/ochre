@@ -32,6 +32,8 @@ export function NotesScreen() {
     if (fresh.includes(id)) bridge.actions.markNoteRead(id)
   }
 
+  // found notes first, in the codex's order, then the blanks still to find
+  const order = [...FIELD_NOTE_IDS.filter((id) => unlocked.includes(id)), ...FIELD_NOTE_IDS.filter((id) => !unlocked.includes(id))]
   const found = FIELD_NOTE_IDS.filter((id) => unlocked.includes(id)).length
   const note = open ? FIELD_NOTES[open] : null
 
@@ -60,7 +62,7 @@ export function NotesScreen() {
             <MenuButton onClick={() => bridge.actions.closeOverlay()}>Back</MenuButton>
           </div>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(176px,1fr))] gap-[clamp(10px,1.2vw,18px)]">
-            {FIELD_NOTE_IDS.map((id, i) =>
+            {order.map((id, i) =>
               unlocked.includes(id) ? (
                 <FoundCard key={id} note={FIELD_NOTES[id]} isNew={fresh.includes(id)} index={i} onOpen={() => show(id)} />
               ) : (

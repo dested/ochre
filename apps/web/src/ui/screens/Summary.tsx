@@ -4,7 +4,7 @@
  */
 import { useEffect, useState, type ReactNode } from 'react'
 import { bridge, useBridge } from '~/game/bridge'
-import { FIELD_NOTE_IDS } from '~/game/contracts'
+import { FIELD_NOTE_IDS, type LifeSummary, type SkillId } from '~/game/contracts'
 import { SKILL_LABELS } from '~/content/skills'
 import { CrossHatch, HatchRule } from '../motifs'
 import { ENGRAVING_KEY, type SavedEngraving } from '../minigames/Engraving'
@@ -105,9 +105,9 @@ export function SummaryScreen() {
           <Section title="What you taught" delay={750}>
             {s.taught.length > 0 ? (
               <ul>
-                {s.taught.map((t, i) => (
-                  <li key={`${t.name}-${t.skill}-${i}`}>
-                    {SKILL_LABELS[t.skill]} to {t.name}
+                {taughtBySkill(s.taught).map(([skill, names]) => (
+                  <li key={skill}>
+                    {SKILL_LABELS[skill]} to {nameList(names)}
                   </li>
                 ))}
               </ul>
@@ -149,4 +149,22 @@ export function SummaryScreen() {
       <style>{`@keyframes ui-sum-push{from{transform:scale(1.04)}to{transform:scale(1.14) translate(1%,0)}}`}</style>
     </div>
   )
+}
+
+/** one line per skill, in the order first taught: "Tides to Totil, Rebal and Wume" */
+function taughtBySkill(taught: LifeSummary['taught']): [SkillId, string[]][] {
+  const bySkill = new Map<SkillId, string[]>()
+  for (const t of taught) {
+    const names = bySkill.get(t.skill) ?? []
+    if (!names.includes(t.name)) names.push(t.name)
+    bySkill.set(t.skill, names)
+  }
+  return [...bySkill]
+}
+
+/** "Ama", "Ama and Tuk", "Ama, Tuk and Oro", past four "Ama, Tuk, Oro and 3 others" */
+function nameList(names: readonly string[]): string {
+  if (names.length > 4) return `${names.slice(0, 3).join(', ')} and ${names.length - 3} others`
+  if (names.length < 2) return names.join('')
+  return `${names.slice(0, -1).join(', ')} and ${names.at(-1) ?? ''}`
 }

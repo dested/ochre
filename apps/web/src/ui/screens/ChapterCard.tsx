@@ -1,5 +1,8 @@
-/** A chapter card: the stage's painting with a slow push-in, its title and the age. Click, Enter or 7 s to go on. */
-import { useEffect } from 'react'
+/**
+ * A chapter card: the stage's painting with a slow push-in, its title and the age. Click, Enter or 7 s to go on; the
+ * card then fades into the world before the game takes over.
+ */
+import { useEffect, useRef, useState } from 'react'
 import { bridge, useBridge } from '~/game/bridge'
 import { STAGES } from '~/content/stages'
 import { isInfant } from '../format'
@@ -7,13 +10,25 @@ import { useAfter } from '../hooks'
 import { CrossHatch } from '../motifs'
 
 const AUTO_MS = 7000
+const LEAVE_MS = 700
 
 export function ChapterCardScreen() {
   const card = useBridge((s) => s.chapter)
   const hint = useAfter(2200)
+  const [leaving, setLeaving] = useState(false)
+  const leaveTimer = useRef<number | null>(null)
+  const leave = () => {
+    if (leaveTimer.current !== null) return
+    setLeaving(true)
+    leaveTimer.current = window.setTimeout(() => bridge.actions.chapterCardDone(), LEAVE_MS)
+  }
+  const leaveRef = useRef(leave)
+  leaveRef.current = leave
 
   useEffect(() => {
-    const done = () => bridge.actions.chapterCardDone()
+    setLeaving(false)
+    leaveTimer.current = null
+    const done = () => leaveRef.current()
     const t = setTimeout(done, AUTO_MS)
     const key = (e: KeyboardEvent) => {
       if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') done()
@@ -22,6 +37,7 @@ export function ChapterCardScreen() {
     return () => {
       clearTimeout(t)
       window.removeEventListener('keydown', key)
+      if (leaveTimer.current !== null) window.clearTimeout(leaveTimer.current)
     }
   }, [card])
 
@@ -31,8 +47,8 @@ export function ChapterCardScreen() {
   return (
     <div
       className="fixed inset-0 animate-ui-fade cursor-pointer overflow-hidden bg-soot ui-grain"
-      style={{ animationDuration: '1400ms' }}
-      onClick={() => bridge.actions.chapterCardDone()}>
+      style={{ animationDuration: '1400ms', opacity: leaving ? 0 : 1, transition: `opacity ${LEAVE_MS}ms ease` }}
+      onClick={leave}>
       <div
         key={card.stage}
         className="absolute inset-0 bg-cover bg-center"

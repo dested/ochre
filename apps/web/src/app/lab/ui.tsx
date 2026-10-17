@@ -209,6 +209,8 @@ function goScreen(screen: Screen) {
       taught: [
         { name: 'Sela', skill: 'corms' },
         { name: 'Ilo', skill: 'tides' },
+        { name: 'Nia', skill: 'tides' },
+        { name: 'Bo', skill: 'tides' },
       ],
       storyTold: 'The night the sea slept',
       beadsGivenTo: 'Hesa',
