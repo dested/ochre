@@ -382,9 +382,15 @@ const TERRAIN_ALBEDO = /* glsl */ `
 		vec3 vv = normalize( uCamPos - vOcWorld );
 		float grazing = pow( 1.0 - clamp( vv.y, 0.0, 1.0 ), 4.0 );
 		totalEmissiveRadiance += uSkyAmb * grazing * wet * 0.35;
+		// rain: puddles in the flat, trodden places, holding the sky
+		if ( uWeather.y > 0.01 ) {
+			float flatK = smoothstep( 0.94, 0.99, nW.y ) * ( wb.w + wa.x * 0.4 + wa.w * 0.3 ) * smoothstep( 0.6, 0.95, ocCaveSky( vOcWorld ) );
+			float pud = smoothstep( 0.6, 0.7, ocNoise( p * 0.28 ) * 0.75 + ocNoise( p * 1.3 ) * 0.25 ) * flatK * smoothstep( 0.15, 0.6, uWeather.y );
+			pool = max( pool, pud * 0.85 );
+		}
 		// the pools hold the sky
 		col = mix( col, ocLin( vec3( 0.08, 0.16, 0.18 ) ), pool );
-		totalEmissiveRadiance += ( uSkyAmb * 0.9 + uKeyColor * 0.05 ) * pool * ( 0.25 + 0.75 * grazing );
+		totalEmissiveRadiance += ( uSkyAmb * 0.75 + uKeyColor * 0.05 ) * pool * ( 0.15 + 0.5 * grazing );
 		diffuseColor.rgb = col;
 	}
 `

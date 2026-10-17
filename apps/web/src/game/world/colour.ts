@@ -129,6 +129,25 @@ function mixed(): Mixed {
 
 export type KeyLight = { dir: Vector3; color: Color; intensity: number; isMoon: boolean }
 
+/** a storm's lightning: a strike every 7–18 s, a bright flash with a dimmer one on its heels (0..1) */
+export function lightningAt(t: number): number {
+  const period = 12.5
+  const slot = Math.floor(t / period)
+  const h = (n: number) => {
+    const x = Math.sin(n * 127.1 + 311.7) * 43758.5453
+    return x - Math.floor(x)
+  }
+  let f = 0
+  for (const sl of [slot - 1, slot]) {
+    const t0 = sl * period + h(sl) * 5.5
+    const dt = t - t0
+    if (dt < 0 || dt > 1.2) continue
+    const k = 0.55 + 0.45 * h(sl + 0.5)
+    f = Math.max(f, k * (Math.exp(-dt * 16) + (dt > 0.14 ? 0.7 * Math.exp(-(dt - 0.14) * 11) : 0)))
+  }
+  return Math.min(1, f)
+}
+
 const M = mixed()
 const SUN = new Vector3()
 const MOON = new Vector3()
@@ -163,6 +182,11 @@ export function applyColourScript(clock: ClockState, weather: WeatherState): Key
   LIGHT.uWeather.value.set(cloud, weather.rain, weather.fog, storm)
   LIGHT.uCloudLit.value.copy(M.cloudLit).lerp(tmpA.setHex(0x8a909c), overcast * 0.5)
   LIGHT.uCloudShade.value.copy(M.cloudShade).lerp(tmpA.setHex(0x4a505c), overcast * 0.5)
+  // a storm's cloud base is heavy and dark
+  if (storm > 0) {
+    LIGHT.uCloudShade.value.lerp(tmpA.setHex(0x2c3038), 0.55)
+    LIGHT.uCloudLit.value.lerp(tmpA.setHex(0x6c7280), 0.45)
+  }
   if (moonSky > 0) LIGHT.uCloudLit.value.lerp(tmpA.setHex(0x8090b0), moonSky * 0.5)
   LIGHT.uWind.value.set(Math.sin(weather.windDir), weather.wind, Math.cos(weather.windDir))
   LIGHT.uStarSpin.value = (clock.hour / 24 + clock.dayOfYear / 365.25) * Math.PI * 2
@@ -197,9 +221,21 @@ export function applyColourScript(clock: ClockState, weather: WeatherState): Key
   LIGHT.uSkyAmb.value.copy(M.sky).multiplyScalar(M.skyI * ambBoost * moonAmb)
   LIGHT.uGroundAmb.value.copy(M.ground).multiplyScalar(M.groundI)
   LIGHT.uRimColor.value.copy(M.rim).multiplyScalar(M.rimI * shade)
+  // lightning lights the whole sky from inside the cloud, and the land with it
+  if (storm > 0) {
+    const fl = lightningAt(LIGHT.uTime.value)
+    if (fl > 0.001) {
+      tmpA.setRGB(0.75, 0.8, 1.0)
+      LIGHT.uSkyAmb.value.lerp(tmpA, fl * 0.55)
+      LIGHT.uZenith.value.lerp(tmpA.setRGB(0.42, 0.45, 0.6), fl * 0.6)
+      LIGHT.uHorizon.value.lerp(tmpA.setRGB(0.55, 0.58, 0.7), fl * 0.6)
+      LIGHT.uCloudLit.value.lerp(tmpA.setRGB(1.1, 1.12, 1.25), fl * 0.8)
+      LIGHT.uCloudShade.value.lerp(tmpA.setRGB(0.5, 0.52, 0.62), fl * 0.7)
+    }
+  }
 
   // the grade
-  POST.exposure.value = M.exposure
+  POST.exposure.value = M.exposure * (1 - storm * 0.1)
   POST.saturation.value = M.sat * (1 - overcast * 0.2)
   const warm = Math.max(0, -M.split)
   const cool = Math.max(0, M.split)

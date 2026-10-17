@@ -16,6 +16,7 @@ import { createFiresView } from './fires'
 import { createFoliageView } from './foliage'
 import { createSeaView } from './sea'
 import { createSky } from './sky'
+import { createRainView } from './rain'
 import { createSprayView } from './spray'
 import { createTerrainView } from './terrain'
 
@@ -56,6 +57,8 @@ export const createWorldView: CreateWorldView = (data: WorldData, pipeline: Rend
   root.add(foliage.root)
   const spray = createSprayView(data, grid)
   root.add(spray.mesh)
+  const rain = createRainView()
+  root.add(rain.mesh)
 
   // the key light, its shadow following the focus
   const sun = new DirectionalLight(0xffffff, 1)
@@ -141,9 +144,10 @@ export const createWorldView: CreateWorldView = (data: WorldData, pipeline: Rend
 
       terrain.update(camera)
       foliage.update(frame.focus, camPos.x, camPos.z, q)
-      sea.update(camera, clock.seaLevel, LIGHT.uTime.value)
+      sea.update(camera, clock.seaLevel, weather)
       fires.update(frame.fires, frame.focus)
       spray.update(weather)
+      rain.update(weather)
       sunOnScreen(camera, LIGHT.uSunDir.value, POST.rays.value)
     },
     dispose() {
@@ -153,6 +157,7 @@ export const createWorldView: CreateWorldView = (data: WorldData, pipeline: Rend
       fires.dispose()
       foliage.dispose()
       spray.dispose()
+      rain.dispose()
       sun.shadow.map?.dispose()
       sun.dispose()
       hemi.dispose()

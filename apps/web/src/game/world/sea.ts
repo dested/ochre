@@ -21,7 +21,7 @@ import {
   Vector3,
   type Camera,
 } from 'three'
-import type { WorldData } from '../contracts'
+import type { WeatherState, WorldData } from '../contracts'
 import { NOISE_GLSL, SKY_GLSL, SKY_UNIFORMS_GLSL } from '../render/glsl'
 import { LIGHT } from '../render/uniforms'
 import { CELL, GRID_N, HALF, LAGOON, LAGOON_LEVEL } from '../../world-gen/layout'
@@ -151,7 +151,14 @@ void main() {
 	float rx = ocNoise( rp + vec2( e, 0.0 ) ) + 0.5 * ocNoise( rp2 + vec2( e, 0.0 ) );
 	float rz = ocNoise( rp + vec2( 0.0, e ) ) + 0.5 * ocNoise( rp2 + vec2( 0.0, e ) );
 	vec3 rip = vec3( r0 - rx, 0.0, r0 - rz ) / e;
-	N = normalize( N + rip * mix( 0.16, 0.05, far ) * ( uFresh > 0.5 ? 0.4 : 1.0 ) );
+	// rain roughens the surface into a dimpled grey
+	float rainK = uWeather.y;
+	if ( rainK > 0.01 ) {
+		vec2 dp = vWorld.xz * 3.1 + uTime * vec2( 0.7, - 1.9 );
+		float d0 = ocNoise( dp );
+		rip += vec3( d0 - ocNoise( dp + vec2( 0.08, 0.0 ) ), 0.0, d0 - ocNoise( dp + vec2( 0.0, 0.08 ) ) ) / 0.08 * 0.35 * rainK * ( 1.0 - far );
+	}
+	N = normalize( N + rip * mix( 0.16, 0.05, far ) * ( uFresh > 0.5 ? 0.4 : 1.0 ) * ( 1.0 + rainK * 0.8 ) );
 	N = normalize( mix( N, vec3( 0.0, 1.0, 0.0 ), far * 0.6 ) );
 	float ndv = max( dot( N, V ), 0.0 );
 	float fres = 0.02 + 0.98 * pow( 1.0 - ndv, 5.0 );
@@ -173,6 +180,8 @@ void main() {
 	vec3 lightIn = uSkyAmb * 0.9 + uKeyColor * ( 0.25 + 0.35 * ndl );
 	lightIn = mix( vec3( dot( lightIn, vec3( 0.3, 0.55, 0.15 ) ) ), lightIn, 0.45 );
 	body *= lightIn;
+	// a storm sea goes slate
+	body = mix( body, vec3( dot( body, vec3( 0.3, 0.55, 0.15 ) ) ) * vec3( 0.86, 0.95, 1.0 ), uWeather.w * 0.55 + rainK * 0.2 );
 	// light through the crest of the swell
 	body += uShallow * uKeyColor * clamp( vWaveH * 1.4, 0.0, 1.0 ) * 0.12 * ( 1.0 - b2 );
 	vec3 col = mix( body, refl, fres );
@@ -202,6 +211,13 @@ void main() {
 		foam = max( foam, trail );
 		// foam round the rocks of the shelf
 		foam = max( foam, smoothstep( 0.6, 0.0, depth ) * smoothstep( 0.45, 0.7, lace ) * 0.8 );
+		// whitecaps on open water when it blows
+		float gale = clamp( ( uWind.y - 0.45 ) * 1.8 + uWeather.w * 0.75, 0.0, 1.0 );
+		if ( gale > 0.01 ) {
+			float wc = ocNoise( vWorld.xz * 0.07 + uTime * vec2( 0.015, - 0.04 ) ) * 0.55 + ocNoise( vWorld.xz * 0.45 - uTime * vec2( 0.05, 0.12 ) ) * 0.45;
+			float cap = smoothstep( 0.66, 0.8, wc + vWaveH * 0.35 ) * gale * smoothstep( 3.0, 9.0, depth );
+			foam = max( foam, cap * 0.8 );
+		}
 		foam *= uFoamK * ( 1.0 - far * 0.7 );
 	}
 	vec3 foamCol = vec3( 0.93, 0.89, 0.8 ) * ( uSkyAmb * 0.9 + uKeyColor * ( 0.35 + 0.5 * ndl ) );
@@ -220,7 +236,7 @@ export type SeaView = {
   sea: Mesh
   lagoon: Mesh
   river: Mesh | null
-  update(camera: Camera, seaLevel: number, time: number): void
+  update(camera: Camera, seaLevel: number, weather: WeatherState): void
   dispose(): void
 }
 
@@ -376,7 +392,10 @@ export function createSeaView(world: WorldData, grid: TerrainGrid | null): SeaVi
     sea,
     lagoon,
     river,
-    update(camera: Camera, seaLevel: number) {
+    update(camera: Camera, seaLevel: number, weather: WeatherState) {
+      // a gale heaps the swell up
+      const wk = seaMat.uniforms.uWaveK
+      if (wk) wk.value = 1 + Math.max(0, weather.wind - 0.3) * 0.7 + (weather.storm ? 0.8 : 0)
       cam.setFromMatrixPosition(camera.matrixWorld)
       center.set(Math.round(cam.x / 4) * 4, Math.round(cam.z / 4) * 4)
       const c = seaMat.uniforms.uCenter?.value

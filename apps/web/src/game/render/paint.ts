@@ -77,6 +77,12 @@ vec3 ocBrush( vec3 c, vec3 wp, float k ) {
 }
 `
 
+/** rain darkens whatever the sky reaches (the sheen is added with the rim) */
+const WET = /* glsl */ `
+	float ocWet = uWeather.y * smoothstep( 0.6, 0.95, ocCaveSky( vOcWorld ) );
+	diffuseColor.rgb *= 1.0 - 0.38 * ocWet;
+`
+
 const DIRECT = /* glsl */ `
 void RE_Direct_Painted( const in IncidentLight directLight, const in vec3 geometryPosition, const in vec3 geometryNormal, const in vec3 geometryViewDir, const in vec3 geometryClearcoatNormal, const in PhysicalMaterial material, inout ReflectedLight reflectedLight ) {
 	float ndl = dot( geometryNormal, directLight.direction );
@@ -117,6 +123,8 @@ const RIM = /* glsl */ `
 		float facing = clamp( dot( ocN, uKeyDir ) * 0.6 + 0.5, 0.0, 1.0 );
 		float behind = clamp( - dot( ocV, uKeyDir ) * 0.5 + 0.5, 0.0, 1.0 );
 		reflectedLight.directDiffuse += uRimColor * fr * facing * ( 0.4 + 0.6 * behind ) * uPaint.y * diffuseColor.rgb * ocCaveSky( vOcWorld );
+		// wet things shine with the sky at a grazing look
+		reflectedLight.directSpecular += uSkyAmb * fr * fr * ocWet * 0.3;
 	}
 `
 
@@ -145,6 +153,7 @@ export function patchPaint(material: MeshStandardMaterial, opts: PaintOptions = 
     u.uSeaLevel = LIGHT.uSeaLevel
     u.uFireGlow = LIGHT.uFireGlow
     u.uFireGlow2 = LIGHT.uFireGlow2
+    u.uWeather = LIGHT.uWeather
     u.uTime = LIGHT.uTime
     u.uWind = LIGHT.uWind
     if (extra?.uniforms) for (const [k, v] of Object.entries(extra.uniforms)) u[k] = v
@@ -154,7 +163,7 @@ export function patchPaint(material: MeshStandardMaterial, opts: PaintOptions = 
       .replace('#include <project_vertex>', `#include <project_vertex>\n${VERT_MAIN}\n${extra?.vertexMain ?? ''}`)
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${FRAG_HEAD}\nuniform float uTime;\nuniform vec3 uWind;\n${extra?.fragmentHead ?? ''}`)
-      .replace('#include <color_fragment>', `#include <color_fragment>\n\tdiffuseColor.rgb = ocBrush( diffuseColor.rgb, vOcWorld, uPaint.x );\n${extra?.albedo ?? ''}`)
+      .replace('#include <color_fragment>', `#include <color_fragment>\n\tdiffuseColor.rgb = ocBrush( diffuseColor.rgb, vOcWorld, uPaint.x );\n${extra?.albedo ?? ''}\n${WET}`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${extra?.normal ?? ''}`)
       .replace('#include <lights_physical_pars_fragment>', `#include <lights_physical_pars_fragment>\n${DIRECT}`)
       .replace('#include <lights_fragment_begin>', `#include <lights_fragment_begin>\n${AMBIENT}`)

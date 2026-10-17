@@ -32,6 +32,27 @@ varying vec2 vUv;
 ${SKY_UNIFORMS_GLSL}
 ${NOISE_GLSL}
 ${SKY_GLSL}
+// rain beyond the streaks drawn in the world: fine slanted strokes falling down the screen, over the far land and
+// the sky only (k), a little lighter than what they cross, like a painter's dry-brushed veil
+vec3 ocRainVeil( vec3 c, float k ) {
+	float rain = uWeather.y;
+	if ( rain < 0.01 || k < 0.01 ) return c;
+	vec3 right = vec3( uCamWorld[ 0 ][ 0 ], uCamWorld[ 0 ][ 1 ], uCamWorld[ 0 ][ 2 ] );
+	float slant = dot( right.xz, uWind.xz ) * ( 0.08 + uWind.y * 0.35 );
+	vec2 q = vUv;
+	q.x += q.y * slant;
+	float lanes = 260.0;
+	float col = floor( q.x * lanes );
+	float h = fract( sin( col * 91.17 ) * 43758.5453 );
+	float h2 = fract( sin( col * 17.31 + 4.0 ) * 23421.631 );
+	float y = q.y * ( 2.6 + h2 * 1.6 ) + uTime * ( 1.7 + h * 0.8 ) + h * 13.0;
+	float seg = fract( y );
+	float streak = smoothstep( 0.0, 0.04, seg ) * ( 1.0 - smoothstep( 0.1, 0.22, seg ) );
+	float across = 1.0 - abs( fract( q.x * lanes ) - 0.5 ) * 2.0;
+	streak *= smoothstep( 0.3, 0.9, across ) * step( 1.0 - rain * 0.7, h2 );
+	vec3 veil = mix( c, vec3( dot( c, vec3( 0.3, 0.55, 0.15 ) ) ) * 1.25 + 0.03, 0.85 );
+	return mix( c, veil, streak * k * ( 0.45 + 0.35 * rain ) );
+}
 // optical depth through exponential height fog from the camera to a point
 float ocHeightFog( float dist, float yc, float yp, float b, float H ) {
 	float dy = yp - yc;
@@ -49,7 +70,7 @@ void main() {
 		bool sky = depth >= 1.0;
 	#endif
 	if ( sky ) {
-		gl_FragColor = sc;
+		gl_FragColor = vec4( ocRainVeil( sc.rgb, 1.0 ), 1.0 );
 		return;
 	}
 	float viewZ = perspectiveDepthToViewZ( depth, uNear, uFar );
@@ -77,7 +98,7 @@ void main() {
 	vec3 sdBlue = normalize( vec3( dir.x * 0.6, 0.62, dir.z * 0.6 ) );
 	vec3 sdLow = normalize( vec3( dir.x, max( dir.y, 0.0 ) * 0.6 + 0.06, dir.z ) );
 	vec3 inscatter = mix( ocSkyBase( sdBlue ) * 0.9, ocSkyBase( sdLow ), smoothstep( 0.3, 1.0, 1.0 - T ) );
-	gl_FragColor = vec4( sc.rgb * T + inscatter * ( 1.0 - T ), 1.0 );
+	gl_FragColor = vec4( ocRainVeil( sc.rgb * T + inscatter * ( 1.0 - T ), smoothstep( 12.0, 70.0, dist ) ), 1.0 );
 }
 `
 

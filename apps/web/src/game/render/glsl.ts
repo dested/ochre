@@ -111,6 +111,7 @@ vec3 ocSkyBase( vec3 d ) {
 	col += vec3( 0.32, 0.16, 0.2 ) * twi * anti * exp( - abs( y - 0.08 ) * 9.0 ) * 0.5;
 	// storms grey the sky
 	col = mix( col, vec3( dot( col, vec3( 0.3, 0.5, 0.2 ) ) ) * vec3( 0.85, 0.9, 1.0 ), uWeather.w * 0.6 + uWeather.y * 0.25 );
+	col *= 1.0 - uWeather.w * 0.3;
 	return col;
 }
 
@@ -240,6 +241,7 @@ uniform vec3 uCamPos;
 uniform float uSeaLevel;
 uniform vec4 uFireGlow;
 uniform vec4 uFireGlow2;
+uniform vec4 uWeather;
 `
 
 /** cave darkness and the painted ramp; needs PAINT_UNIFORMS_GLSL */
