@@ -253,6 +253,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   const relationCache = new Map<string, string | null>()
   const tmp = new Vector3()
   const tmp2 = new Vector3()
+  const tmp3 = new Vector3()
   const fwd = new Vector3()
 
   let relationsFor = ''
@@ -529,11 +530,15 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       if (!a) continue
       a.headPosition(tmp2)
       const d = tmp2.distanceTo(camera.position)
-      if (d > GAZE_RANGE || d < 0.05) continue
-      const angle = fwd.angleTo(tmp2.sub(camera.position))
-      if (angle < GAZE_CONE && (!best || angle < best.angle)) best = { id: q.id, angle }
+      if (d > GAZE_RANGE || d < 0.05 || !inFront(tmp2)) continue
+      const angle = fwd.angleTo(tmp3.copy(tmp2).sub(camera.position))
+      if (angle >= GAZE_CONE || (best && angle >= best.angle)) continue
+      if (occluded(camera.position, tmp2, null)) continue
+      best = { id: q.id, angle }
     }
-    sim.command({ type: 'gaze', personId: best?.id ?? null, dt })
+    // a face counts only while it can be seen: not in the black of a fade
+    const seeing = fadeValue <= FADE_HIDE && bridge.get().screen === 'playing'
+    sim.command({ type: 'gaze', personId: seeing ? (best?.id ?? null) : null, dt })
 
     // reach: what she offers is in her hand; the gaze drifts to it, and looking at it enables the reach (E or click)
     const list = sim.interactionsNear(player.position, INTERACT_RADIUS)
@@ -696,6 +701,10 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     return false
   }
   const hiddenFor = new Map<string, number>()
+  const camSpace = new Vector3()
+  /** in front of the camera (camera-space z < −0.1) */
+  const inFront = (p: Vector3): boolean =>
+    camSpace.copy(p).applyMatrix4(camera.matrixWorldInverse).z < -0.1
   const reachAt = new Vector3()
   const boxTop = new Vector3()
   const boxRight = new Vector3()
@@ -729,6 +738,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     const playerHead = self ? self.headPosition(selfHead) : null
     type Candidate = { tag: NameTag; d: number }
     const cands: Candidate[] = []
+    const shown = new Set(bridge.get().nameTags.map((t) => t.id))
     for (const q of sim.state.people) {
       if (q.isPlayer || q.carriedBy || !q.alive) continue
       if (heldStage && !q.known) continue
@@ -742,8 +752,13 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       head.y += 0.1
       // the tag's anchor sits TAG_ABOVE over the head top (about 0.1 m above the eyes)
       tmp.y += heldStage ? 0.22 : 0.1 + TAG_ABOVE
+      // behind the camera a head projects mirrored onto the screen (and reversed depth passes the z test): cull it
+      if (!inFront(head)) {
+        hiddenFor.delete(q.id)
+        continue
+      }
       tmp.project(camera)
-      if (tmp.z > 1 || tmp.z < -1 || Math.abs(tmp.x) > 1.1 || Math.abs(tmp.y) > 1.1) continue
+      if (Math.abs(tmp.x) > 1.1 || Math.abs(tmp.y) > 1.1) continue
       // a person out of sight loses their tag after OCC_HIDE (faded by the UI, then dropped)
       const hidden =
         occluded(camera.position, head, playerHead) || inTheDark(q.position, d)
@@ -751,6 +766,8 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
           : 0
       hiddenFor.set(q.id, hidden)
       if (hidden > OCC_HIDE + 0.6) continue
+      // someone out of sight who had no tag doesn't get one just to fade it
+      if (hidden > 0 && !shown.has(q.id)) continue
       const speaking = q.speech && q.speech.until > sim.state.clock.t ? q.speech.text : null
       const tag: NameTag = {
         id: q.id,
