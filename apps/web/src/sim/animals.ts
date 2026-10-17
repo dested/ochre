@@ -4,7 +4,7 @@
  * and tortoises in the fynbos. Wounded eland run, then fall.
  */
 import type { AnimalKind, SimAnimal, SimPerson, Vec2 } from '../game/contracts'
-import type { AnimalBrain, Herd, SimCtx } from './ctx'
+import { moveDt, type AnimalBrain, type Herd, type SimCtx } from './ctx'
 
 const ELAND_SPOOK_UPWIND = 40
 const ELAND_SPOOK_DOWNWIND = 15
@@ -216,7 +216,8 @@ export function removeAnimal(ctx: SimCtx, id: string): void {
   ctx.brains.delete(id)
 }
 
-export function updateAnimals(ctx: SimCtx, dt: number): void {
+/** dt: game seconds; realDt: real seconds (animals near the player move in real time) */
+export function updateAnimals(ctx: SimCtx, dt: number, realDt: number): void {
   const { state, rng } = ctx
   const t = state.clock.t
   const night = state.clock.daylight < 0.15
@@ -246,18 +247,19 @@ export function updateAnimals(ctx: SimCtx, dt: number): void {
   for (const a of state.animals) {
     const b = ctx.brains.get(a.id)
     if (!b) continue
+    const mdt = moveDt(ctx, a.position, dt, realDt)
     switch (a.kind) {
       case 'eland':
-        updateEland(ctx, a, b, dt, night)
+        updateEland(ctx, a, b, mdt, night)
         break
       case 'seal':
-        updateSeal(ctx, a, b, dt)
+        updateSeal(ctx, a, b, mdt)
         break
       case 'gull':
-        updateGull(ctx, a, b, dt, night)
+        updateGull(ctx, a, b, mdt, night)
         break
       case 'hyena':
-        updateHyena(ctx, a, b, dt, night)
+        updateHyena(ctx, a, b, mdt, night)
         break
       case 'tortoise':
         if (t > b.until || !b.target) {
@@ -271,7 +273,7 @@ export function updateAnimals(ctx: SimCtx, dt: number): void {
           }
           b.until = t + rng.range(600, 2400)
         }
-        if (b.target && moveToward(ctx, a, b, 0.05, dt, true)) {
+        if (b.target && moveToward(ctx, a, b, 0.05, mdt, true)) {
           a.anim = 'idle'
           b.target = null
         }

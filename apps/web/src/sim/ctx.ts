@@ -157,4 +157,21 @@ export type SimCtx = {
   nextAnimalId: number
   /** whole game hours since t = 0 at the last hourly tick */
   lastHour: number
+  /** someone is playing (a move or gaze command arrived): things near the player move in real time */
+  live: boolean
+}
+
+/**
+ * Seconds of movement for something at `pos` this substep. A day lasts 20 real minutes, but a walk must look
+ * like a walk: near the player things move in real time; past 120 m they move in game time so the band's day
+ * still fits. In the lab and headless (nobody playing) everything moves in game time.
+ */
+export function moveDt(ctx: SimCtx, pos: Vec2, gameDt: number, realDt: number): number {
+  if (!ctx.live) return gameDt
+  const player = ctx.state.people.find((p) => p.id === ctx.state.playerId)
+  if (!player) return gameDt
+  const d = Math.hypot(pos.x - player.position.x, pos.z - player.position.z)
+  const t = Math.min(1, Math.max(0, (d - 60) / 60))
+  const s = t * t * (3 - 2 * t)
+  return realDt + Math.max(0, gameDt - realDt) * s
 }

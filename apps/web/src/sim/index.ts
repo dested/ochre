@@ -8,7 +8,7 @@ import type { CreateSim, FireState, PlayerCommand, Sim, SimEvent, SimState } fro
 import { createAgent, syncCarried, updatePerson } from './ai'
 import { replenishHerds, spawnAnimals, startleHerd, updateAnimals, woundAnimal } from './animals'
 import { buildBand, PLAYER_ID } from './band'
-import { MAX_SUBSTEP, PATH_BUDGET, type Agent, type SimCtx } from './ctx'
+import { MAX_SUBSTEP, moveDt, PATH_BUDGET, type Agent, type SimCtx } from './ctx'
 import { interact, interactionsNear, playerOf, relationOf, updateSleepSkip } from './interact'
 import { gaze, spoil, updateAge, updateBonds, updateFires, updateLearning, updateNeeds } from './life'
 import { PathService } from './path'
@@ -69,6 +69,7 @@ export const createSim: CreateSim = (opts) => {
     sunCache: new Map(),
     nextAnimalId: 1,
     lastHour: 0,
+    live: false,
   }
 
   // families share a sleeping hollow; everyone has a seat at the hearth
@@ -108,14 +109,14 @@ export const createSim: CreateSim = (opts) => {
       if (p.carriedBy) continue
       if (p.isPlayer && (ctx.playerControlled || ctx.sleepSkip)) continue
       const ag = ctx.agents.get(p.id)
-      if (ag) updatePerson(ctx, p, ag, gameDt)
+      if (ag) updatePerson(ctx, p, ag, gameDt, moveDt(ctx, p.position, gameDt, realDt))
     }
     for (const p of state.people) {
       if (!p.alive) continue
       if (p.carriedBy) syncCarried(ctx, p)
       updateNeeds(ctx, p, gameDt)
     }
-    updateAnimals(ctx, gameDt)
+    updateAnimals(ctx, gameDt, realDt)
     updateLearning(ctx, realDt)
     updateBonds(ctx, gameDt)
     updateSleepSkip(ctx)
@@ -140,6 +141,7 @@ export const createSim: CreateSim = (opts) => {
     const player = playerOf(ctx)
     switch (cmd.type) {
       case 'move':
+        ctx.live = true
         if (player.carriedBy || ctx.sleepSkip) return
         ctx.playerControlled = true
         player.position = { x: cmd.position.x, z: cmd.position.z }
@@ -152,6 +154,7 @@ export const createSim: CreateSim = (opts) => {
         interact(ctx, cmd.interactionId)
         return
       case 'gaze':
+        ctx.live = true
         gaze(ctx, cmd.personId, cmd.dt)
         return
       case 'spear-hit':

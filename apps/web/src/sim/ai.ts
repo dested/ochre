@@ -914,7 +914,8 @@ function deposit(ctx: SimCtx, p: SimPerson, ag: Agent): void {
   ag.load = { shellfish: 0, corms: 0, meat: 0, firewood: 0, silcrete: ag.load.silcrete }
 }
 
-export function updatePerson(ctx: SimCtx, p: SimPerson, ag: Agent, dt: number): void {
+/** dt: game seconds (work, timers); mdt: seconds of movement (real time near the player, game time far away) */
+export function updatePerson(ctx: SimCtx, p: SimPerson, ag: Agent, dt: number, mdt: number): void {
   const t = ctx.state.clock.t
   if (p.speech && p.speech.until < t) p.speech = null
   if (!ag.plan || t >= ag.nextThink) think(ctx, p, ag)
@@ -936,7 +937,7 @@ export function updatePerson(ctx: SimCtx, p: SimPerson, ag: Agent, dt: number): 
       ag.pathReq = null
     }
     const near = dist(p.position, leader.position) < 3.5
-    if (!near && travel(ctx, p, ag, plan.dest, walkSpeed(p) * 1.15, dt) === 'failed') {
+    if (!near && travel(ctx, p, ag, plan.dest, walkSpeed(p) * 1.15, mdt) === 'failed') {
       abandon(ctx, p, ag)
       return
     }
@@ -960,7 +961,7 @@ export function updatePerson(ctx: SimCtx, p: SimPerson, ag: Agent, dt: number): 
 
   if (plan.phase === 'go') {
     const speed = plan.kind === 'hunt' && plan.hunt?.stage === 'chase' ? 2.6 : walkSpeed(p)
-    const went = travel(ctx, p, ag, plan.dest, speed, dt)
+    const went = travel(ctx, p, ag, plan.dest, speed, mdt)
     if (went === 'failed') {
       abandon(ctx, p, ag)
       return
@@ -973,7 +974,7 @@ export function updatePerson(ctx: SimCtx, p: SimPerson, ag: Agent, dt: number): 
       }
     }
   } else {
-    work(ctx, p, ag, plan, dt)
+    work(ctx, p, ag, plan, mdt)
   }
   const current = ag.plan
   if (current) setLook(ctx, p, ag, current)
