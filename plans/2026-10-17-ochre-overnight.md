@@ -527,6 +527,15 @@ controller, cameras and verbs that make each stage of life feel different; and t
   minute. The lead rebuilds it on request: send `rebuild qa` and say which commits you need in it. The dev server on
   :4080 stays for quick checks of your in-flight code. Applies to: play, ui, and anyone doing long QA runs.
 
+- (2026-10-17 03:10, lead) **ui item U7, "fresh eyes":** play :4090 as a first-time player who paid $14.99. No QA
+  handles except skipping any wait over 3 real minutes. Play Held and Small in full from "Begin a life", then 5
+  minutes each of Youth, Provider and Elder from the Chapters menu, then let an elder die and continue as the heir.
+  You're judging feel, not whether beats complete (play's PL3 covers that): Is it clear what to do? Is it readable?
+  Is anything ugly, empty, too dark or confusing, or does any moment land flat? Send the top 12 issues ranked by what a
+  player would notice first, one line each: owner (world/people/sim/play/ui), beat id, seen vs expected, and a
+  screenshot path under `/w/junk/sim-80k/ui/shots/u7/`. Fix your own ui issues as you go and mark them fixed.
+  Applies to: ui.
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: 927056d (main, 03:05) · Gate: install 0, typecheck 0, test 0 (52), build 0 at 927056d · Deploy: CI 39022048182 running (f48612e was live)
@@ -536,7 +545,7 @@ Board: down · Last pushed: 927056d (main, 03:05) · Gate: install 0, typecheck 
 | world | opus-xhigh | world-gen, game/world, game/render | W2 (atmosphere, coast drama, shelf, cave rock first; + night by the fire 02:55) | W2 WIP 2d3be72 (foliage, shelf under cave); W1 82b261e passed 02:20 | working |
 | people | opus-xhigh | game/actors | P1b (written into the brief 02:20; outranks P3; P3 WIP uncommitted) | c66a392 → fix sent 01:35 (budget 7 calls/97k tris per person, 40 cm face, garments, arms) | working |
 | sim | opus-high | sim | aside replaces the free-wait objective, then on call for PL3 | S5c 95e8327 passed (42 tests); S5b rest 69428c6 passed (41 tests; covers S5c 1–2); f683e42 superseded; S5b part 6aa3225 passed (held 18:20, follow walk); S5 209a09c passed (7 moments); S4 d0549fd passed; S2 071949a passed | working |
-| ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | on call for PL3 findings | U6 ce615bc passed; U5, U3 passed | idle |
+| ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | U7 fresh eyes on :4090 | chatter 830a7ab; U6 ce615bc passed; U5, U3 passed | working |
 | play | opus-high | game/play, game/audio, app/play.tsx | PL3 run 2 on QA 82c6af6 (run 1: held→summary, 20/26 beats self-completed, no errors) | 9a7684d passed (E verb, seated camera); PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
 
 Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); QA server :4090 (prod build of 82c6af6, task bngs4rahp, log /w/junk/sim-80k/qa-server.log); Drydock portal :4400 (Windows bun, log in
