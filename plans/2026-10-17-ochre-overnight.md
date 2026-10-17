@@ -597,6 +597,21 @@ controller, cameras and verbs that make each stage of life feel different; and t
   **ui:** draw `objectiveMark`. On screen it's a small ochre diamond over the target; off screen, an edge arrow at
   the clamped point with its angle. It fades in 4 s after the objective changes and hides when null.
 
+- (2026-10-17 04:50, lead) **Fix round F2, the held opening** (ui's recheck at 478ad65, shots in
+  `/w/junk/sim-80k/ui/shots/f1/`). The game opens here, so this outranks everything else of play's.
+  **play:** (1) held.faces: the camera rolls 45–90° and her hair crosses the lens; side drags barely move the view;
+  stuck at 2/4 (`sheet-02.png`, `sheet-02r.png`, `sheet-02v.png`). Keep the horizon within ±10° of level, keep the
+  carrier's hair out of the lens (hide strands within 0.25 m of the camera, or move the camera), restore the yaw
+  range, and prove the beat completes 4/4 by looking alone. (2) held.sea: looking down fills the frame with a dark blob
+  (`sheet-01.png`); clamp the pitch so the view never enters her body. (3) held.shell: "Look at what she offers" is
+  disabled with no reason and labelled Click, and the shell isn't visible (`sheet-01s.png`). The shell shows in her
+  hand inside the view, and the prompt enables when the gaze is on it. (4) Mouse look turns only a few degrees per
+  long drag (`05-facing2.png`). Make sure look uses raw `movementX/Y`, never scaled by dt or frame rate. (5) Name tags
+  float about 90 px above heads (`05-tide-a.png`): anchor them 0.15 m above the head top. (6) After telling, the prompt
+  still says "Talk to Bise"; it reverts to ordinary talk.
+  **sim:** the whale was still at night in ui's run at 478ad65 (`06-whale-a.png`). Check daylight holds on every path
+  into provider.whale (normal flow, the Chapters menu, the QA jump).
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: 272d4c7 (main, 04:22) · Gate: install 0, typecheck 0, test 0 (66), build 0 at 272d4c7 · Deploy: 272d4c7 live (CI 39027676825 green, /healthz ok)
@@ -609,7 +624,7 @@ Board: down · Last pushed: 272d4c7 (main, 04:22) · Gate: install 0, typecheck 
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | toast queue under cards, then on call | F1 mark 23acc39 passed; U7 passed (bdc3b86); chatter 830a7ab; U6 ce615bc passed; U5, U3 passed | working |
 | play | opus-high | game/play, game/audio, app/play.tsx | held.sea back carry faces forward; then on call | F1 play 7e42a4a passed (all 9; dd47469 summary hang fixed); PL3 runs 1–2 reached the summary, no errors; 8c75080 aim, 8f774e0 tags, 7a6f0e5 spoor passed; 9a7684d passed (E verb, seated camera); PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
 
-Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); QA server :4090 (prod build of dd47469, task ba99hpddq, log /w/junk/sim-80k/qa-server.log); Drydock portal :4400 (Windows bun, log in
+Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); QA server :4090 (prod build of 421b1a6, log /w/junk/sim-80k/qa-server.log); Drydock portal :4400 (Windows bun, log in
 scratchpad drydock-portal.log)
 Images used: 47 / 200 (lead 2, ui 45). OpenAI credit exhausted 01:05; generation stopped (needs-sal Check 2)
 Waiting on Sal: none (needs-sal file: plans/2026-10-17-needs-sal.md)
