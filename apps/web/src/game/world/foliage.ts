@@ -116,19 +116,19 @@ function lump(b: Builder, tris: Float32Array, c: V3, s: V3, seed: number, dome: 
 }
 
 /** a fynbos clump: a dome of small lumps (erica, a little wider than tall) */
-/** `far`: the same clump in four bigger lumps, for the outer ring */
+/** `far`: the same clump in two bigger lumps, for the outer ring (a few pixels across out there) */
 function fynbosGeo(seed: number, tall: boolean, far = false): BufferGeometry {
   const b = new Builder()
   const r = stream(seed)
   const h = tall ? 0.95 : 0.62
   const w = tall ? 0.5 : 0.62
   const dome: V3 = [0, -h * 0.25, 0]
-  const n = far ? 4 : tall ? 7 : 8
+  const n = far ? 2 : tall ? 7 : 8
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2 + r() * 0.6
     const rr = i === 0 ? 0 : w * (0.45 + 0.4 * r())
     const y = i === 0 ? h * 0.55 : h * (0.25 + 0.35 * r())
-    const sz = (i === 0 ? 0.42 : 0.3 + 0.14 * r()) * (tall ? 0.9 : 1) * (far ? 1.22 : 1)
+    const sz = (i === 0 ? 0.42 : 0.3 + 0.14 * r()) * (tall ? 0.9 : 1) * (far ? 1.5 : 1)
     lump(b, ICO0, [Math.cos(a) * rr, y, Math.sin(a) * rr], [sz * 1.1, sz * (tall ? 1.15 : 0.85), sz * 1.1], seed * 13 + i, dome, h, [1, 1, 1], 0.85 + 0.3 * r())
   }
   return b.geometry()
@@ -857,6 +857,18 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
   const tmpE = new Euler()
   const tmpS = new Vector3()
   const tmpP = new Vector3()
+  /** a scattered set in squares `cell` metres across, each its own draw with its own bounds, so what is out of view
+   * (or out of the shadow box) is skipped */
+  const chunked = (geo: BufferGeometry, mat: MeshStandardMaterial, list: Place[], name: string, shadow: boolean, tumble: boolean, cell: number) => {
+    const cells = new Map<string, Place[]>()
+    for (const p of list) {
+      const key = `${Math.floor(p.x / cell)},${Math.floor(p.z / cell)}`
+      const c = cells.get(key)
+      if (c) c.push(p)
+      else cells.set(key, [p])
+    }
+    for (const [key, c] of cells) staticMesh(geo, mat, c, `${name}-${key}`, shadow, tumble)
+  }
   const staticMesh = (geo: BufferGeometry, mat: MeshStandardMaterial, list: Place[], name: string, shadow: boolean, tumble: boolean) => {
     disposables.push(geo)
     const m = new InstancedMesh(geo, mat, Math.max(1, list.length))
@@ -913,7 +925,7 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
   }
   const treeMat = foliageMaterial('milkwood', 0.05, 0.6, 2.6)
   disposables.push(treeMat)
-  staticMesh(milkwoodGeo(41), treeMat, trees, 'milkwoods', true, false)
+  chunked(milkwoodGeo(41), treeMat, trees, 'milkwoods', true, false, 128)
 
   // the sea stacks: a few big blocks each, standing out of the surf (the heightfield's mound under them keeps the foam)
   const stacks: Place[] = []
@@ -993,7 +1005,7 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
     }
   }
   // small and many: the coarsest rock is plenty
-  staticMesh(rockGeo(9, 0), rockMat, edge, 'path-stones', false, true)
+  chunked(rockGeo(9, 0), rockMat, edge, 'path-stones', false, true, 256)
 
   // ─── refill ────────────────────────────────────────────────────────────────────────────────────────────────
   const out: Place = { x: 0, z: 0, y: 0, s: 1, yaw: 0, r: 1, g: 1, b: 1, tilt: 0 }

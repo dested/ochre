@@ -4,11 +4,13 @@
  * coast running on west into headlands, and the mountain ranges to the north).
  */
 import {
+  Box3,
   BufferAttribute,
   BufferGeometry,
   Group,
   Mesh,
   MeshStandardMaterial,
+  Sphere,
   Uint8BufferAttribute,
   Vector3,
   Vector4,
@@ -24,7 +26,7 @@ const DETAIL = { x0: -640, x1: 640, z0: -768, z1: 512 } as const
 const TILE = 256
 const LODS = [2, 4, 8] as const
 /** past the nearest edge of a tile: 2 m cells within the first distance, 4 m within the second, then 8 m */
-const LOD_DIST: Record<Quality, readonly [number, number]> = { high: [240, 640], medium: [180, 520], low: [120, 400] }
+const LOD_DIST: Record<Quality, readonly [number, number]> = { high: [120, 420], medium: [70, 300], low: [40, 220] }
 const SKIRT = 5
 
 /** per grid vertex: splat weights A = sand, dune, fynbos, grass; B = rock, cliff, shelf, earth */
@@ -594,7 +596,8 @@ export type TerrainView = {
   dispose(): void
 }
 
-type Tile = { lods: Mesh[]; cx: number; cz: number }
+/** a detail tile: per LOD its meshes (the finer levels in quarters, so the camera and the shadow box cull them) */
+type Tile = { lods: Mesh[][]; cx: number; cz: number; quads: { x: number; z: number }[] }
 
 /** the river valley carried on past the world's north edge (the far field has no stamps) */
 function farRiver(x: number, z: number, h: number): number {
@@ -654,46 +657,86 @@ export function createTerrainView(world: WorldData, grid: TerrainGrid | null): T
   const toIx = (x: number) => Math.round((x + HALF) / CELL)
   for (let z0 = DETAIL.z0; z0 < DETAIL.z1; z0 += TILE) {
     for (let x0 = DETAIL.x0; x0 < DETAIL.x1; x0 += TILE) {
-      const lods: Mesh[] = []
+      const lods: Mesh[][] = []
       for (const lod of LODS) {
         const step = lod / CELL
-        const geo = buildPatch(src, toIx(x0), toIx(z0), toIx(x0 + TILE), toIx(z0 + TILE), step, true)
-        const m = new Mesh(geo, material)
-        m.castShadow = lod === 2
-        m.receiveShadow = true
-        m.visible = false
-        m.name = `terrain-${x0}-${z0}-${lod}`
-        root.add(m)
-        lods.push(m)
+        const parts: Mesh[] = []
+        const n = lod === 8 ? 1 : 2
+        const sub = TILE / n
+        for (let j = 0; j < n; j++) {
+          for (let i = 0; i < n; i++) {
+            const sx = x0 + i * sub
+            const sz = z0 + j * sub
+            const geo = buildPatch(src, toIx(sx), toIx(sz), toIx(sx + sub), toIx(sz + sub), step, true)
+            const m = new Mesh(geo, material)
+            // the 8 m level is far enough out that its shadows fall outside the shadow box
+            m.castShadow = lod !== 8
+            m.receiveShadow = true
+            m.visible = false
+            m.name = `terrain-${sx}-${sz}-${lod}`
+            root.add(m)
+            parts.push(m)
+          }
+        }
+        lods.push(parts)
       }
-      tiles.push({ lods, cx: x0 + TILE / 2, cz: z0 + TILE / 2 })
+      const quads = [0, 1, 2, 3].map((i) => ({ x: x0 + ((i % 2) + 0.5) * (TILE / 2), z: z0 + (Math.floor(i / 2) + 0.5) * (TILE / 2) }))
+      tiles.push({ lods, cx: x0 + TILE / 2, cz: z0 + TILE / 2, quads })
     }
   }
 
-  // the rest of the world at 8 m, the detail region cut out
+  // the rest of the world at 8 m, the detail region cut out, in 512 m squares so the ones out of view are culled;
+  // the deep seabed far out under opaque water is left out
   {
     const step = 8 / CELL
-    const geo = buildPatch(src, 0, 0, N - 1, N - 1, step, true)
-    const index = geo.getIndex()
-    const pos = geo.getAttribute('position')
-    if (index) {
-      const keep: number[] = []
-      const arr = index.array
-      for (let t = 0; t < arr.length; t += 3) {
-        const a = arr[t] ?? 0
-        const b = arr[t + 1] ?? 0
-        const c = arr[t + 2] ?? 0
-        const cx = (pos.getX(a) + pos.getX(b) + pos.getX(c)) / 3
-        const cz = (pos.getZ(a) + pos.getZ(b) + pos.getZ(c)) / 3
-        if (cx > DETAIL.x0 && cx < DETAIL.x1 && cz > DETAIL.z0 && cz < DETAIL.z1) continue
-        keep.push(a, b, c)
+    const h = (N - 1) / 4
+    for (let qz = 0; qz < N - 1; qz += h) {
+      for (let qx = 0; qx < N - 1; qx += h) {
+        const geo = buildPatch(src, qx, qz, qx + h, qz + h, step, true)
+        const index = geo.getIndex()
+        const pos = geo.getAttribute('position')
+        if (!index) continue
+        const keep: number[] = []
+        const arr = index.array
+        for (let t = 0; t < arr.length; t += 3) {
+          const a = arr[t] ?? 0
+          const b = arr[t + 1] ?? 0
+          const c = arr[t + 2] ?? 0
+          const cx = (pos.getX(a) + pos.getX(b) + pos.getX(c)) / 3
+          const cz = (pos.getZ(a) + pos.getZ(b) + pos.getZ(c)) / 3
+          if (cx > DETAIL.x0 && cx < DETAIL.x1 && cz > DETAIL.z0 && cz < DETAIL.z1) continue
+          if (Math.max(pos.getY(a), pos.getY(b), pos.getY(c)) < -12) continue
+          keep.push(a, b, c)
+        }
+        if (keep.length === 0) {
+          geo.dispose()
+          continue
+        }
+        geo.setIndex(new BufferAttribute(new Uint32Array(keep), 1))
+        // bounds round what is kept, not the whole square
+        let x0 = Infinity
+        let y0 = Infinity
+        let z0 = Infinity
+        let x1 = -Infinity
+        let y1 = -Infinity
+        let z1 = -Infinity
+        for (const v of keep) {
+          x0 = Math.min(x0, pos.getX(v))
+          y0 = Math.min(y0, pos.getY(v))
+          z0 = Math.min(z0, pos.getZ(v))
+          x1 = Math.max(x1, pos.getX(v))
+          y1 = Math.max(y1, pos.getY(v))
+          z1 = Math.max(z1, pos.getZ(v))
+        }
+        const box = new Box3(new Vector3(x0, y0, z0), new Vector3(x1, y1, z1))
+        geo.boundingBox = box
+        geo.boundingSphere = box.getBoundingSphere(new Sphere())
+        const m = new Mesh(geo, material)
+        m.receiveShadow = true
+        m.name = `terrain-coarse-${qx}-${qz}`
+        root.add(m)
       }
-      geo.setIndex(new BufferAttribute(new Uint32Array(keep), 1))
     }
-    const m = new Mesh(geo, material)
-    m.receiveShadow = true
-    m.name = 'terrain-coarse'
-    root.add(m)
   }
 
   // the far field: a tensor grid growing outward, the world square cut out
@@ -785,12 +828,21 @@ export function createTerrainView(world: WorldData, grid: TerrainGrid | null): T
       camPos.setFromMatrixPosition(camera.matrixWorld)
       const camH = Math.max(0, camPos.y - world.heightAt(camPos.x, camPos.z))
       const bias = camH * 0.8
+      const near = (x: number, z: number, size: number) => Math.max(0, Math.hypot(camPos.x - x, camPos.z - z) - size * 0.6) + bias
       for (const t of tiles) {
-        const d = Math.max(0, Math.hypot(camPos.x - t.cx, camPos.z - t.cz) - TILE * 0.6) + bias
-        const lod = d < ld[0] ? 0 : d < ld[1] ? 1 : 2
+        const far = near(t.cx, t.cz, TILE) >= ld[1]
         for (let k = 0; k < t.lods.length; k++) {
-          const m = t.lods[k]
-          if (m) m.visible = k === lod
+          const parts = t.lods[k] ?? []
+          for (let i = 0; i < parts.length; i++) {
+            const m = parts[i]
+            if (!m) continue
+            // the 2 m and 4 m levels are picked per quarter, so only the quarters round the camera are fine
+            const q = t.quads[i]
+            const lod = far ? 2 : q && near(q.x, q.z, TILE / 2) < ld[0] ? 0 : 1
+            m.visible = k === lod
+            // the 4 m level casts only on high
+            m.castShadow = k === 0 || (k === 1 && quality === 'high')
+          }
         }
       }
     },
