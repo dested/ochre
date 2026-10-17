@@ -53,7 +53,8 @@ export function garmentPlan(ctx: BuildCtx): Plan {
   }
   if (adultF && plan.apron && !plan.wrap) plan.chestBand = true
   // layers: grown women add an overskirt round one hip and, without a back cape, a drape over the right shoulder
-  // (the wrap's strap is on the left); grown men trade the apron for a wrap skirt; every adult carries a pouch
+  // (over the wrap's strap, which is on the right too, so the left stays bare for the arms carry); grown men trade the
+  // apron for a wrap skirt; every adult carries a pouch
   if (d.age >= 14) {
     if (d.female && plan.wrap) {
       plan.skirt = 'side'
@@ -250,11 +251,12 @@ function buildWrap(ctx: BuildCtx, ts: TorsoShape): void {
   const off = 0.006 * (H / 1.6)
   const P = new Vector3()
   const hemY = (th: number): number => hemBase + diag * Math.sin(th - 0.6) - ragged(th / (Math.PI * 2), seed, 0.035 * H)
-  // the top edge runs on a diagonal: high under the strap on the left, low under the right arm
+  // the top edge runs on a diagonal: high under the strap on the right, low under the left arm (the child lies on that
+  // arm in the arms carry and looks up past this side of the chest)
   const span = d.shoulderY - d.chestY
   const lowK = d.female && d.age >= 10 ? 0.12 : 0.3
   const topY = (th: number): number => {
-    const s = Math.sin(th)
+    const s = -Math.sin(th)
     const diagK = s > 0 ? 0.28 * s : lowK * s
     return lerp(topFront, topBack, 0.5 - 0.5 * Math.cos(th)) + span * diagK + ragged(th / (Math.PI * 2) + 3.1, seed, 0.006 * H)
   }
@@ -292,8 +294,8 @@ function buildWrap(ctx: BuildCtx, ts: TorsoShape): void {
   )
   // the cord belt
   cordRing(ctx, ts, d.waistY + 0.004 * H, off * 2.2, rigid3(ts, d.waistY))
-  // the strap over the left shoulder
-  shoulderStrap(ctx, ts, topFront + span * 0.26, topBack + span * 0.26, base, seed, 1)
+  // the strap over the right shoulder
+  shoulderStrap(ctx, ts, topFront + span * 0.26, topBack + span * 0.26, base, seed, -1)
 }
 
 function buildChestBand(ctx: BuildCtx, ts: TorsoShape): void {
@@ -321,7 +323,7 @@ function buildChestBand(ctx: BuildCtx, ts: TorsoShape): void {
     },
     { wrapU: true },
   )
-  shoulderStrap(ctx, ts, top, top + (d.shoulderY - d.chestY) * 0.15, base, seed, 1)
+  shoulderStrap(ctx, ts, top, top + (d.shoulderY - d.chestY) * 0.15, base, seed, -1)
 }
 
 function buildApron(ctx: BuildCtx, ts: TorsoShape): void {
