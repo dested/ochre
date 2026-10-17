@@ -9,6 +9,7 @@ import {
   BufferGeometry,
   Group,
   Mesh,
+  MeshDepthMaterial,
   MeshStandardMaterial,
   Sphere,
   Uint8BufferAttribute,
@@ -662,6 +663,25 @@ export function createTerrainView(world: WorldData, grid: TerrainGrid | null): T
     },
   })
 
+  // the shadow pass folds each patch's skirt up into its rim (the skirt's vertices follow the grid's): the skirts
+  // fill LOD cracks on screen but never cast, or PCF reads a skirt's top edge as an occluder and draws a dark
+  // dotted line along every patch border
+  const skirtless = new Map<number, MeshDepthMaterial>()
+  const skirtlessDepth = (gridVerts: number): MeshDepthMaterial => {
+    const have = skirtless.get(gridVerts)
+    if (have) return have
+    const m = new MeshDepthMaterial()
+    m.defines = { OC_GRID_VERTS: gridVerts }
+    m.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>\n\tif ( gl_VertexID >= OC_GRID_VERTS ) transformed.y += ${SKIRT.toFixed(1)};`,
+      )
+    }
+    skirtless.set(gridVerts, m)
+    return m
+  }
+
   // detail tiles
   const tiles: Tile[] = []
   const toIx = (x: number) => Math.round((x + HALF) / CELL)
@@ -679,6 +699,8 @@ export function createTerrainView(world: WorldData, grid: TerrainGrid | null): T
             const sz = z0 + j * sub
             const geo = buildPatch(src, toIx(sx), toIx(sz), toIx(sx + sub), toIx(sz + sub), step, true)
             const m = new Mesh(geo, material)
+            const side = Math.floor((toIx(sx + sub) - toIx(sx)) / step) + 1
+            m.customDepthMaterial = skirtlessDepth(side * side)
             // the 8 m level is far enough out that its shadows fall outside the shadow box
             m.castShadow = lod !== 8
             m.receiveShadow = true
@@ -861,6 +883,7 @@ export function createTerrainView(world: WorldData, grid: TerrainGrid | null): T
         if (o instanceof Mesh) o.geometry.dispose()
       })
       material.dispose()
+      for (const m of skirtless.values()) m.dispose()
     },
   }
 }
