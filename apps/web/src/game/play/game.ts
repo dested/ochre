@@ -116,7 +116,7 @@ function describe(e: SimEvent): string {
 
 const INTERACT_RADIUS = 2.5
 const TAG_RANGE = 25
-const GAZE_CONE = (6 * Math.PI) / 180
+const GAZE_CONE = (9 * Math.PI) / 180
 /**
  * a chapter's opening (until the player moves, turns or this many seconds pass): its first objective with a
  * target turns the view to it, over AIM_SECONDS
@@ -570,7 +570,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
         camera.position.distanceTo(face) < HEAD_HIDE
     )
 
-    // gaze: the face nearest the screen centre within 6°
+    // gaze: the face nearest the screen centre within 9°
     camera.getWorldDirection(fwd)
     let best: { id: string; angle: number } | null = null
     for (const q of sim.state.people) {
