@@ -50,7 +50,8 @@ const SPEEDS = [0, 1, 10, 100, 600] as const
 type View = { cx: number; cz: number; scale: number }
 
 const VIEWS: Record<string, (w: WorldData) => { x: number; z: number; span: number }> = {
-  band: () => ({ x: 40, z: -190, span: 1100 }),
+  band: (w) => ({ x: (w.poi('hearth-main').x + w.poi('eland-plateau').x) / 2, z: (w.poi('hearth-main').z + w.poi('eland-plateau').z) / 2, span: 1100 }),
+  hearth: (w) => ({ x: w.poi('hearth-main').x, z: w.poi('hearth-main').z, span: 14 }),
   cave: (w) => ({ x: w.poi('hearth-main').x, z: w.poi('hearth-main').z + 10, span: 90 }),
   shore: (w) => ({ x: w.poi('shore-mussels').x - 40, z: w.poi('shore-mussels').z - 30, span: 260 }),
   plateau: (w) => ({ x: w.poi('eland-plateau').x, z: w.poi('eland-plateau').z, span: 500 }),

@@ -148,6 +148,8 @@ export type Agent = {
   order: Order | null
   /** a follower walking to catch up (starts past 4.5 m, stops inside 2.5 m, so it doesn't stutter at one edge) */
   catchingUp: boolean
+  /** a child with its carer: following or gathering beside them, and since when (held FOLLOW_HOLD seconds) */
+  followMode: { kind: 'follow' | 'gather'; since: number } | null
 }
 
 export type AnimalBrain = {

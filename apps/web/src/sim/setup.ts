@@ -18,13 +18,15 @@ export function placeBand(ctx: SimCtx): void {
   ctx.agents.clear()
   const familyOrder: string[] = []
   const bedsTaken = new Map<string, number>()
-  state.people.forEach((p, i) => {
-    if (!familyOrder.includes(p.familyId)) familyOrder.push(p.familyId)
+  for (const p of state.people) if (!familyOrder.includes(p.familyId)) familyOrder.push(p.familyId)
+  // hearth seats go round the ring family by family, so each family sits side by side
+  const seated = [...state.people].sort((a, b) => familyOrder.indexOf(a.familyId) - familyOrder.indexOf(b.familyId))
+  for (const p of state.people) {
     const fi = familyOrder.indexOf(p.familyId)
     const bed = bedsTaken.get(p.familyId) ?? 0
     bedsTaken.set(p.familyId, bed + 1)
-    ctx.agents.set(p.id, createAgent(p.id, SLEEP_SPOTS[fi % SLEEP_SPOTS.length] ?? 'sleep-1', i, bed))
-  })
+    ctx.agents.set(p.id, createAgent(p.id, SLEEP_SPOTS[fi % SLEEP_SPOTS.length] ?? 'sleep-1', seated.indexOf(p), bed))
+  }
   for (const p of state.people) {
     const ag = ctx.agents.get(p.id)
     if (!ag) continue

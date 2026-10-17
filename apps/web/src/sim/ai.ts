@@ -73,6 +73,7 @@ export function createAgent(id: string, sleepId: string, seat: number, bed: numb
     gaze: 0,
     order: null,
     catchingUp: false,
+    followMode: null,
   }
 }
 
@@ -86,16 +87,19 @@ function inCamp(ctx: SimCtx, p: SimPerson): boolean {
   return dist(p.position, hearth(ctx)) < CAMP_RADIUS || ctx.world.inCave(p.position.x, p.position.z)
 }
 
-const SEATS_PER_RING = 11
+const HEARTH_SEATS = 22
+/** game seconds a child keeps following or gathering before it switches */
+const FOLLOW_HOLD = 15 * 60
 
 /** a seat in the ring around the hearth */
 export function seatPos(ctx: SimCtx, ag: Agent, ring = 1): Vec2 {
   const h = hearth(ctx)
-  // two even rings of eleven, the outer one offset half a seat so nobody sits behind a head
-  const k = ag.seat % (SEATS_PER_RING * 2)
-  const outer = k >= SEATS_PER_RING
-  const ang = ((k % SEATS_PER_RING) + (outer ? 0.5 : 0)) * ((Math.PI * 2) / SEATS_PER_RING)
-  const r = (outer ? 3.7 : 2.6) * ring
+  // one ring 2.0–3.2 m out, seats in band order so families sit side by side; every other seat a little further
+  // back so 22 people keep their elbow room
+  const n = Math.max(HEARTH_SEATS, ctx.state.people.length)
+  const k = ag.seat % n
+  const ang = (k / n) * Math.PI * 2
+  const r = (k % 2 === 0 ? 2.3 : 3.1) * ring
   return findWalkable(ctx, { x: h.x + Math.sin(ang) * r, z: h.z + Math.cos(ang) * r }, 8)
 }
 
@@ -199,6 +203,7 @@ function setPlan(
     hunt: opts.hunt ?? null,
     shuffle: null,
   }
+  ag.followMode = null
   say(ctx, p, kind)
 }
 
@@ -275,7 +280,7 @@ function chooseDay(ctx: SimCtx, p: SimPerson, ag: Agent): void {
       setPlan(ctx, p, ag, 'play', scatter(ctx, ctx.world.poi('play-dunes'), 18), { until: t + hours(rng.range(1, 2)) })
       return
     }
-    setPlan(ctx, p, ag, 'hearth', seatPos(ctx, ag, 1.6), { until: t + hours(0.5) })
+    setPlan(ctx, p, ag, 'hearth', seatPos(ctx, ag), { until: t + hours(0.5) })
     return
   }
 
@@ -669,7 +674,8 @@ function work(ctx: SimCtx, p: SimPerson, ag: Agent, plan: Plan, dt: number): voi
         ag.load.shellfish++
         if (rng.chance(0.15)) {
           const q = scatter(ctx, bed, bed.radius * 0.8)
-          if (dist(q, p.position) < 8 && ctx.paths.lineClear(p.position, q, ctx.state.clock.seaLevel)) plan.shuffle = q
+          const taken = ctx.state.people.some((o) => o !== p && o.alive && !o.carriedBy && dist(o.position, q) < 1.4)
+          if (!taken && dist(q, p.position) < 8 && ctx.paths.lineClear(p.position, q, ctx.state.clock.seaLevel)) plan.shuffle = q
         }
       }
       return
@@ -772,18 +778,17 @@ function eat(ctx: SimCtx, p: SimPerson, ag: Agent): void {
   }
   const total = h.meat * FOOD_VALUE.meat + h.corms * FOOD_VALUE.corms + h.shellfish * FOOD_VALUE.shellfish
   let want = Math.min(Math.max(0, 1 - p.needs.fed), total / (waiting + 1))
-  const take = (key: 'meat' | 'corms' | 'shellfish', share: number) => {
+  const take = (key: 'meat' | 'corms' | 'shellfish') => {
     const value = FOOD_VALUE[key]
-    const units = Math.min(h[key], Math.ceil((want * share) / value))
+    const units = Math.min(h[key], Math.ceil(want / value))
     h[key] -= units
     want -= units * value
     p.needs.fed = Math.min(1, p.needs.fed + units * value)
   }
-  // a mixed meal: mostly shellfish (they spoil soonest), some meat and corms; then whatever is left fills up
-  take('shellfish', 0.5)
-  if (want > 0) take('meat', 0.5)
-  if (want > 0) take('corms', 0.6)
-  for (const key of ['shellfish', 'meat', 'corms'] as const) if (want > 0) take(key, 1)
+  // meat first, then corms, then shellfish
+  take('meat')
+  if (want > 0) take('corms')
+  if (want > 0) take('shellfish')
 }
 
 function hunt(ctx: SimCtx, p: SimPerson, ag: Agent, plan: Plan, dt: number): void {
@@ -952,24 +957,29 @@ export function updatePerson(ctx: SimCtx, p: SimPerson, ag: Agent, dt: number, m
       ag.pathReq = null
     }
     const gap = dist(p.position, leader.position)
+    const bedId = la.plan?.kind === 'shore' && la.plan.phase === 'work' ? la.plan.targetId : null
+    const bedReady = bedId !== null && has(p, 'shellfish') && bedOut(ctx, ctx.world.poi(bedId))
+    // a child keeps what it is doing for a while (no flicker), unless the carer has gone off
+    const mode = ag.followMode
+    const held = mode !== null && t - mode.since < FOLLOW_HOLD && gap <= 25
+    const gather = mode?.kind === 'gather' ? bedReady && (held || gap < 6) : bedReady && gap < 4.5 && !held
+    if (gather !== (mode?.kind === 'gather')) ag.followMode = { kind: gather ? 'gather' : 'follow', since: t }
     if (gap > 4.5) ag.catchingUp = true
     else if (gap < 2.5) ag.catchingUp = false
-    const near = !ag.catchingUp
-    if (!near && travel(ctx, p, ag, plan.dest, walkSpeed(p) * 1.15, mdt) === 'failed') {
+    const moving = !gather && ag.catchingUp
+    if (moving && travel(ctx, p, ag, plan.dest, walkSpeed(p) * 1.15, mdt) === 'failed') {
       abandon(ctx, p, ag)
       return
     }
-    if (near) p.speed = 0
-    const bedId = la.plan?.kind === 'shore' && la.plan.phase === 'work' ? la.plan.targetId : null
-    const gathering = near && bedId !== null && bedOut(ctx, ctx.world.poi(bedId))
-    if (gathering && has(p, 'shellfish')) {
+    if (!moving) p.speed = 0
+    if (gather && bedId !== null) {
       p.task = { kind: 'gather-shellfish', targetId: bedId, target: null, until: null, skill: 'shellfish' }
       p.anim = 'gather'
       p.held.right = 'shell'
       if (ctx.rng.chance(dt / 200)) ag.load.shellfish++
     } else {
       p.task = { kind: 'follow', targetId: leader.id, target: { ...leader.position }, until: null, skill: null }
-      p.anim = p.speed > 0 ? 'walk' : gathering ? 'crouch' : 'idle'
+      p.anim = p.speed > 0 ? 'walk' : bedReady ? 'crouch' : 'idle'
       p.held.right = 'none'
     }
     p.lookAt = null
@@ -987,7 +997,7 @@ export function updatePerson(ctx: SimCtx, p: SimPerson, ag: Agent, dt: number, m
     if (went === 'arrived') {
       plan.phase = 'work'
       plan.tick = 0
-      if (plan.kind === 'sleep' || plan.kind === 'hearth' || plan.kind === 'eat' || plan.kind === 'story') {
+      if (plan.kind === 'sleep' || plan.kind === 'hearth' || plan.kind === 'eat' || plan.kind === 'story' || plan.kind === 'sing' || plan.kind === 'hides') {
         p.heading = headingTo(p.position, hearth(ctx))
       }
     }
@@ -1192,9 +1202,11 @@ export function setOrder(ctx: SimCtx, id: string, order: Partial<Order> & { kind
   }
 }
 
-const PERSONAL_SPACE = 0.65
+const PERSONAL_SPACE = 0.75
+/** walkers pass each other; people working in place or shuffling along the rocks keep their distance */
+const SETTLED_SPEED = 0.7
 
-/** people standing or sitting still ease apart so no two share a spot (the player and director holds stay put) */
+/** people standing, sitting or working in place ease apart so no two share a spot (the player and director holds stay put) */
 export function keepApart(ctx: SimCtx, realDt: number): void {
   const people = ctx.state.people
   const k = Math.min(1, realDt * 2)
@@ -1202,10 +1214,10 @@ export function keepApart(ctx: SimCtx, realDt: number): void {
   const fixed = (p: SimPerson) => (p.isPlayer && ctx.playerControlled) || ctx.agents.get(p.id)?.order?.kind === 'hold'
   for (let i = 0; i < people.length; i++) {
     const a = people[i]
-    if (!a || !a.alive || a.carriedBy || a.speed > 0 || a.task.kind === 'sleep') continue
+    if (!a || !a.alive || a.carriedBy || a.speed > SETTLED_SPEED || a.task.kind === 'sleep') continue
     for (let j = i + 1; j < people.length; j++) {
       const b = people[j]
-      if (!b || !b.alive || b.carriedBy || b.speed > 0 || b.task.kind === 'sleep') continue
+      if (!b || !b.alive || b.carriedBy || b.speed > SETTLED_SPEED || b.task.kind === 'sleep') continue
       const dx = b.position.x - a.position.x
       const dz = b.position.z - a.position.z
       const d = Math.hypot(dx, dz)
