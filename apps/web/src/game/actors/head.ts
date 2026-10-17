@@ -185,19 +185,73 @@ export function buildHead(ctx: BuildCtx, hs: HeadShape): void {
   const m = smooth(0, 15, d.age)
   const ex = d.eyeX / ry
   const { eyeYn, mouthYn, noseBaseYn, browYn } = hs
+  const mw = hs.mouthW
 
   /* ── the skull ── */
   const warm = skinC.clone().multiply(new Color(1, 0.86, 0.84))
   const deep = tone(skinC, 0.62)
   const lit = skinC.clone().multiply(new Color(1.07, 1.04, 1.0))
-  /** the baked skin colour at a face point: socket and under-chin occlusion, warm cheeks, lit forehead and cheekbones */
-  /** the sheen (a roughness offset): forehead, nose ridge and cheekbones catch a soft shine */
+  const crease = tone(skinC, 0.42)
+  /**
+   * an elder's face settles into folds: the nasolabial groove with the cheek swelling over it, bags under the eyes,
+   * marionette lines and a soft jowl (all in the geometry), and forehead furrows and crow's feet (mostly baked shade).
+   * Returns a radial offset in ry units and how much the point darkens and catches light.
+   */
+  const old = smooth(40, 68, d.age)
+  const age = { disp: 0, dark: 0, lit: 0 }
+  const ageAt = (X: number, Y: number, fr: number): typeof age => {
+    age.disp = 0
+    age.dark = 0
+    age.lit = 0
+    const k = old * fr
+    if (k <= 0) return age
+    const ax = Math.abs(X)
+    // (it starts just outside the nose wing and runs down past the mouth corner)
+    const yTop = noseBaseYn + 0.06
+    const yBot = mouthYn - 0.1
+    const t = (yTop - Y) / (yTop - yBot)
+    const along = bump(((t - 0.5) / 0.62) ** 2)
+    const dx = ax - lerp(lerp(0.13, 0.2, m) * f.noseWidth + 0.03, mw + 0.09, clamp(t, 0, 1))
+    const groove = bump((dx / 0.034) ** 2) * along
+    const swell = bump(((dx - 0.055) / 0.045) ** 2) * along
+    const bag = bump(((ax - ex) / 0.11) ** 2 + ((Y - eyeYn + 0.105) / 0.035) ** 2)
+    const underBag = bump(((ax - ex) / 0.11) ** 2 + ((Y - eyeYn + 0.15) / 0.022) ** 2)
+    // the cheeks hollow a little under the cheekbones
+    const hollow = bump(((ax - 0.4) / 0.11) ** 2 + ((Y - eyeYn + 0.4) / 0.11) ** 2)
+    const cx = ax - ex - 0.11
+    const cy = Y - eyeYn
+    const cr = Math.hypot(cx, cy)
+    const ca = Math.atan2(cy, cx)
+    let feet = 0
+    for (const a of [-0.45, 0, 0.45]) feet = Math.max(feet, bump(((ca - a) / 0.1) ** 2))
+    feet *= smooth(0.015, 0.04, cr) * smooth(0.15, 0.09, cr) * smooth(-0.03, 0, cx)
+    // furrows, with the skin between them catching the light
+    let furrows = 0
+    let ridges = 0
+    for (let i = 0; i < 3; i++) {
+      const fy = Y - browYn - 0.11 - i * 0.075 - 0.008 * Math.sin(X * 7 + i * 2)
+      furrows = Math.max(furrows, bump((fy / 0.018) ** 2))
+      if (i < 2) ridges = Math.max(ridges, bump(((fy - 0.0375) / 0.022) ** 2))
+    }
+    const brow = bump((X / 0.32) ** 2)
+    furrows *= brow
+    ridges *= brow
+    const mt = (mouthYn - 0.03 - Y) / 0.18
+    const marion = bump(((ax - mw - 0.015 - 0.03 * clamp(mt, 0, 1)) / 0.022) ** 2) * bump(((mt - 0.5) / 0.6) ** 2)
+    const jowl = bump(((ax - mw - 0.09) / 0.07) ** 2 + ((Y - mouthYn + 0.2) / 0.08) ** 2)
+    age.disp = k * (-0.02 * groove + 0.02 * swell + 0.012 * bag - 0.006 * underBag - 0.006 * furrows - 0.008 * marion + 0.01 * jowl - 0.016 * hollow)
+    age.dark = k * Math.min(0.8, 0.7 * groove + 0.65 * underBag + 0.5 * furrows + 0.5 * feet + 0.45 * marion + 0.2 * hollow)
+    age.lit = k * (0.3 * swell + 0.22 * bag + 0.2 * ridges)
+    return age
+  }
+  /** the sheen (a roughness offset): forehead, nose ridge and cheekbones catch a soft shine, less of it on old skin */
   const sheenAt = (X: number, Y: number, fr: number): number => {
     const ax = Math.abs(X)
     const forehead = bump((X / 0.3) ** 2 + ((Y - browYn - 0.2) / 0.17) ** 2)
     const cheekbone = bump(((ax - 0.4) / 0.12) ** 2 + ((Y - eyeYn + 0.18) / 0.08) ** 2)
-    return -0.3 * m * Math.max(forehead, cheekbone) * fr
+    return -0.3 * m * (1 - 0.5 * old) * Math.max(forehead, cheekbone) * fr
   }
+  /** the baked skin colour at a face point: socket and under-chin occlusion, warm cheeks, lit forehead and cheekbones */
   const skinAt = (X: number, Y: number, fr: number, out: Color): Color => {
     const ax = Math.abs(X)
     const socket = bump(((ax - ex) / 0.17) ** 2 + ((Y - eyeYn) / 0.12) ** 2) * fr
@@ -211,18 +265,22 @@ export function buildHead(ctx: BuildCtx, hs: HeadShape): void {
     out.lerp(warm, cheek * 0.55)
     out.lerp(lit, Math.max(forehead * 0.3, cheekbone * 0.4))
     out.lerp(deep, Math.min(0.8, socket * 0.5 + underBrow * 0.35 + underChin * 0.5 + nasolabial * 0.3))
+    if (old > 0) {
+      const a = ageAt(X, Y, fr)
+      out.lerp(crease, a.dark).lerp(lit, a.lit)
+    }
     return out
   }
   const faceSkin =
     (side: 'upper' | 'lower' | 'auto'): SkinFn =>
     (x, y, z) =>
       blend2(B.head, B.jaw, hs.jawWeight(x / ry, (y - d.headCy) / ry, (z - d.headZ) / ry, side))
-  const mw = hs.mouthW
   // dense enough at the front that its baked shading matches the finely sampled face patches laid over it
   // (the far levels keep the old counts: their budgets stand)
   const near = ctx.skin.q >= 1
   const segs = near ? 84 : 64
-  const rings = near ? 64 : 48
+  // (an elder's close level gets more rows, so the forehead furrows resolve)
+  const rings = near ? (old > 0.05 ? 96 : 64) : 48
   const P = new Vector3()
   ctx.skin.at(hs.centre, faceSkin('auto')).grid(
     segs,
@@ -235,6 +293,11 @@ export function buildHead(ctx: BuildCtx, hs: HeadShape): void {
       const X = P.x / ry
       const fr = Math.max(0, Math.cos(th))
       P.z -= ry * 0.07 * smooth(mw * 1.15, mw * 0.75, Math.abs(X)) * bump(((Y - mouthYn) / 0.05) ** 2) * fr
+      if (old > 0) {
+        const disp = ageAt(X, Y, fr).disp
+        const l = P.length()
+        if (disp !== 0 && l > 0) P.multiplyScalar(1 + (disp * ry) / l)
+      }
       out.x = P.x
       out.y = P.y
       out.z = P.z
