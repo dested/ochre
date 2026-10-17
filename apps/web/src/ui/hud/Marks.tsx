@@ -216,11 +216,16 @@ const isKin = (t: NameTag) => t.relation !== null && !t.relation.includes("'s ")
  * At most four tags at once, so a crowded shore doesn't become a wall of labels: whoever is speaking, then family,
  * then the closest bonds and the nearest. The rest fade out but stay mounted, so a tag never pops.
  */
-export function shownTags(tags: readonly NameTag[]): Set<string> {
+export function shownTags(
+  tags: readonly NameTag[],
+  view: { width: number; height: number } = { width: Infinity, height: Infinity }
+): Set<string> {
   const rank = (t: NameTag) => (t.speaking ? 4 : 0) + (isKin(t) ? 2 : 0) + t.bond + t.opacity
+  // a head off the screen gets no tag: the edge clamp would pin it where nobody stands
+  const inView = (t: NameTag) => t.x >= 0 && t.x <= view.width && t.y >= 0 && t.y <= view.height
   return new Set(
     [...tags]
-      .filter((t) => t.opacity > 0.05)
+      .filter((t) => t.opacity > 0.05 && inView(t))
       .sort((a, b) => rank(b) - rank(a))
       .slice(0, MAX_TAGS)
       .map((t) => t.id)
@@ -228,7 +233,12 @@ export function shownTags(tags: readonly NameTag[]): Set<string> {
 }
 
 export function NameTags({ tags }: { tags: readonly NameTag[] }) {
-  const shown = shownTags(tags)
+  const shown = shownTags(
+    tags,
+    typeof window === 'undefined'
+      ? undefined
+      : { width: window.innerWidth, height: window.innerHeight }
+  )
   return (
     <>
       {tags.map((t) => {
