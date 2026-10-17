@@ -617,7 +617,7 @@ controller, cameras and verbs that make each stage of life feel different; and t
 
 ## Ledger (lead, updated 2026-10-17 01:05)
 
-Board: down · Last pushed: 272d4c7 (main, 04:22) · Gate: install 0, typecheck 0, test 0 (66), build 0 at 272d4c7 · Deploy: 272d4c7 live (CI 39027676825 green, /healthz ok)
+Board: down · Last pushed: cca08b3 (main, 04:24) · Gate: install 0, typecheck 0, test 0 (68), build 0 at cca08b3 · Deploy: CI pending (previous 272d4c7 live)
 
 | Agent | Model | Owns | Item now | Last sha / artifact | Status |
 | --- | --- | --- | --- | --- | --- |
