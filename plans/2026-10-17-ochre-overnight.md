@@ -633,6 +633,21 @@ controller, cameras and verbs that make each stage of life feel different; and t
   under it, not floating, not in the water), big enough to read from the cliff path. If it's missing, find why; a fix
   in `game/play/cast.ts` (play's) goes to play as exact lines. Ready line with a shot from the cliff path and one beside it.
 
+- (2026-10-17 04:35, lead) **Sim S6** (from sim's look-only run at seed 80000, logs `/w/junk/sim-80k/sim/pt-p2.log`,
+  `/w/junk/sim-80k/sim/pt-e2.log`). In order:
+  (1) **elder.walk remembers.** The last walk (99–111 s) says nothing. Add three memory captions at 25%, 50% and 75%
+  of the path to the sit, narrator (speaker null), each drawn from this life's own record: the people (mother's name,
+  partner, children, the heir), the moments it lived (seal pup, moon dance, the whale, first steps, honeyguide), what it
+  taught, the story told, who got the beads. Pick the three strongest that exist, in life order; fall back to fixed
+  lines about the sea and the shelter only when the record is thin. Voice: present tense, plain and sensory, at most
+  12 words, no moral, no "you remember". Example shape: "Ama's hands, red with ochre, pressing yours to the wall."
+  Write 12+ templates in `lines.ts`. A test: a life with a whale and two children gets three memory captions naming
+  them, in order, before the sit.
+  (2) **provider.storm firewood is fair at walking pace.** A player walking at 1.4 m/s straight to the gully and back
+  must finish with at least 40% of the time to spare. Your choice how (deadline, count, carry, a nearer wood spot in
+  the layout data you own). A test drives the walking pace and asserts completion before the deadline.
+  (3) Drop the literal "(0/5)" from the objective text (chapters.ts:1154); the counter shows the count.
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: cca08b3 (main, 04:24) · Gate: install 0, typecheck 0, test 0 (68), build 0 at cca08b3 · Deploy: cca08b3 live (CI 39028574081 green, /healthz ok)
@@ -641,7 +656,7 @@ Board: down · Last pushed: cca08b3 (main, 04:24) · Gate: install 0, typecheck 
 | --- | --- | --- | --- | --- | --- |
 | world | opus-xhigh | world-gen, game/world, game/render | sky spike (f1-walk) first, then F1 b, a, c–e; notes: softer ledges, flame cards, cave dressing visibility | W3 4–5 passed 04:20 (421b1a6 tris: cave 126/805k high, 97/484k medium; e988dd0 gold); W3 1–3 passed 04:10 (aeb266c, 500a203, 25aa317); tris 12f7386/3812240; W2 86a96f0 passed 03:20; W1 82b261e passed | working |
 | people | opus-xhigh | game/actors | P4: eland graze, then anim pass (dance, mourn, lie-dead, crawl, tend-fire, engrave, sing) | wrinkles cca08b3 + necklace 126c800 passed 04:30; P3 6798b36 passed 04:40; P1b 3f8b1a9 passed 04:35 (L0 ≤70k); P2 afe56e2 passed | working |
-| sim | opus-high | sim | look-only: provider + elder headless run, list stuck objectives and caption gaps > 120 s | F2 0624283 passed (whale at rise + 3); F1 adc88d1 passed (50 tests); pacing 972f17c passed (47 tests, waits 29–91 s real); aside 74bce0a passed; S5c 95e8327 passed; S5b rest 69428c6 passed (41 tests; covers S5c 1–2); f683e42 superseded; S5b part 6aa3225 passed (held 18:20, follow walk); S5 209a09c passed (7 moments); S4 d0549fd passed; S2 071949a passed | working |
+| sim | opus-high | sim | S6: elder.walk memories, storm firewood fair, (0/5) text | look-only run passed 04:35 (all objectives complete); F2 0624283 passed (whale at rise + 3); F1 adc88d1 passed (50 tests); pacing 972f17c passed (47 tests, waits 29–91 s real); aside 74bce0a passed; S5c 95e8327 passed; S5b rest 69428c6 passed (41 tests; covers S5c 1–2); f683e42 superseded; S5b part 6aa3225 passed (held 18:20, follow walk); S5 209a09c passed (7 moments); S4 d0549fd passed; S2 071949a passed | working |
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | recheck #9, #11 on 421b1a6; then held.* after F2 | F1 mark 23acc39 passed; U7 passed (bdc3b86); chatter 830a7ab; U6 ce615bc passed; U5, U3 passed | working |
 | play | opus-high | game/play, game/audio, app/play.tsx | F2 held opening (acked 04:21) | F1 play 7e42a4a passed (all 9; dd47469 summary hang fixed); PL3 runs 1–2 reached the summary, no errors; 8c75080 aim, 8f774e0 tags, 7a6f0e5 spoor passed; 9a7684d passed (E verb, seated camera); PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
 
