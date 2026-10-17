@@ -113,15 +113,23 @@ canvases or full-screen backdrops; an offset that must clear a zoomed block mult
   italic.
 - **Name tags**: name, relation, a small tick down to the head; warmer with the bond; a voice mark while speaking.
 - **Control hints** (`hud/Hints.tsx`): first-use lines above the dial, small keycaps and low-contrast words, one at
-  a time: watch ring > aiming > an enabled E prompt > move/look/run (not while held; the elder walks and has no
-  Shift) > Esc. Each shows once per life (`ochre:hints`, cleared when the intro starts) and fades after use or a
-  timeout. Derived from bridge state only.
+  a time: watch ring > aiming > move/look/run (not while held; the elder walks and has no Shift) > an enabled E
+  prompt > Esc. Each shows once per life (`ochre:hints`, cleared by "Begin a life" and by picking a chapter) and
+  fades after use or a timeout. Derived from bridge state only.
+- **Name tags** glide between the ~15 Hz positions (transform transition) and are clamped 80 px inside the edges.
+  The HUD hides entirely under the pause screen.
 
 ## Title, About and loading
 
 - The title's "About this world" opens `screens/About.tsx`: two paragraphs on Blombos and how the game uses the
   research, then every Field Note's evidence line grouped (The coast; Stone, fire and the hunt; Ochre, beads and
   marks; Growing up and living together). A new note must be added to a group there.
+- The title's Continue card reads `bridge.saved`: the chapter's painting, "Continue as <name>", "<stage> · age N".
+- Chapter cards fade out over 700 ms into the world before `chapterCardDone`.
+- Family: rows are labelled by the player's direct line ("Parents" only when the row is the player's own line,
+  otherwise "Your parents' generation" etc.); a row of more than four people drops skills and uses small faces; the
+  player sits in the middle of their siblings; skills skip Faces and stop at three ("and 4 more").
+- Field Notes lists found notes first. The summary groups what you taught by skill.
 - Loading shows the coming chapter's painting (slow push), the Blombos band engraving with real `loadingProgress`,
   a rotating true line, and "Building the world · N%".
 
