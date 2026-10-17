@@ -113,6 +113,8 @@ export type BridgeState = {
   screen: Screen
   /** true once a life exists (title shows Continue) */
   hasLife: boolean
+  /** the saved life the title's Continue card shows; play writes it on mount and after every save */
+  saved: { name: string; stage: LifeStageId; ageYears: number } | null
   loadingProgress: number
   chapter: ChapterCard | null
   hud: HudState
@@ -164,6 +166,7 @@ export const DEFAULT_SETTINGS: Settings = {
 export const INITIAL_BRIDGE_STATE: BridgeState = {
   screen: 'title',
   hasLife: false,
+  saved: null,
   loadingProgress: 0,
   chapter: null,
   hud: {

@@ -432,6 +432,10 @@ controller, cameras and verbs that make each stage of life feel different; and t
   frozen frame, name tags over real lighting. Add a Continue card on the title (name, stage, age, that chapter's
   painting) from the save. Send `blocked`/`question` lines to the lead for anything outside ui. Applies to: ui.
 
+- (2026-10-17 01:50, lead) `BridgeState.saved: { name; stage; ageYears } | null` (bridge.ts): play writes it on mount
+  (from `ochre.save.v1`) and after every save; ui's title Continue card reads it with `useBridge`. ui never reads
+  localStorage for the save. Applies to: play, ui.
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: 2078087 (main, 01:15) · Gate: install 0, typecheck 0, test 0 at 2078087 · Deploy: 2078087 live at https://ochre.dested.com (CI 39016003224 green)
