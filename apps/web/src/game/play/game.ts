@@ -119,6 +119,15 @@ const TAG_TALL = 52
 /** samples along the eye→head line for tag occlusion, and how long a person stays hidden before the tag fades */
 const OCC_STEPS = 8
 const OCC_HIDE = 0.2
+/** poses that sit the body down (the camera pivot sinks with it) */
+const SEATED: ReadonlySet<PersonAnim> = new Set<PersonAnim>([
+  'sit',
+  'sleep',
+  'engrave',
+  'knap',
+  'grind',
+  'lie-dead',
+])
 /** poses the sim puts the player in (a hearth seat, a task); they hold while the player stands still */
 const SIM_POSES: ReadonlySet<PersonAnim> = new Set<PersonAnim>([
   'sit',
@@ -403,7 +412,12 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
 
   const updateInteract = (dt: number, player: SimPerson) => {
     const list = sim.interactionsNear(player.position, INTERACT_RADIUS)
-    const it = list[0] ?? null
+    // the beat's own verb (dir:*) wins over eating or talking beside it; then the nearest that works
+    const it =
+      list.find((i) => i.enabled && i.id.startsWith('dir:')) ??
+      list.find((i) => i.enabled) ??
+      list[0] ??
+      null
     if (!it) {
       currentInteraction = null
       holdT = 0
@@ -693,7 +707,14 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
         } else focus = null
         litFires.length = 0
         for (const f of sim.state.fires) if (f.intensity > 0.1) litFires.push(f)
-        controller.updateCamera(dt, camera, feel, hunt.aim, litFires)
+        controller.updateCamera(
+          dt,
+          camera,
+          feel,
+          hunt.aim,
+          litFires,
+          pose && SEATED.has(pose.anim) ? 1 : 0
+        )
         const huntPrompt = hunt.update(dt, input, player, live)
         if (huntPrompt) setPrompt(huntPrompt)
         else if (live) updateInteract(dt, player)

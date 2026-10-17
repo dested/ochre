@@ -11,6 +11,10 @@ import type { StageFeel } from './stages'
 const CAM_STEPS = 14
 /** the camera's line to the player stays this far (m) from a lit fire */
 const FIRE_CLEAR = 1.2
+/** how far the orbit pivot sinks for a seated body, as a share of the standing pivot height */
+const SEATED_DROP = 0.3
+/** the seated over-the-shoulder shift, metres */
+const SEATED_SHOULDER = 0.45
 /** orbit offsets tried, nearest first, when a flame sits between the camera and the player */
 const SWING = [0.45, -0.45, 0.9, -0.9, 1.5, -1.5]
 
@@ -50,7 +54,9 @@ export type Controller = {
     camera: PerspectiveCamera,
     feel: StageFeel,
     aim: number,
-    fires?: readonly Vec2[]
+    fires?: readonly Vec2[],
+    /** 0 standing … 1 seated: the orbit pivot sinks with the body */
+    low?: number
   ): void
 }
 
@@ -72,6 +78,7 @@ export function createController(world: WorldData): Controller {
   let camDist = 3
   let zoom = 1
   let swayT = 0
+  let seat = 0
   const camTarget = { x: 0, y: 0, z: 0 }
   let snapCamera = true
   let lastSea = -Infinity
@@ -181,9 +188,10 @@ export function createController(world: WorldData): Controller {
       else if (!frozen && input.down('KeyC')) anim = 'crouch'
       return { position: { x: position.x, z: position.z }, heading, speed, anim }
     },
-    updateCamera(dt, camera, feel, aim, fires = []) {
+    updateCamera(dt, camera, feel, aim, fires = [], low = 0) {
       const ground = world.heightAt(position.x, position.z)
-      const ty = ground + feel.camTarget * (1 - aim * 0.05)
+      seat += (low - seat) * Math.min(1, dt * 3)
+      const ty = ground + feel.camTarget * (1 - aim * 0.05) * (1 - SEATED_DROP * seat)
       const follow = 1 - Math.exp(-dt * feel.follow)
       if (snapCamera) {
         camTarget.x = position.x
@@ -231,9 +239,10 @@ export function createController(world: WorldData): Controller {
       const fz = Math.cos(yaw)
       const cp = Math.cos(pitch)
       const sp = Math.sin(pitch)
-      // over the shoulder while aiming: shift the pivot right
-      const sx = -fz * 0.55 * aim
-      const sz = fx * 0.55 * aim
+      // over the shoulder while aiming, and while seated so the fire shows past the head: shift the pivot right
+      const shoulder = 0.55 * aim + SEATED_SHOULDER * seat * (1 - aim)
+      const sx = -fz * shoulder
+      const sz = fx * shoulder
       const px = camTarget.x + sx
       const pz = camTarget.z + sz
       const py = camTarget.y + aim * 0.15
