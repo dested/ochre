@@ -218,23 +218,32 @@ void main() {
 	float foam = 0.0;
 	if ( uFoamK > 0.0 ) {
 		float lace = ocNoise( vWorld.xz * 0.8 + uTime * 0.2 ) * 0.6 + ocNoise( vWorld.xz * 2.4 - uTime * 0.3 ) * 0.4;
-		// at the waterline, breathing with the swash
+		// the web a spent wave leaves on thin water: two drifting sets of contour lines, thin and broken, never a sheet
+		vec2 lp = vWorld.xz;
+		float n1 = ocNoise( lp * 1.1 + uTime * vec2( 0.09, 0.05 ) ) + 0.5 * ocNoise( lp * 2.9 - uTime * vec2( 0.04, 0.11 ) );
+		float n2 = ocNoise( lp * 0.7 - uTime * vec2( 0.05, 0.02 ) + 7.3 ) + 0.5 * ocNoise( lp * 2.1 + uTime * 0.08 + 3.1 );
+		float web = min( abs( n1 - 0.75 ), abs( n2 - 0.75 ) * 1.3 );
+		float wfw = fwidth( web );
+		// a churned surge draws the lines thicker
+		float wid = 0.008 + 0.03 * vRush;
+		float lines = 1.0 - smoothstep( wid, wid + wfw * 1.5 + 0.01, web );
+		lines *= smoothstep( 0.3, 0.6, ocNoise( lp * 0.45 + uTime * 0.03 + 11.0 ) ) * smoothstep( 0.2, 0.5, ocNoise( lp * 1.7 - uTime * 0.05 + 5.0 ) );
+		// at the waterline, breathing with the swash: one crisp, broken line at the very edge
 		float swash = 0.18 + 0.16 * sin( uTime * 0.9 + vWorld.x * 0.05 + vWorld.z * 0.03 );
-		float edge = 1.0 - smoothstep( swash * 0.25, swash * 0.5 + 0.1, depth );
-		foam = max( foam, edge * smoothstep( 0.3, 0.6, lace + edge * 0.35 ) );
+		float edge = smoothstep( 0.0, 0.025, depth ) * ( 1.0 - smoothstep( 0.03, 0.03 + swash * 0.25, depth ) );
+		foam = max( foam, edge * smoothstep( 0.25, 0.5, lace ) );
 		// breaking bands marching in toward the shore
 		float d = sh.r;
 		float phase = d / 13.0 + uTime * 0.085 + ocNoise( vWorld.xz * 0.02 ) * 1.5;
 		float band = smoothstep( 0.8, 0.97, fract( phase ) ) * ( 1.0 - smoothstep( 0.97, 1.0, fract( phase ) ) * 0.5 );
-		float zone = smoothstep( 3.2, 1.1, depth ) * smoothstep( 0.05, 0.4, depth );
+		float zone = smoothstep( 3.2, 1.1, depth ) * smoothstep( 0.4, 1.0, depth );
 		foam = max( foam, band * zone * smoothstep( 0.32, 0.62, lace ) );
-		// the wash left behind a breaker
-		float trail = smoothstep( 0.45, 0.95, fract( phase ) ) * zone * 0.5 * smoothstep( 0.5, 0.8, lace );
-		foam = max( foam, trail );
-		// foam round the rocks of the shelf
-		foam = max( foam, smoothstep( 0.3, 0.0, depth ) * smoothstep( 0.5, 0.72, lace ) * 0.6 );
-		// the surge's churned uprush, in lace
-		foam = max( foam, vRush * smoothstep( 0.6, 0.05, depth ) * smoothstep( 0.35, 0.65, lace ) );
+		// the wash left behind a breaker, and all over the thin water: lace
+		float thin = smoothstep( 1.2, 0.1, depth ) * ( 0.45 + 0.55 * smoothstep( 0.5, 0.05, depth ) );
+		float trail = smoothstep( 0.45, 0.95, fract( phase ) ) * zone;
+		foam = max( foam, lines * max( thin * 0.8, trail * 0.55 ) );
+		// the surge's churned uprush: a few torn patches inside the web
+		foam = max( foam, vRush * smoothstep( 0.5, 0.05, depth ) * smoothstep( 0.62, 0.8, lace ) * 0.8 );
 		// whitecaps on open water when it blows
 		float gale = clamp( ( uWind.y - 0.45 ) * 1.8 + uWeather.w * 0.75, 0.0, 1.0 );
 		if ( gale > 0.01 ) {
@@ -251,8 +260,8 @@ void main() {
 	float alpha = clamp( 1.0 - exp( - dd * 1.1 ), 0.0, 1.0 );
 	alpha = max( alpha, fres * 0.9 );
 	alpha = max( alpha, foam );
-	// a thin wash over the rock is glassy: mostly the sky in it, the rock clear beneath
-	alpha *= mix( 0.5, 1.0, smoothstep( 0.04, 0.5, depth ) );
+	// a thin wash over the rock is glassy: mostly the sky in it, the rock clear beneath (the lace stays opaque)
+	alpha *= mix( mix( 0.35, 1.0, foam ), 1.0, smoothstep( 0.04, 0.6, depth ) );
 	alpha *= smoothstep( - 0.05, 0.06, depth );
 	gl_FragColor = vec4( col, alpha );
 }
