@@ -10,6 +10,7 @@ import type { AudioFrame, CreateAudio, GameAudio, MusicCue, SfxName, Vec3 } from
 import { createAmbience, type Ambience } from './ambience'
 import { createMusic, type Music } from './music'
 import { pluckCache, RECIPES, SFX_NAMES, type SfxKit } from './sfx'
+import { clearSharedAudio, setSharedAudio } from './shared'
 import { makeImpulse, makeNoise } from './synth'
 
 export { SFX_NAMES }
@@ -159,7 +160,7 @@ export const createAudio: CreateAudio = (): GameAudio => {
     return p
   }
 
-  return {
+  const audio: GameAudio = {
     async resume() {
       ensure()
       if (live && live.state !== 'running') await live.resume()
@@ -187,6 +188,7 @@ export const createAudio: CreateAudio = (): GameAudio => {
     },
     dispose() {
       disposed = true
+      clearSharedAudio(audio)
       if (timer) clearInterval(timer)
       const e = eng
       eng = null
@@ -197,4 +199,7 @@ export const createAudio: CreateAudio = (): GameAudio => {
       live = null
     },
   }
+  // the minigames and other UI without a game handle play through this mixer
+  setSharedAudio(audio)
+  return audio
 }
