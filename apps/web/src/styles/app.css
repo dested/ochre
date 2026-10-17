@@ -72,10 +72,13 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    scrollbar-width: thin;
   }
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
+    /* the lineage and notes screens scroll over soot: a thin ochre thumb, never the white system bar */
+    scrollbar-color: color-mix(in oklab, var(--color-ochre) 70%, transparent) transparent;
   }
 }
 
