@@ -22,6 +22,9 @@ const AO_DIRS: readonly (readonly [number, number, number])[] = Array.from({ len
 /** how far out each direction is probed, metres, and how much rock found there darkens */
 const AO_REACH = [0.8, 1.6, 2.8, 4.5, 7.5, 11] as const
 const AO_WEIGHT = [1, 0.85, 0.65, 0.45, 0.3, 0.2] as const
+/** shading-normal smoothing: neighbourhood passes, and how far the normal leans to the smoothed one */
+const SMOOTH_PASSES = 4
+const SMOOTH_MIX = 0.65
 
 /** polygonise the density over the cave box (surface nets: one vertex per crossing cell, one quad per crossing edge) */
 export function buildCaveGeometry(grid: TerrainGrid): BufferGeometry {
@@ -199,9 +202,43 @@ export function buildCaveGeometry(grid: TerrainGrid): BufferGeometry {
     ao[vi] = sum > 0 ? 1 - occ / sum : 1
   }
 
+  // shading normals: each vertex's gradient normal blended two-thirds toward the normals averaged over its
+  // neighbourhood, so a low sun rolls across the rock instead of every facet taking its own hard value (a mosaic of
+  // stained glass); the positions, and so the faceted silhouette, are untouched
+  let sm = Float32Array.from(nor)
+  for (let pass = 0; pass < SMOOTH_PASSES; pass++) {
+    const acc = Float32Array.from(sm)
+    for (let t = 0; t + 2 < idx.length; t += 3) {
+      const tri = [idx[t] ?? 0, idx[t + 1] ?? 0, idx[t + 2] ?? 0]
+      for (let e = 0; e < 3; e++) {
+        const p0 = tri[e] ?? 0
+        const p1 = tri[(e + 1) % 3] ?? 0
+        for (let o = 0; o < 3; o++) {
+          acc[p0 * 3 + o] = (acc[p0 * 3 + o] ?? 0) + (sm[p1 * 3 + o] ?? 0)
+          acc[p1 * 3 + o] = (acc[p1 * 3 + o] ?? 0) + (sm[p0 * 3 + o] ?? 0)
+        }
+      }
+    }
+    for (let vi = 0; vi < vcount; vi++) {
+      const l = Math.hypot(acc[vi * 3] ?? 0, acc[vi * 3 + 1] ?? 0, acc[vi * 3 + 2] ?? 0) || 1
+      for (let o = 0; o < 3; o++) acc[vi * 3 + o] = (acc[vi * 3 + o] ?? 0) / l
+    }
+    sm = acc
+  }
+  const shade = new Float32Array(vcount * 3)
+  for (let vi = 0; vi < vcount; vi++) {
+    const x = Nn(vi, 0) * (1 - SMOOTH_MIX) + (sm[vi * 3] ?? 0) * SMOOTH_MIX
+    const y = Nn(vi, 1) * (1 - SMOOTH_MIX) + (sm[vi * 3 + 1] ?? 0) * SMOOTH_MIX
+    const z = Nn(vi, 2) * (1 - SMOOTH_MIX) + (sm[vi * 3 + 2] ?? 0) * SMOOTH_MIX
+    const l = Math.hypot(x, y, z) || 1
+    shade[vi * 3] = x / l
+    shade[vi * 3 + 1] = y / l
+    shade[vi * 3 + 2] = z / l
+  }
+
   const g = new BufferGeometry()
   g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3))
-  g.setAttribute('normal', new BufferAttribute(new Float32Array(nor), 3))
+  g.setAttribute('normal', new BufferAttribute(shade, 3))
   g.setAttribute('aAO', new BufferAttribute(ao, 1))
   g.setIndex(new BufferAttribute(new Uint32Array(idx), 1))
   g.computeBoundingSphere()
@@ -256,7 +293,7 @@ const ROCK_ALBEDO = /* glsl */ `
 		// blocky facets: quantised 3D noise picks a tone per chunk, like knife-laid paint
 		ocFacetT = ocFacet( wp, nW, 1.5 );
 		ocFacetS = ocFacet( wp + 3.7, nW, 0.55 );
-		float facet = ocFacetT.w * 0.75 + ocFacetS.w * 0.25;
+		float facet = mix( 0.5, ocFacetT.w * 0.75 + ocFacetS.w * 0.25, mix( 0.55, 1.0, smoothstep( 3.0, 14.0, length( wp - cameraPosition ) ) ) );
 		float facet2 = ocFacetS.w;
 		vec3 warm = mix( ocLinR( vec3( 0.62, 0.46, 0.33 ) ), ocLinR( vec3( 0.76, 0.62, 0.47 ) ), facet );
 		warm = mix( warm, ocLinR( vec3( 0.52, 0.48, 0.47 ) ), smoothstep( 0.6, 0.9, facet2 ) * 0.5 );
@@ -301,7 +338,10 @@ const ROCK_ALBEDO = /* glsl */ `
 /** a little extra relief: the facets tilt the normal */
 const ROCK_NORMAL = /* glsl */ `
 	{
-		vec3 g = ocFacetT.xyz * 0.55 + ocFacetS.xyz * 0.3 + ocChipT.xyz * 0.28 * ocChipNear;
+		// the knife facets' tilt fades toward the eye: close up, every cell taking its own hard sun value reads as
+		// stained glass, so there the light rolls with the smoothed normal and the facets keep only their tone
+		float farK = mix( 0.08, 1.0, smoothstep( 6.0, 25.0, length( vOcWorld - cameraPosition ) ) );
+		vec3 g = ( ocFacetT.xyz * 0.55 + ocFacetS.xyz * 0.3 ) * farK + ocChipT.xyz * 0.12 * ocChipNear;
 		vec3 gv = ( viewMatrix * vec4( g, 0.0 ) ).xyz;
 		normal = normalize( normal + gv );
 	}
