@@ -634,12 +634,12 @@ controller, cameras and verbs that make each stage of life feel different; and t
   jump to provider.whale, walk to the whale beach and confirm the stranded whale renders, beached on the sand (not
   under it, not floating, not in the water), big enough to read from the cliff path. If it's missing, find why; a fix
   in `game/play/cast.ts` (play's) goes to play as exact lines. Ready line with a shot from the cliff path and one beside it.
-  **P4 item 0b (04:48):** the held.shell offering: the shell prop is a 1.6 cm bead; make the offered shell a real
+  **P4 item 0b (04:37):** the held.shell offering: the shell prop is a 1.6 cm bead; make the offered shell a real
   shell, ~5 cm (a periwinkle or a small abalone with its nacre), readable in the infant's view. And the crouch pose
   leaves both hands at her sides; the offering hand comes up in front of her chest at ~0.25 m. Play stands her up as a
   stop-gap (29ac34c) and drops that once the crouch holds the offer.
 
-- (2026-10-17 04:35, lead) **Sim S6** (from sim's look-only run at seed 80000, logs `/w/junk/sim-80k/sim/pt-p2.log`,
+- (2026-10-17 04:31, lead) **Sim S6** (from sim's look-only run at seed 80000, logs `/w/junk/sim-80k/sim/pt-p2.log`,
   `/w/junk/sim-80k/sim/pt-e2.log`). In order:
   (1) **elder.walk remembers.** The last walk (99–111 s) says nothing. Add three memory captions at 25%, 50% and 75%
   of the path to the sit, narrator (speaker null), each drawn from this life's own record: the people (mother's name,
@@ -659,7 +659,7 @@ controller, cameras and verbs that make each stage of life feel different; and t
   screen when elder.walk fades in: clear captions when a beat opens behind a fade. **(Moved to play as F2 item 8,
   04:40: the contract has no caption-clear event.)**
 
-- (2026-10-17 04:45, lead) **Contract adds:** `HudState.sex?: Sex` (6698df4; play sets `sex: player.sex` in
+- (2026-10-17 04:36, lead) **Contract adds:** `HudState.sex?: Sex` (6698df4; play sets `sex: player.sex` in
   updateHud; ui picks intro/3.webp mirrored for male lives on the summary and elder card) and the optional
   `PersonActor.setSinging?(on)` (18cae73; people builds it; play calls it in cast.ts when `p.speech?.text === '♪'`,
   with setTalking(false)). Play folds both lines into its next commit after F2.
@@ -670,10 +670,10 @@ Board: down · Last pushed: cca08b3 (main, 04:24) · Gate: install 0, typecheck 
 
 | Agent | Model | Owns | Item now | Last sha / artifact | Status |
 | --- | --- | --- | --- | --- | --- |
-| world | opus-xhigh | world-gen, game/world, game/render | F1a follow-up (no haze inside the drip line), spike verdict, then F1 c–e; notes: softer ledges, flame cards, cave dressing visibility | F1b 9bb5669 + F1a 5da59ed passed 04:42; W3 4–5 passed 04:20 (421b1a6 tris: cave 126/805k high, 97/484k medium; e988dd0 gold); W3 1–3 passed 04:10 (aeb266c, 500a203, 25aa317); tris 12f7386/3812240; W2 86a96f0 passed 03:20; W1 82b261e passed | working |
+| world | opus-xhigh | world-gen, game/world, game/render | F1a follow-up (no haze inside the drip line), spike verdict, then F1 c–e; notes: softer ledges, flame cards, cave dressing visibility | F1b 9bb5669 + F1a 5da59ed passed 04:34; W3 4–5 passed 04:20 (421b1a6 tris: cave 126/805k high, 97/484k medium; e988dd0 gold); W3 1–3 passed 04:10 (aeb266c, 500a203, 25aa317); tris 12f7386/3812240; W2 86a96f0 passed 03:20; W1 82b261e passed | working |
 | people | opus-xhigh | game/actors | P4: eland graze, then anim pass (dance, mourn, lie-dead, crawl, tend-fire, engrave, sing) | wrinkles cca08b3 + necklace 126c800 passed 04:30; P3 6798b36 passed 04:40; P1b 3f8b1a9 passed 04:35 (L0 ≤70k); P2 afe56e2 passed | working |
-| sim | opus-high | sim | S6: elder.walk memories, storm firewood fair, (0/5) text | look-only run passed 04:35 (all objectives complete); F2 0624283 passed (whale at rise + 3); F1 adc88d1 passed (50 tests); pacing 972f17c passed (47 tests, waits 29–91 s real); aside 74bce0a passed; S5c 95e8327 passed; S5b rest 69428c6 passed (41 tests; covers S5c 1–2); f683e42 superseded; S5b part 6aa3225 passed (held 18:20, follow walk); S5 209a09c passed (7 moments); S4 d0549fd passed; S2 071949a passed | working |
-| ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | provider/youth/small paintings for male lives; then held.* recheck after F2 | f491768 male elder/summary painting passed 04:50; recheck #9/#11 passed 04:37 (663f793 captions under hidden HUD, 6e14e84 scrollbars); F1 mark 23acc39 passed; U7 passed (bdc3b86); chatter 830a7ab; U6 ce615bc passed; U5, U3 passed | working |
+| sim | opus-high | sim | S6: elder.walk memories, storm firewood fair, (0/5) text | look-only run passed 04:31 (all objectives complete); F2 0624283 passed (whale at rise + 3); F1 adc88d1 passed (50 tests); pacing 972f17c passed (47 tests, waits 29–91 s real); aside 74bce0a passed; S5c 95e8327 passed; S5b rest 69428c6 passed (41 tests; covers S5c 1–2); f683e42 superseded; S5b part 6aa3225 passed (held 18:20, follow walk); S5 209a09c passed (7 moments); S4 d0549fd passed; S2 071949a passed | working |
+| ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | provider/youth/small paintings for male lives; then held.* recheck after F2 | f491768 male elder/summary painting passed 04:39; recheck #9/#11 passed 04:37 (663f793 captions under hidden HUD, 6e14e84 scrollbars); F1 mark 23acc39 passed; U7 passed (bdc3b86); chatter 830a7ab; U6 ce615bc passed; U5, U3 passed | working |
 | play | opus-high | game/play, game/audio, app/play.tsx | F2 held opening (acked 04:21) | F1 play 7e42a4a passed (all 9; dd47469 summary hang fixed); PL3 runs 1–2 reached the summary, no errors; 8c75080 aim, 8f774e0 tags, 7a6f0e5 spoor passed; 9a7684d passed (E verb, seated camera); PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
 
 Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); QA server :4090 (prod build of c0edcb6, log /w/junk/sim-80k/qa-server.log); Drydock portal :4400 (Windows bun, log in
