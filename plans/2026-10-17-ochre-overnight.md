@@ -436,6 +436,19 @@ controller, cameras and verbs that make each stage of life feel different; and t
   (from `ochre.save.v1`) and after every save; ui's title Continue card reads it with `useBridge`. ui never reads
   localStorage for the save. Applies to: play, ui.
 
+- (2026-10-17 02:00, lead) **sim item S4, "the band talks"** (after S3, or while waiting on play's findings):
+  (a) A talk line bank in `src/sim/lines.ts` (data): about 150 one-line remarks, keyed by speaker (the fixed cast
+  by id; others by role: elder, adult woman, adult man, teen, child), stage, time of day, the speaker's current task,
+  weather, tide, and recent events (whale, storm, Oro's death, a new note, a hunt). Each fixed-cast member gets a
+  voice: Ama practical and warm, Tuk quiet and exact about stone and tracks, Oro old and wry, tide and moon sayings,
+  Kaya teasing, Nehe careful, missing her partner, Ilu and Sabo playful. The voice of the design doc's captions:
+  short, concrete, present tense, no modern idioms, no exclamation spam. (b) "Talk" on any adult or child picks the
+  best-matching unused line (no repeats within a game day), raises bond a little, and shows it as a caption with
+  the speaker's name. (c) Ambient chatter: when the player is within 6 m of two NPCs at the same task or the hearth,
+  one says a line to the other as a caption, at most one every 40 real seconds, never during director captions.
+  (d) Tests: every fixed-cast member has at least 8 lines, no line over 90 characters, and the selection is
+  deterministic per seed. Applies to: sim.
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: 2078087 (main, 01:15) · Gate: install 0, typecheck 0, test 0 at 2078087 · Deploy: 2078087 live at https://ochre.dested.com (CI 39016003224 green)
