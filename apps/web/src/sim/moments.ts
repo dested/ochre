@@ -54,15 +54,20 @@ export type MomentState = {
   log: string[]
   /** a director's free wait: one moment is sure to happen in it */
   window: FreeWindow | null
+  /** a free wait's named moment, due and late: it plays even where the player is not */
+  forcing: MomentId | null
   /** an optional objective a moment offers ("Follow Tuk and the honeyguide"), shown when the director has none */
   aside: Objective | null
 }
 
-/** game times; `pick` names the moment that should come (else any that can), `got` once one has begun */
-export type FreeWindow = { from: number; until: number; pick: MomentId | null; got: boolean }
+/**
+ * game times; `pick` names the moment that should come (else any that can), `got` once one has begun; `short` ends
+ * the wait as soon as its moment has played; `hurry` (the player went back to the beat) brings the moment on now
+ */
+export type FreeWindow = { from: number; until: number; pick: MomentId | null; got: boolean; short: boolean; hurry: boolean }
 
 export function emptyMoments(): MomentState {
-  return { active: null, lastAt: -1e9, slot: -1, fired: {}, rain: null, log: [], window: null, aside: null }
+  return { active: null, lastAt: -1e9, slot: -1, fired: {}, rain: null, log: [], window: null, forcing: null, aside: null }
 }
 
 type Step = {
@@ -98,6 +103,10 @@ const CROUCH = pose('scripted', 'crouch')
 const STAND = pose('scripted', 'idle')
 const DANCE = pose('sing', 'dance')
 const TEND = pose('tend-fire', 'tend-fire')
+const EAT = pose('eat', 'eat')
+const SIT_COMB = pose('socialize', 'sit', 'bag')
+/** the honey goes round everyone this close to the men at the fire */
+const SHARE_RADIUS = 6
 
 // ─── helpers ────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -164,6 +173,11 @@ function order(ctx: SimCtx, r: Run, id: string | undefined, o: Partial<Order> & 
 
 function arrived(ctx: SimCtx, ids: readonly (string | undefined)[]): boolean {
   return ids.every((id) => !id || ctx.agents.get(id)?.order?.arrived !== false)
+}
+
+/** the free wait wants this moment now, even away from the player */
+function forcing(ctx: SimCtx, id: MomentId): boolean {
+  return ctx.moments.forcing === id
 }
 
 /** a call across the camp: shown wherever the player is */
@@ -245,6 +259,24 @@ function removePerson(ctx: SimCtx, id: string): void {
   ctx.agents.delete(id)
 }
 
+/** the player is close enough to the men at the fire to be handed some honey */
+function nearShare(ctx: SimCtx, r: Run): boolean {
+  const pl = playerOf(ctx)
+  const by = personById(ctx, r.cast.lead)?.position ?? hearth(ctx)
+  return !!pl && !pl.carriedBy && dist(pl.position, by) <= SHARE_RADIUS
+}
+
+/** the player's piece of the comb, once, and only within reach of the share */
+function tasteHoney(ctx: SimCtx, r: Run): void {
+  const pl = playerOf(ctx)
+  if (!pl || r.cast.tasted || !nearShare(ctx, r)) return
+  r.cast.tasted = pl.id
+  pl.needs.fed = Math.min(1, pl.needs.fed + 0.1)
+  pl.anim = 'eat'
+  pl.speed = 0
+  speak(ctx, null, 'A piece of the comb for you. Sweet and smoky; it runs down your chin.', `moment-${r.id}-taste-${Math.floor(ctx.state.clock.t)}`)
+}
+
 // ─── the moments ────────────────────────────────────────────────────────────────────────────────────────────
 
 const MOMENTS: readonly Moment[] = [
@@ -286,14 +318,16 @@ const MOMENTS: readonly Moment[] = [
         run(ctx, r) {
           say(ctx, r, null, 'They leave a piece of the comb on a branch for the bird.')
           ctx.moments.aside = null
-          // whoever came along walks back with them
+          // whoever came along walks back with them; the men carry the comb home in a bag
           const pl = playerOf(ctx)
           const came = pl && dist(pl.position, r.anchor) < 30 ? pl : null
           if (came) r.cast.came = came.id
           for (const id of [r.cast.lead, r.cast.second]) {
             const ag = id ? ctx.agents.get(id) : undefined
+            const q = personById(ctx, id)
+            if (q) q.held.right = 'bag'
             const wait = came ? { waitFor: came.id, waitDist: 12 } : {}
-            if (ag) order(ctx, r, id, { kind: 'goto', dest: seatPos(ctx, ag), near: 0.8, pose: SIT, face: hearth(ctx), ...wait })
+            if (ag) order(ctx, r, id, { kind: 'goto', dest: seatPos(ctx, ag), near: 0.8, pose: SIT_COMB, face: hearth(ctx), ...wait })
           }
         },
       },
@@ -301,21 +335,32 @@ const MOMENTS: readonly Moment[] = [
         until: (ctx, r) => arrived(ctx, [r.cast.lead, r.cast.second]),
         max: 50,
         run(ctx, r) {
-          // the sweet share, at the fire
-          r.anchor = hearth(ctx)
-          say(ctx, r, r.cast.lead ?? null, 'Honey. One piece each, and the little ones first.')
-          say(ctx, r, null, 'Sweet and smoky, passed from hand to hand.')
+          // home with the comb: a share for everyone close to the fire
+          const h = hearth(ctx)
+          r.anchor = h
+          say(ctx, r, r.cast.lead ?? null, 'Honey! Sit, sit. There is a piece for everyone.')
+          const by = personById(ctx, r.cast.lead)?.position ?? h
           for (const p of ctx.state.people) {
-            if (!p.alive || dist(p.position, hearth(ctx)) > 12) continue
-            p.needs.fed = Math.min(1, p.needs.fed + 0.05)
+            if (!p.alive || p.isPlayer || p.carriedBy || p.task.kind === 'sleep' || dist(p.position, by) > SHARE_RADIUS) continue
+            const ag = ctx.agents.get(p.id)
+            if (ag?.order && !r.ordered.includes(p.id)) continue
+            p.needs.fed = Math.min(1, p.needs.fed + 0.1)
+            order(ctx, r, p.id, { kind: 'hold', pose: EAT, face: h })
           }
           for (const id of [r.cast.lead, r.cast.second]) {
             const q = personById(ctx, id)
             if (q) addBond(ctx, q, r.cast.came ? 0.05 : 0.02)
           }
+          tasteHoney(ctx, r)
         },
       },
-      { after: 4 },
+      {
+        // the player's piece waits for them a while, if they are not at the fire
+        until: (ctx, r) => !!r.cast.tasted || nearShare(ctx, r),
+        max: 20,
+        run: (ctx, r) => tasteHoney(ctx, r),
+      },
+      { after: 3 },
     ],
   },
   {
@@ -440,11 +485,11 @@ const MOMENTS: readonly Moment[] = [
       const bottom = ctx.world.poi('shore-path-bottom')
       const pup = toward(ctx, bottom, ctx.world.poi('shore-limpets'), Math.max(4, dist(bottom, ctx.world.poi('shore-limpets')) * 0.6))
       const kids = children(ctx)
-        .filter((p) => dist(p.position, pup) < 160)
+        .filter((p) => forcing(ctx, 'seal-pup') || dist(p.position, pup) < 160)
         .sort((a, b) => dist(a.position, pup) - dist(b.position, pup))
         .slice(0, 3)
       if (kids.length === 0) return null
-      if (pl && dist(pl.position, pup) > NEAR_PLAYER * 1.5) return null
+      if (pl && !forcing(ctx, 'seal-pup') && dist(pl.position, pup) > NEAR_PLAYER * 1.5) return null
       const warn = grownUps(ctx).sort((a, b) => dist(a.position, pup) - dist(b.position, pup))[0]
       const cast: Record<string, string> = warn ? { warn: warn.id } : {}
       return { cast, crowd: kids.map((k) => k.id), spots: { pup }, anchor: pup, carrier: null }
@@ -497,7 +542,7 @@ const MOMENTS: readonly Moment[] = [
       const pl = playerOf(ctx)
       const out = ctx.state.people.filter((p) => free(ctx, p) && !ctx.world.inCave(p.position.x, p.position.z) && dist(p.position, hearth(ctx)) < 140)
       if (out.length < 5) return null
-      if (pl && dist(pl.position, hearth(ctx)) > 140) return null
+      if (pl && !forcing(ctx, 'rain-dash') && dist(pl.position, hearth(ctx)) > 140) return null
       const kid = out.find((p) => roleOf(p) === 'child')
       const grown = out.find((p) => roleOf(p) === 'adult')
       return { cast: { kid: kid?.id ?? '', grown: grown?.id ?? '' }, crowd: out.map((p) => p.id), spots: {}, anchor: hearth(ctx), carrier: null }
@@ -759,12 +804,14 @@ function advance(ctx: SimCtx): void {
   // a free wait that has had no moment yet: past its middle (or soon, for a named one), one comes for sure
   const w = st.window
   if (w && !w.got && t >= w.from && t < w.until) {
-    // from the middle one the player can see; in the last quarter any at all
-    const dueAt = w.pick ? w.from + SLOT : w.from + (w.until - w.from) / 2
-    const lastAt = w.until - (w.until - w.from) / 4
+    // a named one twenty minutes in; else from the middle one the player can see; in the last quarter any at all
+    const dueAt = w.hurry ? t : w.pick ? w.from + 2 * SLOT : w.from + (w.until - w.from) / 2
+    const lastAt = w.hurry ? t : w.until - (w.until - w.from) / 4
     if (t >= dueAt) {
       // a named one is waited for until the last quarter, then any will do
+      st.forcing = t >= lastAt ? w.pick : null
       const named = w.pick ? readyNow(ctx, [w.pick], false) : []
+      st.forcing = null
       const seen = !w.pick || t >= lastAt ? readyNow(ctx, MOMENT_IDS, true) : []
       const anywhere = t >= lastAt ? readyNow(ctx, MOMENT_IDS, false) : []
       const pick = pickOf(ctx, named, 'moment-due') ?? pickOf(ctx, seen, 'moment-due') ?? pickOf(ctx, anywhere, 'moment-due')
@@ -810,9 +857,18 @@ function syncAside(ctx: SimCtx): void {
 }
 
 /** a director's free wait of `hours`: the band lives its own life, and one moment (`pick`, or any) is sure to come */
-export function openWindow(ctx: SimCtx, hours: number, pick: MomentId | null = null): void {
+export function openWindow(ctx: SimCtx, hours: number, pick: MomentId | null = null, short = false): void {
   const t = ctx.state.clock.t
-  ctx.moments.window = { from: t, until: t + hours * GAME_HOUR, pick, got: false }
+  ctx.moments.window = { from: t, until: t + hours * GAME_HOUR, pick, got: false, short, hurry: false }
+}
+
+/** the player is done with the free time: its moment comes now if it hasn't, and the wait ends after it */
+export function hurryWindow(ctx: SimCtx): void {
+  const w = ctx.moments.window
+  if (w && !w.hurry) {
+    w.hurry = true
+    ctx.moments.slot = -1
+  }
 }
 
 /** the free wait is over: its time is up and no moment is still playing (true when there is none) */
@@ -820,8 +876,8 @@ export function windowOver(ctx: SimCtx): boolean {
   const w = ctx.moments.window
   if (!w) return true
   if (ctx.moments.active) return false
-  // a wait for one named moment ends once it has played
-  if (ctx.state.clock.t < w.until && !(w.pick && w.got)) return false
+  // a short wait, or one the player is done with, ends once its moment has played
+  if (ctx.state.clock.t < w.until && !((w.short || w.hurry) && w.got)) return false
   ctx.moments.window = null
   return true
 }
@@ -834,8 +890,11 @@ export function momentExtras(ctx: SimCtx): { people: ReadonlySet<string>; animal
 
 /** after a load: no visitor stays on from another band, and no moment is half played */
 export function afterLoad(ctx: SimCtx): void {
-  for (const p of [...ctx.state.people]) if (p.familyId === 'lagoon-visit') removePerson(ctx, p.id)
+  const visitors = ctx.state.people.filter((p) => p.familyId === 'lagoon-visit')
+  for (const p of visitors) removePerson(ctx, p.id)
   ctx.moments = emptyMoments()
+  // a visit cut short by the save still counts as today's visit
+  if (visitors.length > 0) ctx.moments.fired.visitor = dayKey(ctx)
 }
 
 /** the weather with any passing shower laid over it */

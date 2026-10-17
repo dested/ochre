@@ -10,7 +10,7 @@ import { addBond } from '../life'
 import { randomLook } from '../looks'
 import { makeName } from '../names'
 import { createAgent, seatPos } from '../ai'
-import { openWindow, windowOver, type MomentId } from '../moments'
+import { hurryWindow, openWindow, windowOver, type MomentId } from '../moments'
 import { hashString, mix32, Rng } from '../../core/rng'
 import { ageBand } from './history'
 import {
@@ -201,14 +201,38 @@ function walkedDown(d: D, mark: 'shore-path-top' | 'mid' | 'shelf', near: number
   return left < bed.radius + 16
 }
 
-/** free hours: everyone back to their own lives for a while, and one of the day's moments (`pick`, or any) is sure to come */
-function freeHours(hours: number, pick: MomentId | null = null): Step[] {
+/**
+ * free hours: everyone back to their own lives for a while, and one of the day's moments (`pick`, or any) is sure to
+ * come. It ends on its own, or once the player has wandered off and comes back to the fire (after the moment);
+ * `short` ends it as soon as the moment has played.
+ */
+function freeHours(hours: number, pick: MomentId | null, text: string | null, short = false): Step[] {
   return [
     run((d) => {
       releaseAll(d)
-      openWindow(d.ctx, hours, pick)
+      openWindow(d.ctx, hours, pick, short)
     }),
-    freeUntil((d) => windowOver(d.ctx)),
+    ...(text ? [obj(text)] : []),
+    freeUntil((d) => {
+      const away = dist(player(d).position, hearth(d))
+      if (away > 25) d.st.counters['free-away'] = 1
+      else if (away < 6 && counter(d, 'free-away') > 0) hurryWindow(d.ctx)
+      return windowOver(d.ctx)
+    }),
+    ...(text ? [clearObj()] : []),
+  ]
+}
+
+/** an afternoon off: if the morning's work finished early, the day moves on to `hour` first */
+function freeAfternoon(hour: number, pick: MomentId): Step[] {
+  return [
+    ...when(
+      (d) => d.ctx.state.clock.hour < hour - 0.5,
+      ...fadeOut(1.2),
+      run((d) => skipTo(d, hour)),
+      ...fadeIn(1.2),
+    ),
+    ...freeHours(2, pick, 'Spend the afternoon with the band'),
   ]
 }
 
@@ -502,7 +526,7 @@ const small: Chapter = {
         return [extra('tag', 'tag', `Tag ${kid.name}`, kid.position, () => {}, { targetKind: 'person', targetId: kid.id })]
       },
     },
-    { id: 'small.free', steps: freeHours(2) },
+    { id: 'small.afternoon', steps: freeAfternoon(13, 'seal-pup') },
     {
       id: 'small.dig',
       steps: [
@@ -850,7 +874,7 @@ const youth: Chapter = {
       extras: (d) => [extra('share', 'give', 'Share the meat', hearth(d), () => {}, { targetId: 'hearth-main' })],
       allows: (_d, i) => i.verb !== 'give',
     },
-    { id: 'youth.free', steps: freeHours(2) },
+    { id: 'youth.afternoon', steps: freeAfternoon(13, 'rain-dash') },
     {
       id: 'youth.gathering',
       steps: [
@@ -925,14 +949,14 @@ const provider: Chapter = {
       steps: [
         run((d) => {
           d.ctx.noAiHunts = false
-          // the chapter opens in full morning light, not the grey before dawn
-          skipTo(d, sun(d).rise + 1)
+          // the chapter opens on its first free afternoon, the little one still on your back
+          skipTo(d, 13.5)
           seatPlayer(d, 0.5)
         }),
         ...fadeIn(2),
         wait(3),
-        // a morning with the little one before the years go by: its first steps, toward you
-        ...freeHours(1.5, 'first-steps'),
+        // before the years go by: its first steps, toward you
+        ...freeHours(1.5, 'first-steps', null, true),
       ],
     },
     {
@@ -1183,7 +1207,6 @@ const elder: Chapter = {
       ],
       extras: (d) => [extra('engrave', 'engrave', 'Engrave the ochre', hearth(d), () => {}, { targetId: 'hearth-main' })],
     },
-    { id: 'elder.free', steps: freeHours(2) },
     {
       id: 'elder.story',
       steps: [
@@ -1234,6 +1257,8 @@ const elder: Chapter = {
       ],
       extras: (d) => [extra('story', 'tell-story', 'Tell a story', hearth(d), () => {}, { targetId: 'hearth-main' })],
     },
+    // the evening goes on after the story: the full moon is up, and someone starts to clap
+    { id: 'elder.evening', steps: freeHours(2, 'moon-dance', 'Spend the evening with the band') },
     {
       id: 'elder.walk',
       steps: [

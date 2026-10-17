@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { LifeStageId, Sim, SimEvent, Vec2 } from '../game/contracts'
-import { createSandboxSim, createSim, debugCtx } from './index'
+import { createSandboxSim, createSim, debugCtx, debugDirector } from './index'
 import { activeMoment, MOMENT_IDS, openWindow, triggerMoment, windowOver, type MomentId } from './moments'
 import { createTestWorld } from './test-world'
 
@@ -86,6 +86,7 @@ describe('days worth living', () => {
       }
       if (id === 'honeyguide') {
         expect(caps).toContain('Come. The bird is talking.')
+        expect(caps.some((c) => c.startsWith('A piece of the comb for you'))).toBe(true)
         expect(caps.some((c) => c.startsWith('Honey'))).toBe(true)
         // the optional "go with Tuk" objective comes and goes with the walk
         expect(seen.aside).toBe(true)
@@ -142,6 +143,35 @@ describe('days worth living', () => {
     expect(ctx.moments.log.map((l) => l.replace(/^D\d+ \d\d:\d\d /, ''))).toEqual(["The child's first steps toward the player"])
     expect(caps).toContain('Into your arms.')
   }, 30_000)
+
+  // the director's free waits: each brings its stage's moment for sure (seed 1)
+  const WAITS: [LifeStageId, string, string][] = [
+    ['small', 'small.afternoon', 'A seal pup on the rocks'],
+    ['youth', 'youth.afternoon', 'A sudden shower sends everyone running for the cave'],
+    ['elder', 'elder.evening', 'A full-moon dance at the hearth'],
+  ]
+  for (const [stage, beat, label] of WAITS) {
+    test(`${beat} brings "${label}" and then lets the story go on`, () => {
+      const sim = createSim({ seed: 1, world, stage, playerName: 'Teni' })
+      const ctx = ctxOf(sim)
+      const dir = debugDirector(sim)
+      if (!dir) throw new Error('no director')
+      for (let i = 0; i < 40 && sim.state.chapter.beatId !== beat; i++) {
+        dir.completeBeat()
+        for (let k = 0; k < 30 && sim.state.chapter.beatId !== beat; k++) sim.step(1 / 30)
+      }
+      expect(sim.state.chapter.beatId).toBe(beat)
+      // (an early finish first fades on to the afternoon)
+      for (let i = 0; i < 30 * 10 && !sim.state.chapter.objective; i++) sim.step(1 / 30)
+      expect(sim.state.clock.hour).toBeGreaterThanOrEqual(12)
+      expect(sim.state.chapter.objective?.text).toMatch(/^Spend the (afternoon|evening) with the band$/)
+      const from = sim.state.clock.t
+      for (let i = 0; i < 20_000 && sim.state.chapter.beatId === beat; i++) sim.step(10 / sim.state.timeScale)
+      expect(sim.state.chapter.beatId).not.toBe(beat)
+      expect(ctx.moments.log.map((l) => l.replace(/^D\d+ \d\d:\d\d /, ''))).toContain(label)
+      expect(sim.state.clock.t - from).toBeGreaterThanOrEqual(2 * 3600 - 60)
+    }, 60_000)
+  }
 
   test('a save made mid-moment loads with no visitor and no half-played moment', () => {
     const sim = createSandboxSim({ seed: 1, world, stage: 'small', playerName: 'Teni' })
