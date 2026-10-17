@@ -550,6 +550,13 @@ controller, cameras and verbs that make each stage of life feel different; and t
   screenshot path under `/w/junk/sim-80k/ui/shots/u7/`. Fix your own ui issues as you go and mark them fixed.
   Applies to: ui.
 
+- (2026-10-17 03:30, lead) **Free-wait pacing (sim):** play measured 213–251 s of real time in the stage
+  afternoons, and the Provider waits (steps, teach, whale) run past 400 s because they end only at a later sunrise or
+  13:00 while Sleep is disabled until evening. Every free wait now ends at whichever comes first: 20 game minutes after
+  its moment finishes, or 1.5 game hours (about 75 s at 72×). The moment arrives within the first 30 real seconds when
+  the player is within 30 m of the hearth. Where a beat needs a later day, the jump is a fade cut after the wait, with
+  no sleep required (Sleep stays optional in the evening). Target: no free wait over 100 s real time. Applies to: sim.
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: 927056d (main, 03:05) · Gate: install 0, typecheck 0, test 0 (52), build 0 at 927056d · Deploy: 927056d live (CI 39022048182 green, /healthz ok)
@@ -562,7 +569,7 @@ Board: down · Last pushed: 927056d (main, 03:05) · Gate: install 0, typecheck 
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | U7 fresh eyes on :4090 | chatter 830a7ab; U6 ce615bc passed; U5, U3 passed | working |
 | play | opus-high | game/play, game/audio, app/play.tsx | PL3 run 2 on QA 82c6af6 (run 1: held→summary, 20/26 beats self-completed, no errors) | 9a7684d passed (E verb, seated camera); PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
 
-Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); QA server :4090 (prod build of 82c6af6, task bngs4rahp, log /w/junk/sim-80k/qa-server.log); Drydock portal :4400 (Windows bun, log in
+Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); QA server :4090 (prod build of 8c75080, task see below, log /w/junk/sim-80k/qa-server.log); Drydock portal :4400 (Windows bun, log in
 scratchpad drydock-portal.log)
 Images used: 47 / 200 (lead 2, ui 45). OpenAI credit exhausted 01:05; generation stopped (needs-sal Check 2)
 Waiting on Sal: none (needs-sal file: plans/2026-10-17-needs-sal.md)
