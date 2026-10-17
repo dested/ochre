@@ -467,6 +467,11 @@ controller, cameras and verbs that make each stage of life feel different; and t
   first steps toward the player (Provider). Data-driven in `src/sim/moments.ts`, deterministic per seed, a test that
   each one can fire, and a lab button to trigger each. Applies to: sim.
 
+- (2026-10-17 02:40, lead) **Frozen QA server: http://localhost:4090** is a production build of a fixed sha (see
+  `/w/junk/sim-80k/qa-server/SHA`). It never reloads, so use it for playthroughs and shots that need more than a
+  minute. The lead rebuilds it on request: send `rebuild qa` and say which commits you need in it. The dev server on
+  :4080 stays for quick checks of your in-flight code. Applies to: play, ui, and anyone doing long QA runs.
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: f48612e (main, 02:05) · Gate: install 0, typecheck 0, test 0, build 0 at f48612e · Deploy: f48612e live (CI 39018937226 green)
@@ -479,7 +484,7 @@ Board: down · Last pushed: f48612e (main, 02:05) · Gate: install 0, typecheck 
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | on call for PL3 findings | U6 ce615bc passed; U5, U3 passed | idle |
 | play | opus-high | game/play, game/audio, app/play.tsx | PL3 (director in; real world + people swapped) | PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
 
-Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); Drydock portal :4400 (Windows bun, log in
+Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); QA server :4090 (prod build of 069899a, log /w/junk/sim-80k/qa-server.log); Drydock portal :4400 (Windows bun, log in
 scratchpad drydock-portal.log)
 Images used: 47 / 200 (lead 2, ui 45). OpenAI credit exhausted 01:05; generation stopped (needs-sal Check 2)
 Waiting on Sal: none (needs-sal file: plans/2026-10-17-needs-sal.md)
