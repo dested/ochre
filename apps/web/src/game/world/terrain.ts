@@ -1,0 +1,501 @@
+/**
+ * The terrain's meshes and its painted material: 2 m detail tiles round the playable coast (three LODs each,
+ * skirted), an 8 m mesh for the rest of the world, and a far field out to the horizon (the base field's
+ * coast running on west into headlands, and the mountain ranges to the north).
+ */
+import {
+  BufferAttribute,
+  BufferGeometry,
+  Group,
+  Mesh,
+  MeshStandardMaterial,
+  Uint8BufferAttribute,
+  Vector3,
+  Vector4,
+  type Camera,
+} from 'three'
+import type { WorldData } from '../contracts'
+import { patchPaint } from '../render/paint'
+import { LIGHT } from '../render/uniforms'
+import { createBaseField, MAT, type TerrainGrid } from '../../world-gen/terrain'
+import { CELL, GRID_N, HALF, RIVER } from '../../world-gen/layout'
+
+const DETAIL = { x0: -640, x1: 640, z0: -768, z1: 512 } as const
+const TILE = 256
+const LODS = [2, 4, 8] as const
+const LOD_DIST = [380, 900] as const
+const SKIRT = 5
+
+/** per grid vertex: splat weights A = sand, dune, fynbos, grass; B = rock, cliff, shelf, earth */
+function buildSplat(g: TerrainGrid): { a: Uint8Array; b: Uint8Array } {
+  const N = g.n
+  const raw = new Float32Array(N * N * 8)
+  const slot = (m: number): number => {
+    switch (m) {
+      case MAT.seabed:
+      case MAT.sand:
+        return 0
+      case MAT.dune:
+        return 1
+      case MAT.fynbos:
+        return 2
+      case MAT.grass:
+        return 3
+      case MAT.rock:
+      case MAT.scree:
+        return 4
+      case MAT.cliff:
+        return 5
+      case MAT.shelf:
+      case MAT.riverBed:
+        return 6
+      default:
+        return 7
+    }
+  }
+  for (let i = 0; i < N * N; i++) raw[i * 8 + slot(g.mat[i] ?? 0)] = 1
+  // a 3×3 blur so borders soften (the shader then roughens them with noise)
+  const a = new Uint8Array(N * N * 4)
+  const b = new Uint8Array(N * N * 4)
+  const acc = new Float32Array(8)
+  for (let iz = 0; iz < N; iz++) {
+    for (let ix = 0; ix < N; ix++) {
+      acc.fill(0)
+      let wsum = 0
+      for (let dz = -1; dz <= 1; dz++) {
+        const z = Math.min(N - 1, Math.max(0, iz + dz))
+        for (let dx = -1; dx <= 1; dx++) {
+          const x = Math.min(N - 1, Math.max(0, ix + dx))
+          const w = dx === 0 && dz === 0 ? 2 : 1
+          const j = (z * N + x) * 8
+          for (let k = 0; k < 8; k++) acc[k] = (acc[k] ?? 0) + (raw[j + k] ?? 0) * w
+          wsum += w
+        }
+      }
+      const i = iz * N + ix
+      for (let k = 0; k < 4; k++) {
+        a[i * 4 + k] = Math.round(((acc[k] ?? 0) / wsum) * 255)
+        b[i * 4 + k] = Math.round(((acc[k + 4] ?? 0) / wsum) * 255)
+      }
+    }
+  }
+  return { a, b }
+}
+
+type GridSource = {
+  h: (ix: number, iz: number) => number
+  splat: { a: Uint8Array; b: Uint8Array }
+}
+
+/** a terrain patch on the grid: [ix0, ix1] × [iz0, iz1] sampled every `step` grid cells, with skirts */
+function buildPatch(src: GridSource, ix0: number, iz0: number, ix1: number, iz1: number, step: number, skirt: boolean): BufferGeometry {
+  const nx = Math.floor((ix1 - ix0) / step) + 1
+  const nz = Math.floor((iz1 - iz0) / step) + 1
+  const edgeCount = skirt ? 2 * (nx + nz) : 0
+  const vcount = nx * nz + edgeCount
+  const pos = new Float32Array(vcount * 3)
+  const nor = new Float32Array(vcount * 3)
+  const sa = new Uint8Array(vcount * 4)
+  const sb = new Uint8Array(vcount * 4)
+  const N = GRID_N
+  const put = (v: number, ix: number, iz: number, drop: number) => {
+    const cx = Math.min(N - 1, Math.max(0, ix))
+    const cz = Math.min(N - 1, Math.max(0, iz))
+    const hv = src.h(cx, cz)
+    pos[v * 3] = -HALF + ix * CELL
+    pos[v * 3 + 1] = hv - drop
+    pos[v * 3 + 2] = -HALF + iz * CELL
+    const s = Math.max(1, step)
+    const hl = src.h(Math.max(0, cx - s), cz)
+    const hr = src.h(Math.min(N - 1, cx + s), cz)
+    const hu = src.h(cx, Math.max(0, cz - s))
+    const hd = src.h(cx, Math.min(N - 1, cz + s))
+    const nxv = (hl - hr) / (2 * s * CELL)
+    const nzv = (hu - hd) / (2 * s * CELL)
+    const len = Math.hypot(nxv, 1, nzv)
+    nor[v * 3] = nxv / len
+    nor[v * 3 + 1] = 1 / len
+    nor[v * 3 + 2] = nzv / len
+    const gi = cz * N + cx
+    for (let k = 0; k < 4; k++) {
+      sa[v * 4 + k] = src.splat.a[gi * 4 + k] ?? 0
+      sb[v * 4 + k] = src.splat.b[gi * 4 + k] ?? 0
+    }
+  }
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) put(j * nx + i, ix0 + i * step, iz0 + j * step, 0)
+  const idx: number[] = []
+  for (let j = 0; j < nz - 1; j++) {
+    for (let i = 0; i < nx - 1; i++) {
+      const a = j * nx + i
+      const b = a + 1
+      const c = a + nx
+      const d = c + 1
+      idx.push(a, c, b, b, c, d)
+    }
+  }
+  if (skirt) {
+    let v = nx * nz
+    const ring: [number, number][] = []
+    for (let i = 0; i < nx; i++) ring.push([i, 0])
+    for (let j = 0; j < nz; j++) ring.push([nx - 1, j])
+    for (let i = nx - 1; i >= 0; i--) ring.push([i, nz - 1])
+    for (let j = nz - 1; j >= 0; j--) ring.push([0, j])
+    const top: number[] = []
+    const bot: number[] = []
+    for (const [i, j] of ring) {
+      put(v, ix0 + i * step, iz0 + j * step, SKIRT)
+      top.push(j * nx + i)
+      bot.push(v)
+      v++
+    }
+    for (let k = 0; k < ring.length - 1; k++) {
+      const t0 = top[k] ?? 0
+      const t1 = top[k + 1] ?? 0
+      const b0 = bot[k] ?? 0
+      const b1 = bot[k + 1] ?? 0
+      idx.push(t0, b0, t1, t1, b0, b1, t0, t1, b0, t1, b1, b0)
+    }
+  }
+  const g = new BufferGeometry()
+  g.setAttribute('position', new BufferAttribute(pos, 3))
+  g.setAttribute('normal', new BufferAttribute(nor, 3))
+  g.setAttribute('aSplatA', new Uint8BufferAttribute(sa, 4, true))
+  g.setAttribute('aSplatB', new Uint8BufferAttribute(sb, 4, true))
+  g.setIndex(vcount > 65535 ? new BufferAttribute(new Uint32Array(idx), 1) : new BufferAttribute(new Uint16Array(idx), 1))
+  g.computeBoundingSphere()
+  g.computeBoundingBox()
+  return g
+}
+
+const TERRAIN_VERT_HEAD = /* glsl */ `
+attribute vec4 aSplatA;
+attribute vec4 aSplatB;
+varying vec4 vSplatA;
+varying vec4 vSplatB;
+`
+const TERRAIN_VERT_MAIN = /* glsl */ `
+	vSplatA = aSplatA;
+	vSplatB = aSplatB;
+`
+
+const TERRAIN_FRAG_HEAD = /* glsl */ `
+varying vec4 vSplatA;
+varying vec4 vSplatB;
+uniform vec3 uKeyDirT;
+uniform vec4 uOchre;
+vec3 ocLin( vec3 c ) { return pow( c, vec3( 2.2 ) ); }
+// fynbos from above: rounded shrubs in a mix of greens, rust and blond, lit on the sun's side
+vec3 ocBushes( vec2 p, float px, vec3 soil ) {
+	float cs = 2.4;
+	vec2 g = p / cs;
+	vec2 i = floor( g );
+	vec2 f = fract( g );
+	float d1 = 9.0;
+	vec2 rel = vec2( 0.0 );
+	vec2 id = vec2( 0.0 );
+	for ( int y = - 1; y <= 1; y ++ ) {
+		for ( int x = - 1; x <= 1; x ++ ) {
+			vec2 o = vec2( float( x ), float( y ) );
+			vec2 r = o + 0.15 + 0.7 * ocHash2( i + o ) - f;
+			float d = dot( r, r );
+			if ( d < d1 ) { d1 = d; rel = r; id = i + o; }
+		}
+	}
+	float h = ocHash( id + 3.7 );
+	float size = 0.36 + 0.2 * ocHash( id + 9.1 );
+	float dist = sqrt( d1 );
+	float bush = 1.0 - smoothstep( size * 0.75, size, dist );
+	vec3 c;
+	if ( h < 0.34 ) c = ocLin( vec3( 0.49, 0.545, 0.35 ) );
+	else if ( h < 0.56 ) c = ocLin( vec3( 0.37, 0.41, 0.23 ) );
+	else if ( h < 0.72 ) c = ocLin( vec3( 0.56, 0.31, 0.17 ) );
+	else if ( h < 0.88 ) c = ocLin( vec3( 0.70, 0.62, 0.38 ) );
+	else c = ocLin( vec3( 0.47, 0.53, 0.47 ) );
+	// the lit side of the dome
+	vec2 sd = normalize( uKeyDirT.xz + 1e-4 );
+	float side = clamp( dot( - rel / max( dist, 1e-3 ), sd ) * ( dist / size ), - 1.0, 1.0 );
+	c *= 0.82 + 0.32 * side * bush;
+	// a protea's pink head now and then
+	float pr = step( 0.965, ocHash( id + 21.0 ) ) * ( 1.0 - smoothstep( 0.06, 0.1, length( rel - vec2( 0.1 ) ) ) );
+	c = mix( c, ocLin( vec3( 0.86, 0.52, 0.58 ) ), pr );
+	vec3 o = mix( soil, c, bush );
+	// far away: the average
+	vec3 avg = mix( soil, ocLin( vec3( 0.5, 0.48, 0.3 ) ), 0.62 );
+	return mix( avg, o, smoothstep( cs * 0.9, cs * 0.35, px * 3.0 ) );
+}
+`
+
+const TERRAIN_ALBEDO = /* glsl */ `
+	{
+		vec2 p = vOcWorld.xz;
+		float y = vOcWorld.y;
+		float px = length( fwidth( p ) );
+		vec4 wa = vSplatA;
+		vec4 wb = vSplatB;
+		// ragged, painted borders between the washes
+		float r1 = ocNoise( p * 0.23 );
+		float r2 = ocNoise( p * 0.71 + 13.1 );
+		float rr = r1 * 0.65 + r2 * 0.35;
+		wa *= vec4( 0.55 + 0.9 * rr, 0.55 + 0.9 * ( 1.0 - rr ), 0.55 + 0.9 * rr, 0.55 + 0.9 * ( 1.0 - rr ) );
+		wb *= vec4( 0.55 + 0.9 * ( 1.0 - rr ), 0.8 + 0.4 * rr, 0.55 + 0.9 * rr, 0.6 + 0.8 * ( 1.0 - rr ) );
+		wa = pow( wa, vec4( 1.6 ) );
+		wb = pow( wb, vec4( 1.6 ) );
+		float ws = dot( wa, vec4( 1.0 ) ) + dot( wb, vec4( 1.0 ) ) + 1e-4;
+		wa /= ws;
+		wb /= ws;
+		float drift = ocNoise( p * 0.031 );
+		float fine = ocNoise( p * 1.9 );
+		vec3 nW = normalize( vOcNormalW );
+		// sand: warm cream, darker where wet
+		vec3 sand = mix( ocLin( vec3( 0.90, 0.81, 0.63 ) ), ocLin( vec3( 0.84, 0.72, 0.54 ) ), drift );
+		sand *= 0.95 + 0.08 * fine;
+		vec3 dune = mix( ocLin( vec3( 0.92, 0.84, 0.68 ) ), ocLin( vec3( 0.86, 0.78, 0.6 ) ), drift );
+		float tuft = smoothstep( 0.62, 0.8, ocNoise( p * 0.6 + 4.0 ) ) * smoothstep( 0.4, 0.7, ocNoise( p * 2.7 ) );
+		dune = mix( dune, ocLin( vec3( 0.6, 0.6, 0.36 ) ), tuft * 0.8 );
+		vec3 soil = mix( ocLin( vec3( 0.44, 0.36, 0.25 ) ), ocLin( vec3( 0.55, 0.43, 0.29 ) ), drift );
+		vec3 fyn = ocBushes( p, px, soil );
+		vec3 grass = mix( ocLin( vec3( 0.71, 0.65, 0.40 ) ), ocLin( vec3( 0.56, 0.6, 0.32 ) ), ocNoise( p * 0.05 + 2.0 ) );
+		grass = mix( grass, ocLin( vec3( 0.78, 0.69, 0.46 ) ), smoothstep( 0.55, 0.8, ocNoise( p * 0.18 + 9.0 ) ) * 0.7 );
+		grass *= 0.9 + 0.18 * ocNoise( vec2( p.x * 3.0, p.y * 0.8 ) + 5.0 );
+		// rock: limestone in blocky facets, ledges along the strata, orange lichen
+		float facet = floor( ocNoise3( vOcWorld * 0.42 ) * 4.0 ) / 4.0;
+		float strata = smoothstep( 0.78, 0.96, sin( y * 1.45 + ocNoise( p * 0.12 ) * 4.0 ) );
+		vec3 rock = mix( ocLin( vec3( 0.60, 0.52, 0.41 ) ), ocLin( vec3( 0.74, 0.64, 0.50 ) ), facet );
+		rock = mix( rock, ocLin( vec3( 0.36, 0.30, 0.24 ) ), strata * 0.55 );
+		float lichen = smoothstep( 0.68, 0.8, ocNoise( p * 0.33 + y * 0.21 ) ) * smoothstep( 0.2, 0.7, nW.y + 0.5 );
+		rock = mix( rock, ocLin( vec3( 0.78, 0.46, 0.2 ) ), lichen * 0.55 );
+		vec3 cliff = mix( rock, rock * vec3( 0.86, 0.82, 0.8 ), smoothstep( 0.4, 0.8, ocNoise( vec2( p.x + p.y, y * 0.25 ) * 0.4 ) ) );
+		// the intertidal shelf: dark rock, black mussel beds, green weed, pink coralline low down
+		vec3 shelf = mix( ocLin( vec3( 0.30, 0.27, 0.22 ) ), ocLin( vec3( 0.40, 0.35, 0.28 ) ), facet );
+		float lowZone = smoothstep( uSeaLevel + 0.3, uSeaLevel - 0.8, y );
+		float mussel = smoothstep( 0.55, 0.7, ocNoise( p * 0.9 + 1.0 ) ) * smoothstep( 1.0, -0.6, y );
+		shelf = mix( shelf, ocLin( vec3( 0.12, 0.13, 0.12 ) ), mussel * 0.8 );
+		shelf = mix( shelf, ocLin( vec3( 0.26, 0.33, 0.17 ) ), smoothstep( 0.5, 0.75, ocNoise( p * 0.45 + 7.0 ) ) * smoothstep( 1.4, -0.2, y ) * 0.7 );
+		shelf = mix( shelf, ocLin( vec3( 0.55, 0.40, 0.42 ) ), smoothstep( -0.9, -1.5, y ) * 0.5 );
+		vec3 earth = mix( ocLin( vec3( 0.56, 0.44, 0.31 ) ), ocLin( vec3( 0.46, 0.35, 0.25 ) ), drift );
+		vec3 col = sand * wa.x + dune * wa.y + fyn * wa.z + grass * wa.w + rock * wb.x + cliff * wb.y + shelf * wb.z + earth * wb.w;
+		// the red ochre seam in the gully
+		float od = length( p - uOchre.xy );
+		if ( od < uOchre.z ) {
+			float seam = smoothstep( 0.55, 0.85, sin( y * 2.4 + ocNoise( p * 0.5 ) * 2.0 ) * 0.5 + 0.5 ) * ( 1.0 - smoothstep( uOchre.z * 0.5, uOchre.z, od ) );
+			col = mix( col, ocLin( vec3( 0.61, 0.24, 0.13 ) ), seam * smoothstep( 0.2, 0.5, 1.0 - nW.y ) );
+		}
+		// wet: the swash zone and everything the sea covers
+		float wet = smoothstep( uSeaLevel + 1.1, uSeaLevel + 0.15, y );
+		col = mix( col, col * vec3( 0.58, 0.6, 0.62 ), wet * ( 0.85 - 0.3 * wb.z ) );
+		diffuseColor.rgb = col;
+	}
+`
+
+const TERRAIN_NORMAL = /* glsl */ `
+	{
+		// bend the normal on rock so cliffs read as faceted stone
+		vec4 wbn = vSplatB;
+		float rk = clamp( wbn.x + wbn.y + wbn.z * 0.6, 0.0, 1.0 );
+		if ( rk > 0.05 ) {
+			vec3 q = vOcWorld * 0.38;
+			float e = 0.35;
+			float n0 = ocNoise3( q );
+			vec3 g = vec3( ocNoise3( q + vec3( e, 0.0, 0.0 ) ) - n0, ocNoise3( q + vec3( 0.0, e, 0.0 ) ) - n0, ocNoise3( q + vec3( 0.0, 0.0, e ) ) - n0 ) / e;
+			vec3 gv = ( viewMatrix * vec4( g, 0.0 ) ).xyz;
+			normal = normalize( normal - gv * 0.55 * rk );
+		}
+	}
+`
+
+export type TerrainView = {
+  root: Group
+  material: MeshStandardMaterial
+  update(camera: Camera): void
+  dispose(): void
+}
+
+type Tile = { lods: Mesh[]; cx: number; cz: number }
+
+/** the river valley carried on past the world's north edge (the far field has no stamps) */
+function farRiver(x: number, z: number, h: number): number {
+  if (z > -1000) return h
+  const last = RIVER[RIVER.length - 1]
+  const rx = (last?.x ?? 330) + Math.sin(z / 260) * 60
+  const d = Math.abs(x - rx)
+  const floor = 39 + (-1024 - z) * 0.03
+  return Math.min(h, floor + Math.max(0, d - 22) * 0.52)
+}
+
+export function createTerrainView(world: WorldData, grid: TerrainGrid | null): TerrainView {
+  const root = new Group()
+  root.name = 'terrain'
+  const N = GRID_N
+  // a grid source: the real grid, or one sampled from heightAt (a stub world)
+  let hArr: Float32Array
+  let splat: { a: Uint8Array; b: Uint8Array }
+  if (grid) {
+    hArr = grid.h
+    splat = buildSplat(grid)
+  } else {
+    hArr = new Float32Array(N * N)
+    for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) hArr[iz * N + ix] = world.heightAt(-HALF + ix * CELL, -HALF + iz * CELL)
+    splat = { a: new Uint8Array(N * N * 4).fill(0), b: new Uint8Array(N * N * 4).fill(0) }
+    for (let i = 0; i < N * N; i++) splat.a[i * 4 + 2] = 255
+  }
+  const src: GridSource = { h: (ix, iz) => hArr[iz * N + ix] ?? 0, splat }
+
+  const ochre = world.pois.find((p) => p.id === 'ochre-seam')
+  const ochreU = { value: ochre ? new Vector4(ochre.x + 6, ochre.z, 9, 0) : new Vector4(0, 0, 0, 0) }
+  const material = new MeshStandardMaterial({ roughness: 0.92, metalness: 0 })
+  patchPaint(material, { brush: 0.35, rim: 0.15 }, {
+    key: 'terrain',
+    vertexHead: TERRAIN_VERT_HEAD,
+    vertexMain: TERRAIN_VERT_MAIN,
+    fragmentHead: TERRAIN_FRAG_HEAD,
+    albedo: TERRAIN_ALBEDO,
+    normal: TERRAIN_NORMAL,
+    uniforms: { uKeyDirT: LIGHT.uKeyDir, uOchre: ochreU },
+  })
+
+  // detail tiles
+  const tiles: Tile[] = []
+  const toIx = (x: number) => Math.round((x + HALF) / CELL)
+  for (let z0 = DETAIL.z0; z0 < DETAIL.z1; z0 += TILE) {
+    for (let x0 = DETAIL.x0; x0 < DETAIL.x1; x0 += TILE) {
+      const lods: Mesh[] = []
+      for (const lod of LODS) {
+        const step = lod / CELL
+        const geo = buildPatch(src, toIx(x0), toIx(z0), toIx(x0 + TILE), toIx(z0 + TILE), step, true)
+        const m = new Mesh(geo, material)
+        m.castShadow = lod === 2
+        m.receiveShadow = true
+        m.visible = false
+        m.name = `terrain-${x0}-${z0}-${lod}`
+        root.add(m)
+        lods.push(m)
+      }
+      tiles.push({ lods, cx: x0 + TILE / 2, cz: z0 + TILE / 2 })
+    }
+  }
+
+  // the rest of the world at 8 m, the detail region cut out
+  {
+    const step = 8 / CELL
+    const geo = buildPatch(src, 0, 0, N - 1, N - 1, step, true)
+    const index = geo.getIndex()
+    const pos = geo.getAttribute('position')
+    if (index) {
+      const keep: number[] = []
+      const arr = index.array
+      for (let t = 0; t < arr.length; t += 3) {
+        const a = arr[t] ?? 0
+        const b = arr[t + 1] ?? 0
+        const c = arr[t + 2] ?? 0
+        const cx = (pos.getX(a) + pos.getX(b) + pos.getX(c)) / 3
+        const cz = (pos.getZ(a) + pos.getZ(b) + pos.getZ(c)) / 3
+        if (cx > DETAIL.x0 && cx < DETAIL.x1 && cz > DETAIL.z0 && cz < DETAIL.z1) continue
+        keep.push(a, b, c)
+      }
+      geo.setIndex(new BufferAttribute(new Uint32Array(keep), 1))
+    }
+    const m = new Mesh(geo, material)
+    m.receiveShadow = true
+    m.name = 'terrain-coarse'
+    root.add(m)
+  }
+
+  // the far field: a tensor grid growing outward, the world square cut out
+  {
+    const base = createBaseField(world.seed)
+    const coords: number[] = []
+    let s = 64
+    let v = HALF
+    const outer: number[] = []
+    while (v < 26000) {
+      v += s
+      outer.push(v)
+      s *= 1.13
+    }
+    for (let i = outer.length - 1; i >= 0; i--) coords.push(-(outer[i] ?? 0))
+    for (let c = -HALF; c <= HALF; c += 64) coords.push(c)
+    for (const o of outer) coords.push(o)
+    const n = coords.length
+    const pos = new Float32Array(n * n * 3)
+    const nor = new Float32Array(n * n * 3)
+    const sa = new Uint8Array(n * n * 4)
+    const sb = new Uint8Array(n * n * 4)
+    const hf = (x: number, z: number) => farRiver(x, z, base.heightAt(x, z))
+    for (let j = 0; j < n; j++) {
+      const z = coords[j] ?? 0
+      for (let i = 0; i < n; i++) {
+        const x = coords[i] ?? 0
+        const k = j * n + i
+        const hv = hf(x, z)
+        pos[k * 3] = x
+        pos[k * 3 + 1] = hv
+        pos[k * 3 + 2] = z
+        const e = Math.max(8, Math.abs(x) * 0.01 + Math.abs(z) * 0.01)
+        const dx = hf(x + e, z) - hf(x - e, z)
+        const dz = hf(x, z + e) - hf(x, z - e)
+        const nx = -dx / (2 * e)
+        const nz = -dz / (2 * e)
+        const len = Math.hypot(nx, 1, nz)
+        nor[k * 3] = nx / len
+        nor[k * 3 + 1] = 1 / len
+        nor[k * 3 + 2] = nz / len
+        const slope = Math.hypot(nx, nz)
+        if (hv < 2.5) sa[k * 4] = 255
+        else if (slope > 0.75) sb[k * 4 + 1] = 255
+        else if (slope > 0.45 || hv > 250) sb[k * 4] = 200
+        else sa[k * 4 + (hv > 90 ? 3 : 2)] = 255
+        if (sb[k * 4] === 200) sa[k * 4 + 2] = 55
+      }
+    }
+    const idx: number[] = []
+    for (let j = 0; j < n - 1; j++) {
+      for (let i = 0; i < n - 1; i++) {
+        const cx = ((coords[i] ?? 0) + (coords[i + 1] ?? 0)) / 2
+        const cz = ((coords[j] ?? 0) + (coords[j + 1] ?? 0)) / 2
+        if (Math.abs(cx) < HALF && Math.abs(cz) < HALF) continue
+        const a = j * n + i
+        const b = a + 1
+        const c = a + n
+        const d = c + 1
+        idx.push(a, c, b, b, c, d)
+      }
+    }
+    const geo = new BufferGeometry()
+    geo.setAttribute('position', new BufferAttribute(pos, 3))
+    geo.setAttribute('normal', new BufferAttribute(nor, 3))
+    geo.setAttribute('aSplatA', new Uint8BufferAttribute(sa, 4, true))
+    geo.setAttribute('aSplatB', new Uint8BufferAttribute(sb, 4, true))
+    geo.setIndex(new BufferAttribute(new Uint32Array(idx), 1))
+    geo.computeBoundingSphere()
+    const m = new Mesh(geo, material)
+    m.receiveShadow = false
+    m.frustumCulled = false
+    m.name = 'terrain-far'
+    root.add(m)
+  }
+
+  const camPos = new Vector3()
+  return {
+    root,
+    material,
+    update(camera: Camera) {
+      camPos.setFromMatrixPosition(camera.matrixWorld)
+      const camH = Math.max(0, camPos.y - world.heightAt(camPos.x, camPos.z))
+      const bias = camH * 0.8
+      for (const t of tiles) {
+        const d = Math.max(0, Math.hypot(camPos.x - t.cx, camPos.z - t.cz) - TILE * 0.6) + bias
+        const lod = d < LOD_DIST[0] ? 0 : d < LOD_DIST[1] ? 1 : 2
+        for (let k = 0; k < t.lods.length; k++) {
+          const m = t.lods[k]
+          if (m) m.visible = k === lod
+        }
+      }
+    },
+    dispose() {
+      root.traverse((o) => {
+        if (o instanceof Mesh) o.geometry.dispose()
+      })
+      material.dispose()
+    },
+  }
+}
