@@ -560,8 +560,9 @@ export function buildTerrain(seed: number): TerrainGrid {
       const d = Math.hypot(x - sx, z - sz) * (1 + nD.at(x / 7, z / 7) * 0.25)
       if (d > r) return v
       stack[i] = 1
+      // only a low reef round the foot: the stack itself is the world view's blocks standing on it
       const k = 1 - smoothstep(r * 0.5, r, d)
-      return Math.max(v, top * k + nD.ridged(x / 4, z / 4, 2) * 1.6 * k + v * (1 - k))
+      return Math.max(v, Math.min(top, 1.1) * k + nD.ridged(x / 4, z / 4, 2) * 0.9 * k + v * (1 - k))
     })
   }
 

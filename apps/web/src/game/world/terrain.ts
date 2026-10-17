@@ -254,8 +254,14 @@ vec3 ocBushes( vec2 p, float px, vec3 soil ) {
 	ca = mix( ca, ocLin( vec3( 0.8, 0.5, 0.54 ) ), step( 0.975, a.w ) * smoothstep( 0.45, 0.15, abs( a.y - 0.4 ) ) );
 	vec3 o = mix( ground, cb, b.x );
 	o = mix( o, ca, a.x );
-	// far away: the average
-	vec3 avg = mix( soil, ocLin( vec3( 0.47, 0.47, 0.3 ) ), 0.66 );
+	// far away: the veld's own patchwork, old dark stands, young pale ones after a fire, restio tan in the damp
+	float v1 = ocNoise( p * 0.035 + 3.0 );
+	float v2 = ocNoise( p * 0.13 + 7.0 );
+	float v3 = ocNoise( p * 0.5 + 1.0 );
+	vec3 avg = mix( ocLin( vec3( 0.35, 0.37, 0.31 ) ), ocLin( vec3( 0.5, 0.49, 0.38 ) ), smoothstep( 0.3, 0.7, v1 ) );
+	avg = mix( avg, ocLin( vec3( 0.28, 0.3, 0.27 ) ), smoothstep( 0.55, 0.8, v2 ) * 0.7 );
+	avg = mix( avg, ocLin( vec3( 0.6, 0.55, 0.42 ) ), smoothstep( 0.66, 0.85, v2 * 0.6 + v1 * 0.4 ) * 0.6 );
+	avg = mix( avg * ( 0.86 + 0.28 * v3 ), soil, 0.15 );
 	return mix( avg, o, smoothstep( 1.4, 0.45, px * 3.0 ) );
 }
 `
@@ -554,7 +560,11 @@ export function createTerrainView(world: WorldData, grid: TerrainGrid | null): T
         else if (slope > 0.45 || hv > 420) {
           sb[k * 4] = 150
           sa[k * 4 + 2] = 105
-        } else sa[k * 4 + (hv > 40 && hv < 120 && slope < 0.15 ? 3 : 2)] = 255
+        } else if (hv > 40 && hv < 120 && slope < 0.15) {
+          // the inland grass, never a lawn: the veld runs through it
+          sa[k * 4 + 3] = 150
+          sa[k * 4 + 2] = 105
+        } else sa[k * 4 + 2] = 255
       }
     }
     const idx: number[] = []

@@ -467,9 +467,10 @@ const ROCK_ALBEDO = /* glsl */ `
 		// band, mussels and weed at the foot
 		rock = mix( rock, rock * vec3( 0.6, 0.57, 0.55 ), smoothstep( 14.0, 2.0, wp.y ) * 0.8 );
 		#ifdef OC_STACK
-			// the birds' white on the tops
-			float guano = ocEdgeF( 0.55, ocNoise( wp.xz * 0.8 ) * 0.6 + ocNoise( wp.xz * 3.3 ) * 0.4 ) * smoothstep( 0.35, 0.8, nW.y ) * smoothstep( 3.0, 5.0, wp.y );
-			rock = mix( rock, ocLinF( vec3( 0.86, 0.84, 0.78 ) ), guano * 0.85 );
+			// out in the swell the rock is always damp and dark; the birds' white only on the flat tops
+			rock *= vec3( 0.66, 0.65, 0.64 );
+			float guano = ocEdgeF( 0.62, ocNoise( wp.xz * 0.8 ) * 0.6 + ocNoise( wp.xz * 3.3 ) * 0.4 ) * smoothstep( 0.6, 0.9, nW.y ) * smoothstep( 3.0, 5.0, wp.y );
+			rock = mix( rock, ocLinF( vec3( 0.8, 0.78, 0.72 ) ), guano * 0.7 );
 		#endif
 		float tidal = smoothstep( 3.6, 1.8, wp.y );
 		rock = mix( rock, rock * vec3( 0.48, 0.46, 0.45 ), tidal );
@@ -866,12 +867,13 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
   const stacks: Place[] = []
   const kr = stream(521)
   for (const [sx, sz, r, top] of STACKS) {
-    const n = r > 10 ? 4 : r > 7 ? 3 : 2
+    // narrow, upright blocks split by joints, not one round lump
+    const n = r > 10 ? 6 : r > 7 ? 4 : 2
     for (let i = 0; i < n; i++) {
       const a = kr() * Math.PI * 2
-      const off = i === 0 ? 0 : r * (0.25 + 0.3 * kr())
-      const s = r * (i === 0 ? 0.72 : 0.42 + 0.2 * kr())
-      const h = (i === 0 ? top + 1.2 : top * (0.45 + 0.4 * kr())) + 3
+      const off = i === 0 ? 0 : r * (0.3 + 0.35 * kr())
+      const s = r * (i === 0 ? 0.52 : 0.28 + 0.16 * kr())
+      const h = (i === 0 ? top + 1.6 : top * (0.4 + 0.5 * kr())) + 3
       stacks.push({ x: sx + Math.cos(a) * off, z: sz + Math.sin(a) * off, y: -3, s, sy: h / (s * 0.62), yaw: kr() * 6.28, r: 1, g: 1, b: 1, tilt: 0 })
     }
   }
