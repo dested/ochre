@@ -1,11 +1,18 @@
-name: ochre          # init → project.json name; also the Postgres db/user and <name>.dested.com
-kind: ssr
-runtime: bun
-port: 4080                 # container port; the task def injects it as PORT, which server/env.ts already reads
-size: s
-rootDir: apps/web
-build: bun run build       # runs in apps/web after the root workspace install (needs Drydock's workspace fix)
-start: bun run start       # cross-env NODE_ENV=production bun server.ts. No --env-file in start: prod env comes from ECS/SSM
-database: true
-prisma: true
-predeploy: bunx prisma migrate deploy   # never Drydock's `db push --accept-data-loss` default
+# drydock.yaml — Drydock deploy manifest. Replaces render.yaml.
+# Drydock reads this to build, run, and provision your app. Edit here or in
+# the portal (portal writes win on the next "Re-commit"). Secrets live in the
+# portal (SSM), never in this file.
+name: ochre
+kind: ssr          # ssr | static
+runtime: bun        # bun | node
+port: 4080
+size: s          # xs | s | m | l — memory reservation
+rootDir: apps/web       # app lives in this repo subdirectory
+workspace: "@app/web"   # Bun workspace member: root install --filter
+build: bun run build
+start: bun run start
+database: true      # provision Postgres + DATABASE_URL
+prisma: true        # prisma generate on build, db push predeploy
+predeploy: bunx prisma migrate deploy
+domains:
+  - ochre.dested.com
