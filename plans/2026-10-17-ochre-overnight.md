@@ -634,6 +634,10 @@ controller, cameras and verbs that make each stage of life feel different; and t
   jump to provider.whale, walk to the whale beach and confirm the stranded whale renders, beached on the sand (not
   under it, not floating, not in the water), big enough to read from the cliff path. If it's missing, find why; a fix
   in `game/play/cast.ts` (play's) goes to play as exact lines. Ready line with a shot from the cliff path and one beside it.
+  **P4 item 0b (04:48):** the held.shell offering: the shell prop is a 1.6 cm bead; make the offered shell a real
+  shell, ~5 cm (a periwinkle or a small abalone with its nacre), readable in the infant's view. And the crouch pose
+  leaves both hands at her sides; the offering hand comes up in front of her chest at ~0.25 m. Play stands her up as a
+  stop-gap (29ac34c) and drops that once the crouch holds the offer.
 
 - (2026-10-17 04:35, lead) **Sim S6** (from sim's look-only run at seed 80000, logs `/w/junk/sim-80k/sim/pt-p2.log`,
   `/w/junk/sim-80k/sim/pt-e2.log`). In order:
@@ -672,7 +676,7 @@ Board: down · Last pushed: cca08b3 (main, 04:24) · Gate: install 0, typecheck 
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | male-life summary and elder card painting (existing art); then held.* recheck after F2 | recheck #9/#11 passed 04:37 (663f793 captions under hidden HUD, 6e14e84 scrollbars); F1 mark 23acc39 passed; U7 passed (bdc3b86); chatter 830a7ab; U6 ce615bc passed; U5, U3 passed | working |
 | play | opus-high | game/play, game/audio, app/play.tsx | F2 held opening (acked 04:21) | F1 play 7e42a4a passed (all 9; dd47469 summary hang fixed); PL3 runs 1–2 reached the summary, no errors; 8c75080 aim, 8f774e0 tags, 7a6f0e5 spoor passed; 9a7684d passed (E verb, seated camera); PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
 
-Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); QA server :4090 (prod build of b5d9c29, log /w/junk/sim-80k/qa-server.log); Drydock portal :4400 (Windows bun, log in
+Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); QA server :4090 (prod build of c0edcb6, log /w/junk/sim-80k/qa-server.log); Drydock portal :4400 (Windows bun, log in
 scratchpad drydock-portal.log)
 Images used: 47 / 200 (lead 2, ui 45). OpenAI credit exhausted 01:05; generation stopped (needs-sal Check 2)
 Waiting on Sal: none (needs-sal file: plans/2026-10-17-needs-sal.md)
