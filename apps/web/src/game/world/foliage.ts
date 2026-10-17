@@ -518,12 +518,12 @@ const LEAF_ALBEDO = /* glsl */ `
 			float dab = 1.0 - smoothstep( rad - 0.2, rad + 0.04, sqrt( d1 ) );
 			diffuseColor.rgb *= mix( 1.0, mix( 0.86, 1.12, h.z ) * mix( 0.66, 1.0, dab ), near );
 			ocKeyOcc *= 1.0 - 0.4 * ( 1.0 - dab ) * near;
-			ocLeafTilt = ( - rn * 0.35 * dab + ( h - 0.5 ) * 1.2 ) * near;
+			ocLeafTilt = ( - rn * 0.35 * dab + ( h - 0.5 ) * 0.9 ) * near;
 			// the outline is the clusters' edge, not the lump's: between them, where the surface turns away, it opens
 			// (the facet's own normal: the shading normal leans toward the clump's dome and faces the eye too often)
 			vec3 fN = normalize( cross( dFdx( vViewPosition ), dFdy( vViewPosition ) ) );
 			float ndvL = abs( dot( fN, normalize( vViewPosition ) ) );
-			if ( ( dab < 0.55 && ndvL < 0.5 * near ) || h.x < 0.1 * near * lc ) discard;
+			if ( ( dab < 0.55 && ndvL < 0.5 * near ) || h.x < 0.06 * near * lc ) discard;
 		}
 		#ifndef FLAT_SHADED
 			float ndv = abs( dot( normalize( vNormal ), normalize( vViewPosition ) ) );
