@@ -79,6 +79,21 @@ function orderRow(row: readonly LineageEntry[], above: readonly LineageEntry[]):
     } else units.push([p])
   }
   for (const p of row) if (!placed.has(p.id)) units.push([p])
+  // the player sits in the middle of their brothers and sisters, not at the end
+  const keyAt = (i: number) => {
+    const head = units[i]?.[0]
+    return head ? parentIndex(head) : Number.NaN
+  }
+  const mine = units.findIndex((u) => u.some((p) => p.isPlayer))
+  const own = units[mine]
+  if (own) {
+    let lo = mine
+    let hi = mine
+    while (keyAt(lo - 1) === keyAt(mine)) lo--
+    while (keyAt(hi + 1) === keyAt(mine)) hi++
+    units.splice(mine, 1)
+    units.splice(lo + Math.floor((hi - lo) / 2), 0, own)
+  }
   return units
 }
 
@@ -89,13 +104,51 @@ function bondWord(bond: number): string {
   return 'Distant'
 }
 
-const ROW_LABELS: Record<number, string> = {
-  [-2]: 'Grandparents',
-  [-1]: 'Parents',
-  0: 'Your generation',
-  1: 'Children',
-  2: 'Grandchildren',
+/** "Parents" only when the row is just the player's own line (and their partners); otherwise the generation */
+function rowLabel(gen: number, row: readonly LineageEntry[], line: ReadonlySet<string>): string {
+  const own = row.every((p) => line.has(p.id) || (p.partnerId !== null && line.has(p.partnerId)))
+  switch (gen) {
+    case -2:
+      return own ? 'Grandparents' : "Your grandparents' generation"
+    case -1:
+      return own ? 'Parents' : "Your parents' generation"
+    case 0:
+      return 'Your generation'
+    case 1:
+      return own ? 'Children' : 'The next generation'
+    case 2:
+      return own ? 'Grandchildren' : 'The generation after'
+    default:
+      return ''
+  }
 }
+
+/** the player's direct line: ancestors through mother and father, descendants through children */
+function directLine(all: readonly LineageEntry[], playerId: string): Set<string> {
+  const byId = new Map(all.map((p) => [p.id, p]))
+  const line = new Set<string>()
+  const up = (id: string | null) => {
+    if (!id || line.has(id) || !byId.has(id)) return
+    line.add(id)
+    const p = byId.get(id)
+    up(p?.motherId ?? null)
+    up(p?.fatherId ?? null)
+  }
+  up(playerId)
+  const down = (id: string) => {
+    for (const c of all) {
+      if ((c.motherId === id || c.fatherId === id) && !line.has(c.id)) {
+        line.add(c.id)
+        down(c.id)
+      }
+    }
+  }
+  down(playerId)
+  return line
+}
+
+/** past this many people a row drops the skill lists and draws smaller faces, so it stays on one line */
+const FULL_ROW = 4
 
 export function LineageScreen() {
   const lineage = useBridge((s) => s.lineage)
@@ -128,6 +181,7 @@ export function LineageScreen() {
   const band = everyone.filter((p) => !family.has(p.id))
   const byGen = new Map<number, LineageEntry[]>()
   for (const p of everyone) if (family.has(p.id)) byGen.set(p.generation, [...(byGen.get(p.generation) ?? []), p])
+  const line = directLine(everyone, player.id)
   const gens = [...byGen.keys()].sort((a, b) => a - b)
   const rows: { gen: number; units: Unit[] }[] = []
   let above: LineageEntry[] = []
@@ -143,7 +197,7 @@ export function LineageScreen() {
         className="absolute inset-0 bg-cover bg-center opacity-[0.14] blur-[8px]"
         style={{ backgroundImage: 'url(/art/chapters/held.webp)', transform: 'scale(1.1)' }}
       />
-      <div className="ui-scale absolute inset-0 overflow-y-auto px-[clamp(24px,5vw,80px)] pb-12 pt-[clamp(24px,5vh,52px)]">
+      <div className="ui-scale absolute inset-0 overflow-y-auto overflow-x-hidden px-[clamp(24px,5vw,80px)] pb-12 pt-[clamp(24px,5vh,52px)]">
         <div className="mb-6 flex items-end justify-between gap-6">
           <div>
             <h2
@@ -162,7 +216,7 @@ export function LineageScreen() {
             <div key={gen} className="flex w-full flex-col items-center">
               {i > 0 && <Connector />}
               <h3 className="mb-3 font-serif text-[15px] italic text-bone-dim" style={{ fontVariationSettings: '"opsz" 18' }}>
-                {ROW_LABELS[gen] ?? ''}
+                {rowLabel(gen, units.flat(), line)}
               </h3>
               <div className="flex flex-wrap justify-center gap-x-[clamp(20px,3vw,52px)] gap-y-5">
                 {units.map((unit) => (
@@ -170,7 +224,7 @@ export function LineageScreen() {
                     {unit.map((p, j) => (
                       <div key={p.id} className="flex items-center gap-3">
                         {j > 0 && <PartnerMark />}
-                        <Person p={p} self={p.isPlayer} />
+                        <Person p={p} self={p.isPlayer} small={units.flat().length > FULL_ROW} />
                       </div>
                     ))}
                   </div>
@@ -225,7 +279,9 @@ function Person({ p, self = false, small = false }: { p: LineageEntry; self?: bo
   const r = size / 2 - 3
   const len = 2 * Math.PI * r
   const warm = self ? C.amber : mix(C.boneDim, C.amber, p.bond)
-  const skills = p.skills.map((s) => SKILL_LABELS[s]).join(', ')
+  // everyone knows faces; past three the list stops telling you who someone is
+  const known = p.skills.filter((s) => s !== 'faces').map((s) => SKILL_LABELS[s])
+  const skills = known.length > 3 ? `${known.slice(0, 3).join(', ')} and ${known.length - 3} more` : known.join(', ')
   return (
     <div className={'flex items-center gap-3 ' + (p.alive ? '' : 'opacity-55')} style={{ minWidth: small ? 0 : 168 }}>
       <div className="relative grid shrink-0 place-items-center" style={{ width: size, height: size }}>
@@ -255,9 +311,9 @@ function Person({ p, self = false, small = false }: { p: LineageEntry; self?: bo
           {p.name}
           {!p.alive && <span className="ml-2 font-sans text-[12px] italic text-bone-dim">remembered</span>}
         </p>
-        <p className="whitespace-nowrap font-sans text-[13px] text-bone-dim">
+        <p className={'font-sans text-[13px] leading-snug text-bone-dim ' + (small ? '' : 'whitespace-nowrap')}>
           {p.relation}
-          {p.ageYears > 0 ? ` · ${ageShort(p.ageYears)}` : ''}
+          {` · ${ageShort(p.ageYears)}`}
         </p>
         {!self && <p className="font-sans text-[12px]" style={{ color: warm }}>{bondWord(p.bond)}</p>}
         {!small && skills && <p className="mt-0.5 max-w-[200px] font-sans text-[12px] leading-snug text-bone/60">{skills}</p>}

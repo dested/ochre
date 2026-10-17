@@ -43,7 +43,7 @@ export function Hud({ dimmed = false }: { dimmed?: boolean }) {
   return (
     <div
       className="pointer-events-none fixed inset-0 select-none overflow-hidden"
-      style={{ opacity: dimmed ? 0.25 : 1, transition: 'opacity 400ms ease' }}>
+      style={{ opacity: dimmed ? 0 : 1, transition: 'opacity 400ms ease' }}>
       <NameTags tags={nameTags} />
 
       <div className="absolute left-[clamp(20px,3vw,44px)] top-[clamp(18px,3.4vh,36px)]">

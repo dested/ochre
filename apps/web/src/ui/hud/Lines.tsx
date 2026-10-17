@@ -7,7 +7,7 @@ export function ObjectiveLine({ objective, dim }: { objective: Objective; dim: b
   return (
     <div
       key={objective.id + objective.text}
-      className="ui-wash flex max-w-[min(44vw,520px)] animate-ui-rise items-start gap-3"
+      className="ui-wash ui-wash-tight flex max-w-[min(44vw,520px)] animate-ui-rise items-start gap-3"
       style={{ opacity: dim ? 0.6 : 1, transition: 'opacity 1.6s ease' }}>
       <svg width="16" height="22" viewBox="0 0 16 22" className="mt-[3px] shrink-0" aria-hidden>
         <g fill="none" stroke={C.ochreBright} strokeWidth="1.8" strokeLinecap="round" style={{ filter: 'url(#ui-brush)' }}>

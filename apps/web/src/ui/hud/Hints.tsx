@@ -70,17 +70,17 @@ export function ControlHints() {
   }, [name])
 
   const walking = stage !== 'held'
-  // contextual hints first, then the basics
+  // what is on screen right now (the watch ring, the spear) first, then moving, then the first prompt, then Esc
   const active: HintId | null = !seen || !visible
     ? null
     : watching && !seen.has('watch')
       ? 'watch'
       : aiming && !seen.has('aim')
         ? 'aim'
-        : promptE && !seen.has('act')
-          ? 'act'
-          : walking && !seen.has('move')
-            ? 'move'
+        : walking && !seen.has('move')
+          ? 'move'
+          : promptE && !seen.has('act')
+            ? 'act'
             : !seen.has('menu')
               ? 'menu'
               : null
