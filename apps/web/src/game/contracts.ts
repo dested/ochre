@@ -589,6 +589,8 @@ export type SimEvent =
   | { type: 'death'; personId: string }
   | { type: 'life-summary'; summary: LifeSummary }
   | { type: 'sfx'; name: SfxName; at: Vec2 | null }
+  /** the director moved the player (a travel cut or a new chapter); play snaps its controller and camera there */
+  | { type: 'teleport'; position: Vec2; heading: number }
 
 export type PlayerCommand =
   /** play integrates the player's movement each frame and reports it */

@@ -399,6 +399,11 @@ controller, cameras and verbs that make each stage of life feel different; and t
   test panel goes in `/lab/play` (play each sfx, scrub the ambience inputs). ui drops U4 and keeps U3. Applies to:
   play, ui.
 
+- (2026-10-17 01:12, lead) `SimEvent` gained `{ type: 'teleport'; position: Vec2; heading: number }`: the director
+  moved the player (a travel cut behind a fade, or a new chapter). play snaps its controller and camera there, and
+  hides the HUD while `state.chapter.beatId === 'elder.walk'`. NPCs and animals within ~60 m of the player move at
+  real-time speed; distant ones at game-time speed (sim). Applies to: sim, play.
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: 60add27 (main) · Gate: typecheck green at 60add27 · Deploy: c61a551 live at https://ochre.dested.com (CI green)
