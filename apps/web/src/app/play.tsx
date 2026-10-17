@@ -1,4 +1,14 @@
-/** placeholder: the play agent replaces this with the game route (/) */
+import { ClientMount } from './client-mount'
+import { PlayOverlay } from '~/game/play/overlay'
+
+const load = () => import('~/game/play/session')
+
+/** the game route (/): the 3D session and the UI over it */
 export function PlayPage() {
-  return <div className="fixed inset-0 grid place-items-center bg-black text-[#efe3c8]">OCHRE</div>
+  return (
+    <>
+      <ClientMount load={load} />
+      <PlayOverlay />
+    </>
+  )
 }
