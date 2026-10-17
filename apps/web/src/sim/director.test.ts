@@ -465,6 +465,57 @@ describe('director', () => {
     expect(spent).toBeLessThan(budget * 0.6)
   }, 60_000)
 
+  test('youth.track: Tuk teaches as they go, never more than 45 s without a word at the headless pace', () => {
+    const sim = newSim('youth')
+    const dir = director(sim)
+    for (let i = 0; i < 20 && sim.state.chapter.beatId !== 'youth.track'; i++) {
+      dir.completeBeat()
+      steps(sim, 0.2)
+    }
+    expect(sim.state.chapter.beatId).toBe('youth.track')
+    let t = 0
+    const said: { t: number; who: string | null; text: string }[] = []
+    const frame = (to: { x: number; z: number } | null, speed: number) => {
+      const p = player(sim).position
+      let at = p
+      if (to) {
+        const left = Math.hypot(to.x - p.x, to.z - p.z)
+        const k = left > 0.01 ? Math.min(1, speed / 30 / left) : 0
+        at = { x: p.x + (to.x - p.x) * k, z: p.z + (to.z - p.z) * k }
+      }
+      sim.command({ type: 'move', position: at, heading: 0, speed, anim: to ? 'walk' : 'idle' })
+      for (const e of sim.step(1 / 30)) if (e.type === 'caption') said.push({ t, who: e.caption.speaker, text: e.caption.text })
+      t += 1 / 30
+    }
+    const tuk = () => sim.state.people.find((p) => p.id === 'tuk')
+    const top = world.poi('plateau-path-top')
+    // up the path at 2.5 m/s, then stand by Tuk while he reads the ground, then creep in at 0.8 m/s
+    while (t < 200 && sim.state.chapter.beatId === 'youth.track' && sim.state.chapter.objective?.text.startsWith('Follow ') === true) {
+      const p = player(sim).position
+      frame(Math.hypot(top.x - p.x, top.z - p.z) > 9 ? top : null, 2.5)
+    }
+    while (t < 260 && sim.state.chapter.beatId === 'youth.track' && !player(sim).skills.includes('tracking')) {
+      const f = tuk()
+      const p = player(sim).position
+      frame(f && Math.hypot(f.position.x - p.x, f.position.z - p.z) > 2 ? f.position : null, 2.2)
+    }
+    while (t < 420 && sim.state.chapter.beatId === 'youth.track') {
+      const p = player(sim).position
+      const e = sim.state.animals
+        .filter((a) => a.kind === 'eland' && a.alive)
+        .sort((a, b) => Math.hypot(a.position.x - p.x, a.position.z - p.z) - Math.hypot(b.position.x - p.x, b.position.z - p.z))[0]
+      frame(e ? e.position : null, 0.8)
+    }
+    expect(sim.state.chapter.beatId).not.toBe('youth.track')
+    const marks = [0, ...said.map((x) => x.t), t]
+    const gaps = marks.slice(1).map((m, i) => m - (marks[i] ?? 0))
+    expect(Math.max(...gaps)).toBeLessThanOrEqual(45)
+    const tukSaid = said.filter((x) => x.who === tuk()?.name).map((x) => x.text)
+    expect(tukSaid.length).toBeGreaterThanOrEqual(8)
+    expect(tukSaid.some((x) => x.includes('wind on your face'))).toBe(true)
+    expect(tukSaid.every((x) => x.split(/\s+/).length <= 14)).toBe(true)
+  }, 60_000)
+
   test('elder.walk remembers: three memories from this life, in order, on the way down', () => {
     const sim = newSim('provider')
     const dir = director(sim)

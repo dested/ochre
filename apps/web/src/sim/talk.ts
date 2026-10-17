@@ -12,7 +12,7 @@ import { TALK_CAST, TALK_LINES, type TalkCast, type TalkLine, type TalkRecent, t
 import { sunTimes } from './time'
 
 export type TalkState = {
-  /** line id → the stage and day it was last said ("small:0") */
+  /** a line's words → the stage and day it was last said ("small:0") */
   used: Record<string, string>
   /** game time each recent thing happened */
   recent: Partial<Record<TalkRecent, number>>
@@ -26,10 +26,15 @@ export type TalkState = {
   chatterAt: number
   /** hearth meat at the last look, to notice a hunt coming home */
   lastMeat: number
+  /** a line's words → the real time it was last said, so a cut to the next day doesn't bring it straight back */
+  saidAt: Record<string, number>
 }
 
+/** real seconds before the same words can come round again, whatever the day */
+const SAY_AGAIN = 120
+
 export function emptyTalk(): TalkState {
-  return { used: {}, recent: {}, talkedAt: {}, realT: 0, quietUntil: 0, chatterAt: -1e9, lastMeat: 0 }
+  return { used: {}, recent: {}, talkedAt: {}, realT: 0, quietUntil: 0, chatterAt: -1e9, lastMeat: 0, saidAt: {} }
 }
 
 /** game seconds a recent thing stays worth talking about */
@@ -135,7 +140,9 @@ export function pickLine(ctx: SimCtx, p: SimPerson, to: 'you' | 'band'): TalkLin
   let best: TalkLine | null = null
   let bestScore = -Infinity
   for (const l of TALK_LINES) {
-    if (ctx.talk.used[l.id] === today) continue
+    // keyed by the words: a band-wide line said by one role isn't said again by another the same day
+    if (ctx.talk.used[l.text] === today) continue
+    if (ctx.talk.realT - (ctx.talk.saidAt[l.text] ?? -1e9) < SAY_AGAIN) continue
     const f = fit(ctx, l, p, to)
     if (f === null) continue
     // ties (and near ties) break by a hash of the seed and the day: the same seed says the same things
@@ -178,7 +185,10 @@ export function talkTo(ctx: SimCtx, q: SimPerson): string {
   let text = scripted
   if (text === null) {
     const l = pickLine(ctx, q, 'you')
-    if (l) ctx.talk.used[l.id] = dayKey(ctx)
+    if (l) {
+      ctx.talk.used[l.text] = dayKey(ctx)
+      ctx.talk.saidAt[l.text] = ctx.talk.realT
+    }
     text = l ? fill(ctx, l.text) : 'Mm.'
   }
   say(ctx, q, text, `talk-${q.id}-${Math.floor(s.clock.t)}`)
@@ -244,7 +254,8 @@ export function updateChatter(ctx: SimCtx, realDt: number): void {
       const fb = lb ? (fit(ctx, lb, b, 'band') ?? -Infinity) : -Infinity
       const pick = la && fa >= fb ? { p: a, l: la } : lb ? { p: b, l: lb } : null
       if (!pick) continue
-      tk.used[pick.l.id] = dayKey(ctx)
+      tk.used[pick.l.text] = dayKey(ctx)
+      tk.saidAt[pick.l.text] = tk.realT
       tk.chatterAt = tk.realT
       say(ctx, pick.p, fill(ctx, pick.l.text), `chat-${pick.p.id}-${Math.floor(s.clock.t)}`)
       return

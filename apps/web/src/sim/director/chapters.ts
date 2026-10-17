@@ -728,14 +728,29 @@ const youth: Chapter = {
         }),
         ...fadeIn(2),
         wait(0.5),
+        run((d) => tukSay(d, STONE_LINES[0])),
         objAt((d) => `Walk with ${nameOf(d, 'father', 'Tuk')} to the silcrete outcrop`, toward('father')),
         until((d) => {
           const ridge = poi(d, 'silcrete-ridge')
-          return dist(player(d).position, ridge) < ridge.radius + 4
+          if (dist(player(d).position, ridge) < ridge.radius + 4) return true
+          // or beside Tuk once he has stopped at the outcrop's edge
+          const f = person(d, 'father')
+          return f !== undefined && dist(f.position, ridge) < ridge.radius + 6 && dist(player(d).position, f.position) < 4
         }),
         run((d) => order(d, 'father', { kind: 'hold', pose: pose('knap', 'crouch', null, 'stone'), face: poi(d, 'silcrete-ridge') })),
         objAt('Collect silcrete (0/3)', at('silcrete-ridge'), 3, (d) => d.ctx.state.inventory.silcrete),
-        until((d) => d.ctx.state.inventory.silcrete >= 3),
+        until((d) => d.ctx.state.inventory.silcrete >= 3, {
+          tick: (d) => {
+            if (d.ctx.state.inventory.silcrete >= 1 && counter(d, 'stone-ring') === 0) {
+              bump(d, 'stone-ring')
+              tukSay(d, STONE_LINES[1])
+            }
+          },
+        }),
+        // the last line waits for the ring line to be heard, then gets its own moment
+        until((d) => tukQuiet(d) >= 4.5, { max: 6 }),
+        run((d) => tukSay(d, STONE_LINES[2])),
+        wait(5),
         note('silcrete'),
         clearObj(),
       ],
@@ -823,9 +838,17 @@ const youth: Chapter = {
     {
       id: 'youth.track',
       steps: [
-        run((d) => order(d, 'father', { kind: 'goto', dest: spot(d, poi(d, 'plateau-path-top'), 8), waitFor: player(d).id, waitDist: 12, near: 1.5 })),
+        run((d) => {
+          order(d, 'father', { kind: 'goto', dest: spot(d, poi(d, 'plateau-path-top'), 8), waitFor: player(d).id, waitDist: 12, near: 1.5 })
+          d.st.counters['climb-from'] = Math.max(1, dist(player(d).position, poi(d, 'plateau-path-top')))
+        }),
         objAt((d) => `Follow ${nameOf(d, 'father', 'Tuk')} onto the plateau`, toward('father')),
-        until((d) => dist(player(d).position, poi(d, 'plateau-path-top')) < 10),
+        until((d) => dist(player(d).position, poi(d, 'plateau-path-top')) < 10, {
+          tick: (d) => {
+            const gone = 1 - dist(player(d).position, poi(d, 'plateau-path-top')) / counter(d, 'climb-from')
+            tukNext(d, 'climb', CLIMB_LINES, (i) => gone >= (CLIMB_AT[i] ?? 2))
+          },
+        }),
         ...fadeOut(1.4),
         run((d) => {
           // out on the plateau, downwind of the herd
@@ -839,15 +862,34 @@ const youth: Chapter = {
           order(d, 'father', { kind: 'hold', pose: TRACK, face: c })
         }),
         ...fadeIn(1.4),
+        run((d) => tukSay(d, WIND_LINE)),
         objAt((d) => `Watch ${nameOf(d, 'father', 'Tuk')} read the ground`, toward('father')),
-        until((d) => player(d).skills.includes('tracking')),
+        until((d) => player(d).skills.includes('tracking'), { tick: (d) => tukNext(d, 'ground', GROUND_LINES, () => true, 7) }),
         note('tracking'),
-        run((d) => order(d, 'father', { kind: 'follow', targetId: player(d).id, near: 6, speed: 1.2 })),
-        objAt("Follow the eland's trail", toHerd),
-        until((d) => {
-          const e = herdNearest(d, player(d).position)
-          return e !== null && e.calm && e.d < 32
+        run((d) => {
+          order(d, 'father', { kind: 'follow', targetId: player(d).id, near: 6, speed: 1.2 })
+          d.st.counters['trail-from'] = herdNearest(d, player(d).position)?.d ?? 0
         }),
+        objAt("Follow the eland's trail", toHerd),
+        until(
+          (d) => {
+            const e = herdNearest(d, player(d).position)
+            return e !== null && e.calm && e.d < TRAIL_CLOSE
+          },
+          {
+            tick: (d) => {
+              // what's left of reading the ground first, then the trail, whispered, as the herd gets nearer
+              if (counter(d, 'ground') < GROUND_LINES.length) {
+                tukNext(d, 'ground', GROUND_LINES, () => true, 7)
+                return
+              }
+              const from = counter(d, 'trail-from')
+              const now = herdNearest(d, player(d).position)?.d ?? from
+              const gone = from > TRAIL_CLOSE ? (from - now) / (from - TRAIL_CLOSE) : 1
+              tukNext(d, 'trail', TRAIL_LINES, (i) => gone >= (TRAIL_AT[i] ?? 2))
+            },
+          },
+        ),
       ],
     },
     {
@@ -1258,8 +1300,57 @@ function hourNowGE(d: D, h: number): boolean {
   return d.ctx.state.clock.hour >= h
 }
 
+/** Tuk teaching as he goes (youth.stone, youth.track): practical, at most 14 words, his voice */
+const STONE_LINES = [
+  'Not any stone. Look for the fine grain, smooth as fat.',
+  'Knock it. Hear that clear ring? No cracks inside. Keep it.',
+  'Under the fire, in the sand, it changes. Then it flakes true.',
+] as const
+const CLIMB_LINES = [
+  'Up top, no talking. Sound carries a long way over the flat.',
+  'Watch the grass lean. The wind tells you which way to walk.',
+] as const
+/** how far up the path (0..1) each climb line waits for */
+const CLIMB_AT = [0.05, 0.55] as const
+const WIND_LINE = 'Feel the wind on your face? Keep it there, or they smell us.'
+const GROUND_LINES = [
+  'Look. Sharp edges, crumbs still on the rim. This one is fresh.',
+  'Old prints go soft. Wind and dew round the edges off.',
+  'Walking, the hoof sits flat. Running, the toes dig in deep.',
+] as const
+/** whispered on the trail, at these shares of the way in to the herd */
+const TRAIL_LINES = ['Dung. Still warm. They were here this morning.', 'See that stem? Bent, and still rising. Very close.', 'Slow now. Stop when I stop.'] as const
+const TRAIL_AT = [0.15, 0.45, 0.75] as const
+/** the trail ends this close to a calm eland */
+const TRAIL_CLOSE = 32
+
+/** real seconds since Tuk last spoke in this beat (a long time if he hasn't) */
+function tukQuiet(d: D): number {
+  if (counter(d, 'tuk-said') === 0) return 1e9
+  return (d.ctx.state.clock.t - counter(d, 'tuk-at')) / d.ctx.state.timeScale
+}
+
+function tukSay(d: D, line: string): void {
+  caption(d, line, 'father')
+  d.st.counters['tuk-at'] = d.ctx.state.clock.t
+  bump(d, 'tuk-said')
+}
+
+/** the next of `lines` once it is due and Tuk has been quiet `gap` real seconds; `key` counts what's been said */
+function tukNext(d: D, key: string, lines: readonly string[], due: (i: number) => boolean, gap = 6): void {
+  const i = counter(d, key)
+  const line = lines[i]
+  if (line === undefined || !due(i) || tukQuiet(d) < gap) return
+  bump(d, key)
+  tukSay(d, line)
+}
+
 /** what is said while the player teaches: how to do it, now and again, and the band's talk turns to corms */
-const TEACH_HINT = (d: D) => `Dig where the dry leaves are, and let ${nameOf(d, 'child', 'the child')} watch your hands.`
+const TEACH_HINTS: readonly ((d: D) => string)[] = [
+  (d) => `Dig where the dry leaves are, and let ${nameOf(d, 'child', 'the child')} watch your hands.`,
+  (d) => `Slow hands. ${nameOf(d, 'child', 'The child')} learns by watching you dig.`,
+  (d) => `Find the dry leaves, then dig. Let ${nameOf(d, 'child', 'the child')} see each corm come up.`,
+]
 const CORM_TALK = [
   'The corms are fat this year. The rain came at the right time.',
   'Show the little one the leaves first. The leaves tell you where.',
@@ -1275,7 +1366,8 @@ function teachTalk(d: D): void {
   if (d.stepT < due) return
   bump(d, 'teach-talk')
   if (n % 2 === 0) {
-    caption(d, TEACH_HINT(d), null, undefined, 6)
+    const hint = TEACH_HINTS[(n >> 1) % TEACH_HINTS.length]
+    if (hint) caption(d, hint(d), null, undefined, 6)
     return
   }
   const pl = player(d)
