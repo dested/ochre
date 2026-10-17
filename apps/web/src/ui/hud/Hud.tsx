@@ -45,7 +45,19 @@ export function Hud({ dimmed = false, toasts }: { dimmed?: boolean; toasts: read
   // the mark waits 4 s after a new objective, so the line is read before the arrow pulls the eye
   const markWaiting = useRecent(objective ? objective.id : 'none', 4000)
 
-  if (!hud.visible) return null
+  const lines = (
+    <div className="absolute bottom-[clamp(24px,5vh,56px)] left-1/2 -translate-x-1/2">
+      <div className="ui-scale flex flex-col items-center gap-[clamp(14px,2.6vh,26px)]">
+        {hud.visible && prompt && <Prompt prompt={prompt} />}
+        <Captions captions={captions} large={largeCaptions} />
+      </div>
+    </div>
+  )
+  // a hidden HUD (the death) drops the chrome, never the story: the captions stay
+  if (!hud.visible)
+    return (
+      <div className="pointer-events-none fixed inset-0 overflow-hidden select-none">{lines}</div>
+    )
   const held = hud.stage === 'held'
   const showNeeds = reveal || needsRecent
   const showDial = reveal || dialRecent
@@ -120,12 +132,7 @@ export function Hud({ dimmed = false, toasts }: { dimmed?: boolean; toasts: read
         </div>
       )}
 
-      <div className="absolute bottom-[clamp(24px,5vh,56px)] left-1/2 -translate-x-1/2">
-        <div className="ui-scale flex flex-col items-center gap-[clamp(14px,2.6vh,26px)]">
-          {prompt && <Prompt prompt={prompt} />}
-          <Captions captions={captions} large={largeCaptions} />
-        </div>
-      </div>
+      {lines}
     </div>
   )
 }
