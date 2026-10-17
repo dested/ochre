@@ -81,7 +81,7 @@ export type ObjectiveMark = {
   x: number
   y: number
   onScreen: boolean
-  /** radians in screen space toward the target (0 = up), for the edge arrow */
+  /** radians in screen space toward the target, 0 = up, clockwise (as the wind mark), for the edge arrow */
   angle: number
   /** metres from the player */
   distance: number
