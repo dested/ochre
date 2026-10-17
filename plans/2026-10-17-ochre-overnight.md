@@ -696,6 +696,15 @@ controller, cameras and verbs that make each stage of life feel different; and t
   there (no phantom tags on held.faces / small.follow; held.faces starts at 0/4). **ui:** after the late-chapter run on
   :4090, the final held → small run is on :4091. Both servers stay frozen until ui reports.
 
+- (2026-10-17 05:37, lead) From people's whale check (`/w/junk/sim-80k/people/p4/whale/`, shot on a10f6ba). **people:** the
+  whale is there but reads as an orca (black and white, a dorsal fin). Make it a southern right whale, the whale of this
+  coast: no dorsal fin, dark grey-black all over, pale callosities on the head, the bowed jaw line. That comes before sing,
+  the hip flap and the skirt. **play:** the "Hadun / Niece" tag draws through the whale (`beside.png`); add the carcass
+  (a box or capsule) to `occluded()`. The held.shell offer stays on play's offer-shell.ts tonight (the infant is behind
+  her, so a chest-height palm would be out of view); the cast.ts:92 stand-in stays too. **world:** a long, straight,
+  thin shadow line crosses the whale beach (`far.png`). Probably the brow slab's shadow, gone with a6034f1; confirm on
+  :4091 at provider.whale, and if it's still there, find what casts it.
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: 38795f4 (main, 05:29) · Gate: install 0, typecheck 0, test 0 (73), build 0 at 38795f4 · Deploy: CI running (prev a10f6ba live)
