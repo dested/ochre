@@ -80,7 +80,8 @@ export function createSimWith(opts: SimOptions, flags: { director: boolean }): S
     brains: new Map(),
     herds: [],
     fuel: {},
-    playerControlled: false,
+    // in a story the player is play's from the first frame; in a sandbox the AI lives their day until a move arrives
+    playerControlled: flags.director,
     sleepSkip: null,
     sunCache: new Map(),
     nextAnimalId: 1,

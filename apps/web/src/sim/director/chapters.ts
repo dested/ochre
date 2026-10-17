@@ -118,9 +118,19 @@ function hearthSeat(d: D, angle: number, r = 2.6): { at: Vec2; heading: number }
   return { at, heading: face(at, h) }
 }
 
+/** the player sits down where they are (play keeps a sim-set pose until the player moves) */
+function sitDown(d: D, faceTo?: Vec2): void {
+  const pl = player(d)
+  if (pl.carriedBy) return
+  if (faceTo) pl.heading = face(pl.position, faceTo)
+  pl.anim = 'sit'
+  pl.speed = 0
+}
+
 function seatPlayer(d: D, angle = 0.4): void {
   const s = hearthSeat(d, angle, 3)
   teleport(d, s.at, s.heading)
+  sitDown(d)
 }
 
 /** the edge of a shellfish bed nearest the path down, dry at the current tide */
@@ -364,9 +374,13 @@ const small: Chapter = {
             return dist(p, sand) < sand.radius + 3 && d.ctx.world.heightAt(p.x, p.z) > d.ctx.state.clock.seaLevel + 0.5
           },
           {
-            // the tide comes in fast for a minute, then at its own pace
+            // the tide turns and comes in fast until it has risen well up the rocks, then at its own pace
             tick: (d) => {
-              d.ctx.state.timeScale = d.stepT < 90 && d.ctx.state.clock.seaLevel < 0.3 ? 300 : 72
+              const sea = d.ctx.state.clock.seaLevel
+              const low = d.st.counters.low
+              if (low === undefined || sea < low) d.st.counters.low = sea
+              const risen = sea - (d.st.counters.low ?? sea)
+              d.ctx.state.timeScale = d.stepT < 150 && sea < 0.3 && risen < 0.8 ? 300 : 72
             },
           },
         ),
@@ -1158,7 +1172,7 @@ const elder: Chapter = {
         ...fadeOut(4),
         wait(1),
       ],
-      extras: (d) => [extra('sit', 'sit', 'Sit by the sea', sitHere(d), () => {}, { targetKind: 'poi', targetId: 'shore' })],
+      extras: (d) => [extra('sit', 'sit', 'Sit by the sea', sitHere(d), (d) => sitDown(d, poi(d, 'shore-mussels')), { targetKind: 'poi', targetId: 'shore' })],
     },
   ],
 }

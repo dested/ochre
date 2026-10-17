@@ -230,7 +230,25 @@ function chooseManDay(ctx: SimCtx, p: SimPerson, ag: Agent): Agent['dayChoice'] 
   return ag.dayChoice
 }
 
+/** about a day and a half of shellfish for the band; past this, foragers dig corms, fetch wood or rest */
+const SHELLFISH_ENOUGH = 500
+
+/** shellfish at the hearth plus what is on its way there */
+function shellfishStock(ctx: SimCtx): number {
+  let total = ctx.state.hearth.shellfish
+  for (const ag of ctx.agents.values()) total += ag.load.shellfish
+  return total
+}
+
+/** gatherers on the rocks stop at enough */
+function shellfishFull(ctx: SimCtx): boolean {
+  return shellfishStock(ctx) >= SHELLFISH_ENOUGH
+}
+
+/** a shellfish bed worth walking to now, unless the hearth already has enough */
 function shoreBed(ctx: SimCtx): string | null {
+  // a new trip only once the store has gone down a good way, so nobody walks down for five minutes' work
+  if (shellfishStock(ctx) >= SHELLFISH_ENOUGH * 0.75) return null
   for (const id of ['shore-mussels', 'shore-limpets']) {
     if (bedWorthGoing(ctx, ctx.world.poi(id), 1.1, 0.6)) return id
   }
@@ -643,7 +661,7 @@ function work(ctx: SimCtx, p: SimPerson, ag: Agent, plan: Plan, dt: number): voi
       const out = bed ? bedOut(ctx, bed) : false
       // wait on the upper rocks if the bed is about to come out
       const worthWaiting = bed && !out && bedWorthGoing(ctx, bed, 0.6, 0.4)
-      if (!bed || (!out && !worthWaiting) || ag.load.shellfish >= 60 || ctx.state.clock.hour > set - 1) {
+      if (!bed || (!out && !worthWaiting) || ag.load.shellfish >= 60 || ctx.state.clock.hour > set - 1 || shellfishFull(ctx)) {
         setPlan(ctx, p, ag, 'deposit', seatPos(ctx, ag))
         return
       }
@@ -670,7 +688,7 @@ function work(ctx: SimCtx, p: SimPerson, ag: Agent, plan: Plan, dt: number): voi
         return
       }
       while (t >= plan.tick) {
-        plan.tick += rng.range(150, 210)
+        plan.tick += rng.range(240, 330)
         ag.load.shellfish++
         if (rng.chance(0.15)) {
           const q = scatter(ctx, bed, bed.radius * 0.8)

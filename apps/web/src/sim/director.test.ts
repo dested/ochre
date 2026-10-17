@@ -102,8 +102,9 @@ describe('director', () => {
     expect(sim.state.chapter.objective?.text).toBe('Get back to the sand before the sea wakes up')
     const sea0 = sim.state.clock.seaLevel
     const sand = world.poi('safe-sand')
-    standAt(sim, { x: bed.x, z: bed.z }, 25)
-    expect(sim.state.clock.seaLevel).toBeGreaterThan(sea0 + 0.3)
+    // the sea may fall a little more before it turns, then comes in fast
+    standAt(sim, { x: bed.x, z: bed.z }, 40)
+    expect(sim.state.clock.seaLevel).toBeGreaterThan(sea0 + 0.5)
     standAt(sim, { x: sand.x, z: sand.z }, 1)
     expect(sim.state.chapter.beatId).toBe('small.play')
     expect(sim.state.timeScale).toBe(72)
@@ -269,6 +270,24 @@ describe('director', () => {
     expect(loaded.state.chapter.beatId).toBe('small.gather')
     expect(loaded.state.chapter.objective?.text).toBe('Gather shellfish (0/12)')
     expect(loaded.state.notes).toEqual(sim.state.notes)
+  })
+
+  test('a seated beat sits the player down; the last walk sits them by the sea', () => {
+    const sim = newSim('elder')
+    steps(sim, 1.5)
+    expect(sim.state.chapter.beatId).toBe('elder.mark')
+    expect(player(sim).anim).toBe('sit')
+    for (let i = 0; i < 10 && sim.state.chapter.beatId !== 'elder.walk'; i++) {
+      director(sim).completeBeat()
+      steps(sim, 0.1)
+    }
+    steps(sim, 8)
+    expect(sim.state.chapter.beatId).toBe('elder.walk')
+    const sit = sim.interactionsNear(player(sim).position, 200).find((i) => i.verb === 'sit')
+    if (!sit) throw new Error('no sit by the sea')
+    sim.command({ type: 'move', position: sit.position, heading: 0, speed: 0, anim: 'idle' })
+    sim.command({ type: 'interact', interactionId: sit.id })
+    expect(player(sim).anim).toBe('sit')
   })
 
   test('the director is deterministic for a seed', () => {
