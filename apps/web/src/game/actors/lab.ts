@@ -486,6 +486,8 @@ export function mount(el: HTMLElement): () => void {
       controls.target.copy(h)
       controls.update()
     },
+    /** a hand's world position, for aiming close-up cameras */
+    handAt: (i: number, side: 'left' | 'right') => people[i]?.handPosition(side, new Vector3()).toArray() ?? null,
     count: () => people.length + crowd.length,
     /** show or hide the panel (clean contact sheets) */
     ui: (on: boolean) => {
@@ -528,7 +530,7 @@ export function mount(el: HTMLElement): () => void {
       }
     },
     /** a fixed full-body camera on person i from its left side or its front, with room for `pad` × the body */
-    frame: (i: number, view: 'side' | 'front', pad = 1.3) => {
+    frame: (i: number, view: 'side' | 'front' | 'top', pad = 1.3) => {
       const b = bodyBox(i)
       if (b.isEmpty()) return
       closeIdx = null
@@ -541,7 +543,11 @@ export function mount(el: HTMLElement): () => void {
       const th = Math.tan((camera.fov * Math.PI) / 360)
       const across = view === 'side' ? size.z : size.x
       const dist = Math.max(size.y / 2 / th, across / 2 / (th * camera.aspect)) * pad + (view === 'side' ? size.x : size.z) / 2
-      camera.position.set(c.x + (view === 'side' ? dist : 0), c.y + 0.04, c.z + (view === 'side' ? 0 : dist))
+      if (view === 'top') {
+        // from above the left side, 55 degrees down: a body lying on the ground reads whole
+        const far = Math.max(size.x, size.z) / 2 / th * pad + size.y
+        camera.position.set(c.x + far * 0.57, c.y + far * 0.82, c.z + far * 0.08)
+      } else camera.position.set(c.x + (view === 'side' ? dist : 0), c.y + 0.04, c.z + (view === 'side' ? 0 : dist))
       controls.target.copy(c)
       controls.update()
     },
@@ -554,6 +560,8 @@ export function mount(el: HTMLElement): () => void {
       if (!p) return null
       p.object.updateMatrixWorld(true)
       let minY = Infinity
+      let lowBone = -1
+      const low = new Vector3()
       const foot = [new Vector3(0, Infinity, 0), new Vector3(0, Infinity, 0)]
       const v = new Vector3()
       levelZero(p).forEach((m, mi) => {
@@ -563,7 +571,6 @@ export function mount(el: HTMLElement): () => void {
         const sw = m.geometry.getAttribute('skinWeight')
         for (let k = 0; k < pos.count; k++) {
           m.getVertexPosition(k, v).applyMatrix4(m.matrixWorld)
-          if (v.y < minY) minY = v.y
           let best = -1
           let bw = 0
           for (let j = 0; j < 4; j++) {
@@ -573,13 +580,19 @@ export function mount(el: HTMLElement): () => void {
               best = si.getComponent(k, j)
             }
           }
+          if (v.y < minY) {
+            minY = v.y
+            lowBone = best
+            low.copy(v)
+          }
           const f = best === B.footL || best === B.shinL ? 0 : best === B.footR || best === B.shinR ? 1 : -1
           const fv = foot[f]
           if (fv && v.y < fv.y) fv.copy(v)
         }
       })
       const r = (n: number) => Math.round(n * 1000) / 1000
-      return { minY: r(minY), left: foot[0]?.toArray().map(r), right: foot[1]?.toArray().map(r) }
+      const boneName = Object.entries(B).find(([, n]) => n === lowBone)?.[0] ?? String(lowBone)
+      return { minY: r(minY), low: [boneName, ...low.toArray().map(r)], left: foot[0]?.toArray().map(r), right: foot[1]?.toArray().map(r) }
     },
     /** triangles per detail level for person i (every level's meshes summed) */
     tris: (i: number) => {

@@ -5,7 +5,7 @@
  * so a person is three draw calls at any distance and a far crowd costs a fraction of the close-up triangles.
  */
 import { Group, LOD, Skeleton, SkinnedMesh, Sphere, Vector3, type Bone, type BufferGeometry } from 'three'
-import type { CarrySlot, HeldItem, PersonLook } from '../contracts'
+import type { CarrySlot, PersonLook } from '../contracts'
 import { Rng, mix32 } from '~/core/rng'
 import { bodyDims, type BodyDims } from './body'
 import type { BuildCtx } from './ctx'
@@ -17,7 +17,7 @@ import { buildHead, headShape } from './head'
 import { buildAdornments } from './adorn'
 import { hairColor, skinColor } from './looks'
 import { actorMaterials } from './materials'
-import { buildItem, buildSling } from './props'
+import { buildItem, buildSling, type PropItem } from './props'
 import { B, bindPositions, makeBones } from './rig'
 import type { RigInfo } from './pose'
 
@@ -35,7 +35,7 @@ export type BuiltPerson = {
   /** triangles per detail level, close to far (with the detail mesh) */
   levelTriangles: number[]
   /** rebuild the detail mesh with these items and an optional back sling for a child of these dims */
-  setProps(left: HeldItem, right: HeldItem, sling: { child: BodyDims; slot: CarrySlot } | null): void
+  setProps(left: PropItem, right: PropItem, sling: { child: BodyDims; slot: CarrySlot } | null): void
   dispose(): void
 }
 

@@ -7,7 +7,7 @@ import { Vector3 } from 'three'
 import type { AnimCtx } from './anims'
 import { clamp, lerp, smooth } from './geo'
 import type { ArmSpec, PoseSpec } from './pose'
-import { gripPoint } from './props'
+import { FLAKE_REACH, POKER_REACH, gripPoint } from './props'
 import { B } from './rig'
 
 const TAU = Math.PI * 2
@@ -24,6 +24,11 @@ const _ax = new Vector3()
 const _g = new Vector3()
 const _palm = new Vector3()
 const _pole = new Vector3()
+// the tool poses' own scratch (wristForGrip writes _hx, _hy, _hz and _off)
+const _tDir = new Vector3()
+const _tGrip = new Vector3()
+const _tPalm = new Vector3()
+const _tPole = new Vector3()
 
 /**
  * Where the wrist must be so a closed hand's grip lands on `grip` with the held item along `axis` and the palm
@@ -217,31 +222,39 @@ export function poseKnap(c: AnimCtx, s: PoseSpec, seatY: number): void {
   }
 }
 
+/**
+ * engraving the ochre: the slab held flat in the left hand over the lap, the flake's point drawn across its face in
+ * short careful strokes, a pause to look, again
+ */
 export function poseEngrave(c: AnimCtx, s: PoseSpec, seatY: number): void {
   const { rig, t } = c
   const legL = rig.thigh + rig.shin
-  // short careful strokes, a pause to look, again
-  const stroke = Math.sin(t * TAU * 2.6) * (frac(t / 3 + c.jit) < 0.75 ? 1 : 0)
+  const cyc = frac(t / 3 + c.jit)
+  const working = cyc < 0.75 ? 1 : 0
+  const stroke = Math.sin(t * TAU * 2.6) * working
   s.spine.x += 0.16
   s.chest.x += 0.1
   s.head.set(0.5, -0.05, 0.05)
   s.neck.x = 0.12
   const l = s.arms[0]
   const r = s.arms[1]
+  // the slab: over the lap a little left of centre, its long side across the body, its face up
+  const slab = _p0.set(0.03 * legL, seatY + 0.26 * legL, 0.33 * legL)
+  const along = _ax.set(-0.92, 0.1, 0.38).normalize()
   if (l) {
-    l.ik = true
-    l.wrist.set(0.05 * legL, seatY + 0.28 * legL, 0.32 * legL)
-    l.pole.set(0.8, -0.4, -0.4)
-    l.hand.set(-0.7, 0, -0.6)
-    l.curl = 0.55
+    gripWith(c, l, 0, slab, along, _palm.set(0, 1, 0), _pole.set(0.8, -0.4, -0.4))
+    l.curl = 0.45
+    l.thumb = 0.55
   }
   if (r) {
-    r.ik = true
-    r.wrist.set(-0.02 * legL + 0.012 * legL * stroke, seatY + 0.33 * legL, 0.31 * legL)
-    r.pole.set(-0.9, -0.3, -0.3)
-    r.hand.set(0.4, 0, 0.3)
+    // the point on the slab's face, sliding along it; the flake comes in from above and the right
+    _g.copy(slab).addScaledVector(along, 0.012 * stroke)
+    _g.y += 0.0065 + 0.006 * (1 - working)
+    const dir = _tDir.set(0.45, -0.75, 0.2).normalize()
+    const grip = _tGrip.copy(_g).addScaledVector(dir, -FLAKE_REACH)
+    gripWith(c, r, 1, grip, dir, _tPalm.set(0.5, 0, -0.3), _tPole.set(-0.9, -0.3, -0.3))
     r.curl = 0.8
-    r.thumb = 0.8
+    r.thumb = 0.85
   }
 }
 
@@ -339,7 +352,15 @@ export function poseTendFire(c: AnimCtx, s: PoseSpec): void {
     l.hand.set(0.3, 0, 0)
     l.curl = 0.4
   }
-  if (r) {
+  if (r && c.held[1] === 'none') {
+    // the poker: its tip rests by the stones, then goes into the coals (the sim seats a tender 1.27 m from the fire's
+    // centre, the bed 0.35 m across) and stirs them
+    const tip = _g.set(lerp(-0.13, -0.05, reach), lerp(0.015, 0.05, reach) + 0.02 * poke, lerp(0.74, 1.1 + 0.05 * poke, reach))
+    const shoulder = _p0.set(-0.16 * legL, hipY + 0.5 * legL, 0.12 * legL)
+    const dir = _tDir.subVectors(tip, shoulder).normalize()
+    const grip = _tGrip.copy(tip).addScaledVector(dir, -POKER_REACH)
+    gripWith(c, r, 1, grip, dir, _tPalm.set(0.4, -0.9, 0), _tPole.set(-0.9, -0.3, -0.3))
+  } else if (r) {
     r.ik = true
     r.wrist.set(-0.12 * legL, lerp(hipY + 0.12 * legL, 0.18 * legL, reach), lerp(0.3, 0.75 + 0.04 * poke, reach) * legL)
     r.pole.set(-0.9, -0.3, -0.3)
@@ -391,11 +412,17 @@ export function poseSleep(c: AnimCtx, s: PoseSpec): void {
 export function poseLieDead(c: AnimCtx, s: PoseSpec): void {
   const { rig, d } = c
   const legL = rig.thigh + rig.shin
-  s.hip.set(0, d.hipDepth * 0.95, 0)
+  // the buttocks and the shoulder blades both on the ground: the body's back reaches about 1.22× the hip depth and
+  // 1.26× the chest depth behind the spine line, so the hips sit that high and the trunk tips up toward the head by
+  // the difference
+  const hipBack = d.hipDepth * 1.22
+  const chestBack = d.chestDepth * 1.26
+  const torso = d.shoulderJointY - d.hipY
+  s.hip.set(0, hipBack + 0.002 * d.stature, 0)
   // on the back: the body's up runs along −Z, its front faces the sky
-  s.hipRot.set(-Math.PI / 2, 0, 0)
-  s.spine.set(-0.04, 0, 0)
-  s.chest.set(-0.02, 0, 0)
+  s.hipRot.set(-Math.PI / 2 + Math.atan2(Math.max(0, chestBack - hipBack), torso * 0.8), 0, 0)
+  s.spine.set(0, 0, 0)
+  s.chest.set(0, 0, 0)
   s.neck.set(0.05, 0, 0.25)
   s.head.set(-0.1, 0, 0.3)
   for (let i = 0; i < 2; i++) {
@@ -407,11 +434,12 @@ export function poseLieDead(c: AnimCtx, s: PoseSpec): void {
     leg.pitch = 1.35
     leg.yaw = 0.4
     leg.pole.set(side * 0.3, 1, 0.1)
+    // the arms lie on the ground beside the body: back from the shoulder (which sits above the ground) and a little out
     a.ik = false
-    a.flex = 0.05
+    a.flex = -Math.asin(clamp((hipBack - d.armR) / (rig.upperArm + rig.foreArm), 0, 0.6))
     a.abduct = 0.28
     a.twist = 0.3
-    a.elbow = 0.25
+    a.elbow = 0.12
     a.hand.set(0.1, 0, 0)
     a.curl = 0.35
     a.thumb = 0.2
@@ -633,7 +661,7 @@ export function poseCrawl(c: AnimCtx, s: PoseSpec): void {
   const S = rig.shin
   const arm = (d.upperArm + d.foreArm) * 0.95 + d.palm * 0.6
   const kneeH = d.kneeR
-  const hipH = kneeH + T * 0.92
+  const hipH = kneeH + T * 0.92 + 0.012 * d.stature
   const torso = d.shoulderJointY - d.hipY
   // pitch the torso so the shoulders sit at arm's height
   const pitch = Math.acos(clamp((arm - hipH) / torso, -0.2, 0.96))
@@ -666,9 +694,9 @@ export function poseCrawl(c: AnimCtx, s: PoseSpec): void {
     const leg = s.legs[i]
     const a = s.arms[i]
     if (leg) {
-      // knee down, the shin back along the ground
+      // knee down, the shin back along the ground, the foot sole-up behind it
       leg.ankle.set(side * rig.hipX * 1.3, d.footH + 0.03 * d.stature * lq.lift, -S * 0.92 + lq.z)
-      leg.pitch = -2.2
+      leg.pitch = -2.95
       leg.yaw = 0.1
       leg.pole.set(side * 0.15, -1, 0.7)
     }

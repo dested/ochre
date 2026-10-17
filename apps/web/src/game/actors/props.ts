@@ -4,7 +4,7 @@
  * forearm raised, +Z points up), skinned rigid to the hand bone, so a pose only has to place the hand.
  */
 import { Color, Matrix4, Vector3 } from 'three'
-import type { CarrySlot, Hand, HeldItem } from '../contracts'
+import type { CarrySlot, Hand, HeldItem, PersonAnim } from '../contracts'
 import type { BodyDims } from './body'
 import { B } from './rig'
 import { MeshBuilder, Rx, T, fbm3, lerp, mul, rigid, smooth, type SkinFn } from './geo'
@@ -14,6 +14,25 @@ const WOOD = new Color('#7a5a3c')
 const WOOD_DARK = new Color('#4a3424')
 const SILCRETE = new Color('#9b7863')
 const CHAR = new Color('#231a14')
+
+/** what a hand shows: a held item, or a tool the anim itself needs (the fire's poker, the engraver's slab and flake) */
+export type PropItem = HeldItem | 'poker' | 'slab' | 'flake'
+
+/** the length of the engraving flake from the grip point to its tip, and the poker's from the grip to its tip */
+export const FLAKE_REACH = 0.045
+export const POKER_REACH = 0.62
+
+/**
+ * the items the hands show for an anim: what they hold, except that tending a fire with an empty right hand takes a
+ * poker, and engraving takes both hands: the ochre slab in the left and a stone flake in the right (whatever else was
+ * held is set down)
+ */
+export function shownItems(anim: PersonAnim, held: readonly [HeldItem, HeldItem]): [PropItem, PropItem] {
+  const [l, r] = held
+  if (anim === 'tend-fire' && r === 'none') return [l, 'poker']
+  if (anim === 'engrave') return ['slab', 'flake']
+  return [l, r]
+}
 
 /** the grip point in bind space (body space with arms hanging) for a closed hand */
 export function gripPoint(d: BodyDims, hand: Hand, out: Vector3): Vector3 {
@@ -42,7 +61,7 @@ function rod(mb: MeshBuilder, at: Matrix4, skin: SkinFn, z0: number, z1: number,
   })
 }
 
-export function buildItem(mb: MeshBuilder, d: BodyDims, hand: Hand, item: HeldItem, seed: number): void {
+export function buildItem(mb: MeshBuilder, d: BodyDims, hand: Hand, item: PropItem, seed: number): void {
   if (item === 'none') return
   const k = d.stature / 1.65
   const g = gripPoint(d, hand, new Vector3())
@@ -93,6 +112,31 @@ export function buildItem(mb: MeshBuilder, d: BodyDims, hand: Hand, item: HeldIt
     }
     case 'firebrand': {
       rod(mb, at, skin, -0.2, 0.32, (z) => 0.014 * (1 + 0.1 * Math.sin(z * 23)), (z) => (z > 0.24 ? new Color('#f08a2a') : z > 0.18 ? CHAR : WOOD), 8, 12)
+      break
+    }
+    case 'poker': {
+      // a stick for the fire: a short butt behind the fist, a charred end with a glowing tip out in front
+      rod(mb, at, skin, -0.16, POKER_REACH, (z) => 0.011 * (1 - 0.3 * smooth(0.2, POKER_REACH, z)) * (1 + 0.1 * Math.sin(z * 31)), (z) => (z > POKER_REACH - 0.025 ? new Color('#f08a2a') : z > POKER_REACH - 0.14 ? CHAR : fbm3(z * 7, 3, 0, seed) > 0.5 ? WOOD : tone(WOOD, 0.8)), 7, 16)
+      break
+    }
+    case 'slab': {
+      // the ochre slab (the size of a thumb's length and two fingers wide), held flat in the fingers, its broad face
+      // to the palm's side: a cross-hatched band scratched along the top face
+      mb.at(mul(at, Rx(Math.PI / 2)), skin).box(0.006, 0.034, 0.016, (y, th, v) => {
+        const top = Math.abs(Math.sin(th)) > 0.7 && Math.abs(v.x) > 0.003
+        const hatch = Math.abs(Math.sin((y + v.z) * 260)) < 0.18 || Math.abs(Math.sin((y - v.z) * 260)) < 0.18
+        return top && Math.abs(v.z) < 0.009 && hatch ? tone(OCHRE, 0.55) : y > 0.03 ? tone(OCHRE, 0.85) : OCHRE
+      }, 3, 10, 8)
+      break
+    }
+    case 'flake': {
+      // a silcrete flake pinched in the fingers, its point out ahead of the grip
+      mb.at(mul(at, T(0, 0, FLAKE_REACH * 0.5), Rx(Math.PI / 2)), skin).box(0.004, FLAKE_REACH * 0.5, 0.009, (y) => (y > FLAKE_REACH * 0.3 ? tone(SILCRETE, 1.15) : SILCRETE), 3, 8, 6, (v) => {
+        // taper to the point
+        const k = 1 - Math.max(0, v.y / (FLAKE_REACH * 0.5)) * 0.9
+        v.x *= k
+        v.z *= k
+      })
       break
     }
     case 'firewood': {

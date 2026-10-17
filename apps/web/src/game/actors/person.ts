@@ -12,7 +12,7 @@ import type { BodyDims } from './body'
 import { buildPerson, type BuiltPerson } from './build'
 import { clamp } from './geo'
 import { Solver, blendPose, copyPose, makePose, makeSpec, type PoseSpec, type RigInfo } from './pose'
-import { backSeat, gripPoint } from './props'
+import { backSeat, gripPoint, shownItems } from './props'
 import { B } from './rig'
 
 const people = new WeakMap<PersonActor, PersonImpl>()
@@ -171,8 +171,11 @@ class PersonImpl implements PersonActor {
 
   setAnim(anim: PersonAnim, fadeSeconds = 0.25): void {
     if (anim === this.anim) return
+    const was = shownItems(this.anim, this.held)
     this.anim = anim
     this.startFade(fadeSeconds)
+    const now = shownItems(anim, this.held)
+    if (now[0] !== was[0] || now[1] !== was[1]) this.refreshProps()
   }
 
   setSpeed(mps: number): void {
@@ -274,7 +277,8 @@ class PersonImpl implements PersonActor {
 
   private refreshProps(): void {
     const sling = this.carrying && this.carrying.slot === 'back' ? { child: this.carrying.child.built.dims, slot: this.carrying.slot } : null
-    this.built.setProps(this.held[0], this.held[1], sling)
+    const [left, right] = shownItems(this.anim, this.held)
+    this.built.setProps(left, right, sling)
   }
 
   /** where a carried child's rig sits, relative to the carrier's chest or hips bone */
@@ -527,13 +531,23 @@ class PersonImpl implements PersonActor {
         if (lid) lid.quaternion.setFromAxisAngle(AX, follow + close * (0.82 - follow))
       }
     }
-    // the cape lags with speed and swings back
+    // the cape lags with speed and swings back; when the trunk bends forward (a squat at the fire, a bow) it falls
+    // back toward hanging straight down instead of standing out behind like a wing
     const cape = bones[B.cape]
     if (cape) {
       const target = 0.04 + 0.22 * Math.min(1, this.speedS / 3.5)
       this.capeV += ((target - this.cape) * 60 - this.capeV * 9) * dt
       this.cape += this.capeV * dt
-      cape.quaternion.setFromAxisAngle(AX, this.cape)
+      let lean = 0
+      const hips = bones[B.hips]
+      const spine = bones[B.spine]
+      const chest = bones[B.chest]
+      if (hips && spine && chest && this.anim !== 'sleep' && this.anim !== 'lie-dead') {
+        _q.copy(hips.quaternion).multiply(spine.quaternion).multiply(chest.quaternion)
+        _v.set(0, 1, 0).applyQuaternion(_q)
+        lean = clamp(Math.atan2(_v.z, _v.y), 0, 1.3)
+      }
+      cape.quaternion.setFromAxisAngle(AX, this.cape - 0.75 * lean)
     }
   }
 }
