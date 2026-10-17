@@ -407,6 +407,14 @@ controller, cameras and verbs that make each stage of life feel different; and t
 - (2026-10-17 01:18, lead) **No more image generation tonight**: the OpenAI credit is exhausted (01:05). Use
   the art already in `public/art/`, or procedural/shader art. Don't retry the API. Applies to: all.
 
+- (2026-10-17 01:30, lead) **ui item U5** (after U3): (a) first-use control hints in the ui style, each shown once
+  per life and derived from existing bridge state (no contract change): move/look/run when the HUD first shows in a
+  walking stage, "E" on the first prompt, the watch ring the first time `hud.watching` appears, aim/throw the first
+  time `hud.aiming` is true, Esc for the menu. Small, low-contrast, bottom-left, fade after use. (b) An "About this
+  world" screen from the title: two short paragraphs on Blombos 80,000 years ago and the research behind the game,
+  then the sources from the Field Notes, grouped. (c) The loading screen: a painting and a real progress line.
+  (d) A pass over every screen at 1920×1080 and 1280×800. Applies to: ui.
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: 2078087 (main, 01:15) · Gate: install 0, typecheck 0, test 0 at 2078087 · Deploy: 2078087 live at https://ochre.dested.com (CI 39016003224 green)
@@ -416,7 +424,7 @@ Board: down · Last pushed: 2078087 (main, 01:15) · Gate: install 0, typecheck 
 | world | opus-xhigh | world-gen, game/world, game/render | W1 | 2edee96 wip (lab washed out at 01:20, not yet ready) | working |
 | people | opus-xhigh | game/actors | P1 | — | working (spawned 00:39) |
 | sim | opus-high | sim | S2 | S1 854d192 passed (spacing, hearth ring, child hysteresis, meal mix, hunt label → S2) | working |
-| ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | U3 | U2 8965c7c passed; lineage links fix pending | working |
+| ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | U5 | U3 bf4973b passed; 627cf52 lineage fix passed | working |
 | play | opus-high | game/play, game/audio, app/play.tsx | PL3 (swapping in world modules) | PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
 
 Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); Drydock portal :4400 (Windows bun, log in
