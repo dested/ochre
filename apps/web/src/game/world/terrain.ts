@@ -185,6 +185,11 @@ uniform vec3 uKeyDirT;
 uniform vec4 uOchre;
 vec4 ocFacetT = vec4( 0.0 );
 vec3 ocLin( vec3 c ) { return pow( c, vec3( 2.2 ) ); }
+// a hard painted edge at threshold t of a field n, antialiased to a pixel however close the camera is
+float ocEdge( float t, float n ) {
+	float w = max( fwidth( n ) * 0.75, 1e-4 );
+	return smoothstep( t - w, t + w, n );
+}
 // fynbos from above: two layers of rounded shrubs (big and small) in greens, rust and blond, each lit on the
 // key light's side with a shadowed crescent opposite, over dry soil speckled with litter
 vec4 ocBushLayer( vec2 p, float cs, float seed ) {
@@ -208,7 +213,7 @@ vec4 ocBushLayer( vec2 p, float cs, float seed ) {
 	// ragged, twiggy outlines instead of discs
 	float ang = atan( rel.y, rel.x );
 	float rag = ( ocNoise( vec2( ang * 2.5, id.x * 3.1 + id.y ) ) - 0.5 ) * 0.35 + ( ocNoise( p * 7.0 ) - 0.5 ) * 0.3;
-	float bush = ( 1.0 - smoothstep( size * 0.75, size, dist + rag * size ) ) * present;
+	float bush = ( 1.0 - ocEdge( size * 0.9, dist + rag * size ) ) * present;
 	vec2 sd = normalize( uKeyDirT.xz + 1e-4 );
 	float side = clamp( dot( - rel / max( dist, 1e-3 ), sd ) * ( dist / size ), - 1.0, 1.0 );
 	return vec4( bush, side, ocHash( id + 3.7 + seed ), ocHash( id + 21.0 + seed ) );
@@ -279,16 +284,25 @@ const TERRAIN_ALBEDO = /* glsl */ `
 		float facet = ocFacetT.w;
 		vec3 rock = mix( ocLin( vec3( 0.58, 0.5, 0.4 ) ), ocLin( vec3( 0.76, 0.65, 0.5 ) ), facet );
 		rock = mix( rock, ocLin( vec3( 0.55, 0.52, 0.5 ) ), step( 0.8, facet ) * 0.6 );
-		float lichen = smoothstep( 0.7, 0.82, ocNoise( p * 0.9 + y * 0.5 ) ) * smoothstep( 0.2, 0.7, nW.y + 0.5 );
+		float lichen = ocEdge( 0.74, ocNoise( p * 0.9 + y * 0.5 ) * 0.75 + ocNoise( p * 3.7 ) * 0.25 ) * smoothstep( 0.2, 0.7, nW.y + 0.5 );
 		rock = mix( rock, ocLin( vec3( 0.74, 0.52, 0.3 ) ), lichen * 0.4 );
 		vec3 cliff = mix( rock, rock * vec3( 0.86, 0.82, 0.8 ), smoothstep( 0.4, 0.8, ocNoise( vec2( p.x + p.y, y * 0.25 ) * 0.4 ) ) );
-		// the intertidal shelf: dark rock, black mussel beds, green weed, pink coralline low down
-		vec3 shelf = mix( ocLin( vec3( 0.30, 0.27, 0.22 ) ), ocLin( vec3( 0.40, 0.35, 0.28 ) ), facet );
-		float lowZone = smoothstep( uSeaLevel + 0.3, uSeaLevel - 0.8, y );
-		float mussel = smoothstep( 0.55, 0.7, ocNoise( p * 0.9 + 1.0 ) ) * smoothstep( 1.0, -0.6, y );
-		shelf = mix( shelf, ocLin( vec3( 0.12, 0.13, 0.12 ) ), mussel * 0.8 );
-		shelf = mix( shelf, ocLin( vec3( 0.26, 0.33, 0.17 ) ), smoothstep( 0.5, 0.75, ocNoise( p * 0.45 + 7.0 ) ) * smoothstep( 1.4, -0.2, y ) * 0.7 );
-		shelf = mix( shelf, ocLin( vec3( 0.55, 0.40, 0.42 ) ), smoothstep( -0.9, -1.5, y ) * 0.5 );
+		// rock the sea reaches stays dark and wet
+		float seaRock = smoothstep( 14.0, 1.5, y ) * 0.8 + smoothstep( 4.0, 1.2, y ) * 0.2;
+		rock = mix( rock, rock * vec3( 0.55, 0.52, 0.5 ), seaRock );
+		cliff = mix( cliff, cliff * vec3( 0.55, 0.52, 0.5 ), seaRock );
+		// the intertidal shelf: small dark blocks split by cracks along the bedding, mussel clusters, olive weed,
+		// pink coralline low down, and pools left in the hollows when the tide is out
+		vec4 sf = ocFacet( vOcWorld + 13.0, nW, 0.8 );
+		vec3 shelf = mix( ocLin( vec3( 0.27, 0.24, 0.2 ) ), ocLin( vec3( 0.43, 0.38, 0.31 ) ), sf.w * 0.7 + facet * 0.3 );
+		float crackN = fract( dot( p, vec2( 0.42, 0.91 ) ) * 0.55 + ocNoise( p * 0.21 ) * 1.6 );
+		shelf *= 1.0 - 0.45 * ( 1.0 - ocEdge( 0.04, abs( crackN - 0.5 ) ) );
+		float mussel = ocEdge( 0.73, ocNoise( p * 2.3 + 1.0 ) * 0.6 + ocNoise( p * 0.4 ) * 0.4 ) * smoothstep( 0.6, -1.0, y ) * 0.8;
+		shelf = mix( shelf, ocLin( vec3( 0.1, 0.11, 0.12 ) ), mussel * 0.85 );
+		shelf = mix( shelf, ocLin( vec3( 0.3, 0.33, 0.18 ) ), ocEdge( 0.64, ocNoise( p * 0.9 + 7.0 ) * 0.7 + ocNoise( p * 3.1 ) * 0.3 ) * smoothstep( 1.4, -0.2, y ) * 0.6 );
+		shelf = mix( shelf, ocLin( vec3( 0.58, 0.42, 0.44 ) ), smoothstep( -0.9, -1.5, y ) * 0.5 );
+		float poolN = ocNoise( p * 0.16 + 11.0 ) * 0.65 + ocNoise( p * 0.55 + 3.0 ) * 0.35;
+		float pool = ocEdge( 0.69, poolN ) * step( uSeaLevel + 0.12, y ) * smoothstep( 1.8, 0.8, y ) * wb.z;
 		// earth, trodden floors and the cave: dust over rubble, each stone its own tone, darker in the cracks
 		vec3 earth = mix( ocLin( vec3( 0.54, 0.43, 0.31 ) ), ocLin( vec3( 0.44, 0.34, 0.25 ) ), drift );
 		if ( wb.w > 0.02 ) {
@@ -307,9 +321,15 @@ const TERRAIN_ALBEDO = /* glsl */ `
 			float seam = smoothstep( 0.55, 0.85, sin( y * 2.4 + ocNoise( p * 0.5 ) * 2.0 ) * 0.5 + 0.5 ) * ( 1.0 - smoothstep( uOchre.z * 0.5, uOchre.z, od ) );
 			col = mix( col, ocLin( vec3( 0.61, 0.24, 0.13 ) ), seam * smoothstep( 0.2, 0.5, 1.0 - nW.y ) );
 		}
-		// wet: the swash zone and everything the sea covers
+		// wet: the swash zone and everything the sea covers, with a sheen of sky
 		float wet = smoothstep( uSeaLevel + 1.1, uSeaLevel + 0.15, y );
 		col = mix( col, col * vec3( 0.58, 0.6, 0.62 ), wet * ( 0.85 - 0.3 * wb.z ) );
+		vec3 vv = normalize( uCamPos - vOcWorld );
+		float grazing = pow( 1.0 - clamp( vv.y, 0.0, 1.0 ), 4.0 );
+		totalEmissiveRadiance += uSkyAmb * grazing * wet * 0.35;
+		// the pools hold the sky
+		col = mix( col, ocLin( vec3( 0.08, 0.16, 0.18 ) ), pool );
+		totalEmissiveRadiance += ( uSkyAmb * 0.9 + uKeyColor * 0.05 ) * pool * ( 0.25 + 0.75 * grazing );
 		diffuseColor.rgb = col;
 	}
 `
