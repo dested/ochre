@@ -1,16 +1,22 @@
 /**
- * Fires: painted flame tongues (additive billboards, banded like brushwork), embers that rise and wink out,
- * smoke wisps drifting with the wind, and a warm flickering point light per fire. One draw call each for the
- * flames, embers and smoke whatever the number of fires; always four lights (three recompiles when the count
+ * Fires: painted flame tongues in layers (additive billboards: orange-red outside, yellow within, a white core at
+ * the root), a bed of glowing coals under the wood, embers that rise and wink out, smoke wisps drifting with the
+ * wind, and a warm flickering point light per fire. One draw call each for the flames, coals, embers and smoke
+ * whatever the number of fires; always four lights (three recompiles when the count
  * changes), given to the four fires nearest the focus.
  */
 import {
+  AddEquation,
   AdditiveBlending,
   BufferAttribute,
   BufferGeometry,
+  CustomBlending,
+  DoubleSide,
   Group,
   Mesh,
   NormalBlending,
+  OneFactor,
+  OneMinusSrcAlphaFactor,
   PointLight,
   Points,
   ShaderMaterial,
@@ -21,7 +27,8 @@ import type { FireState, Vec3, WorldData } from '../contracts'
 import { LIGHT } from '../render/uniforms'
 
 const MAX_FIRES = 8
-const TONGUES = 6
+/** per fire: four outer tongues, four inner, two for the core */
+const TONGUES = 10
 const EMBERS = 28
 const PUFFS = 7
 const LIGHTS = 4
@@ -35,21 +42,27 @@ uniform vec3 uWind;
 const FLAME_VERT = /* glsl */ `
 ${FIRE_UNIFORMS}
 attribute vec4 aFlame; // fire index, seed, corner x (-1..1), corner y (0..1)
+attribute float aLayer; // 0 the outer orange-red tongues, 1 the yellow ones inside them, 2 the white core at the root
 varying vec2 vUv;
 varying float vSeed;
 varying float vHeat;
+varying float vLayer;
 void main() {
 	vec4 f = uFires[ int( aFlame.x ) ];
 	float seed = aFlame.y;
 	float k = f.w;
 	// each tongue leans and breathes on its own
 	float t = uTime * ( 1.6 + seed * 0.9 );
-	// a hearth fire: knee-high tongues, the middle ones tallest, the outer ones low and quick
-	vec2 off = ( vec2( fract( seed * 13.1 ), fract( seed * 29.7 ) ) - 0.5 ) * ( 0.25 + 0.35 * k );
-	float mid = 1.0 - smoothstep( 0.05, 0.3, length( off ) );
-	float hgt = ( 0.3 + 0.55 * k ) * ( 0.8 + 0.2 * sin( t * 2.3 + seed * 17.0 ) + 0.12 * sin( t * 5.1 + seed * 5.0 ) ) * ( 0.6 + 0.35 * fract( seed * 7.13 ) + 0.2 * mid );
-	float wid = ( 0.2 + 0.2 * k ) * ( 0.75 + 0.5 * fract( seed * 3.7 ) );
-	vec3 base = f.xyz + vec3( off.x, 0.0, off.y );
+	// a hearth fire, knee high: the outer tongues spread round it, the yellow ones close in, the core at the heart
+	float outer = step( aLayer, 0.5 );
+	float core = step( 1.5, aLayer );
+	float spread = mix( mix( 0.55, 1.0, outer ), 0.18, core );
+	vec2 off = ( vec2( fract( seed * 13.1 ), fract( seed * 29.7 ) ) - 0.5 ) * ( 0.26 + 0.3 * k ) * spread;
+	float tall = mix( mix( 0.8, 1.0, outer ), 0.36, core );
+	float hgt = ( 0.32 + 0.6 * k ) * tall * ( 0.82 + 0.18 * sin( t * 2.3 + seed * 17.0 ) + 0.1 * sin( t * 5.1 + seed * 5.0 ) ) * ( 0.8 + 0.3 * fract( seed * 7.13 ) );
+	float wid = ( 0.22 + 0.2 * k ) * mix( mix( 0.7, 1.15, outer ), 0.6, core ) * ( 0.8 + 0.4 * fract( seed * 3.7 ) );
+	// the root sits down among the coals, so the flame grows out of them with no gap
+	vec3 base = f.xyz + vec3( off.x, - 0.12, off.y );
 	// a billboard turning about the vertical axis toward the camera
 	vec3 toCam = cameraPosition - base;
 	vec3 right = normalize( vec3( toCam.z, 0.0, - toCam.x ) );
@@ -60,6 +73,7 @@ void main() {
 	vUv = vec2( aFlame.z, aFlame.w );
 	vSeed = seed;
 	vHeat = k;
+	vLayer = aLayer;
 	gl_Position = projectionMatrix * viewMatrix * vec4( wp, 1.0 );
 }
 `
@@ -79,28 +93,95 @@ ${NOISE}
 varying vec2 vUv;
 varying float vSeed;
 varying float vHeat;
+varying float vLayer;
 void main() {
 	if ( vHeat < 0.01 ) discard;
 	float y = vUv.y;
-	// a teardrop, broad and round low down, swaying more the higher it goes, its tip torn into licks that break away
+	// a teardrop, round at the root and whole, swaying more the higher it goes; only its tip tears into licks
 	float n = fNoise( vec2( vUv.x * 2.5 + vSeed * 31.0, y * 3.0 - uTime * 3.2 ) ) * 0.6 + fNoise( vec2( vUv.x * 5.0, y * 6.0 - uTime * 5.5 + vSeed * 7.0 ) ) * 0.4;
-	float x = vUv.x + ( fNoise( vec2( y * 2.2 - uTime * 1.9, vSeed * 9.0 ) ) - 0.5 ) * 0.9 * y;
-	float w = pow( 1.0 - y, 0.8 ) * ( 0.6 + 0.4 * smoothstep( 0.0, 0.2, y ) );
-	float d = abs( x ) / max( w, 1e-3 );
-	float body = 1.0 - smoothstep( 0.55, 1.0, d + ( n - 0.5 ) * 0.8 * ( 0.25 + y ) );
-	float tear = smoothstep( 0.4, 0.75, y ) * smoothstep( 0.42, 0.62, fNoise( vec2( x * 3.0 + vSeed * 17.0, y * 4.5 - uTime * 4.2 ) ) );
-	body *= ( 1.0 - tear ) * smoothstep( 0.0, 0.07, y );
-	body *= 1.0 - smoothstep( 0.6, 1.0, y + ( n - 0.5 ) * 0.5 );
+	float x = vUv.x + ( fNoise( vec2( y * 2.2 - uTime * 1.9, vSeed * 9.0 ) ) - 0.5 ) * 0.8 * y;
+	float w = pow( 1.0 - y, 0.75 ) * ( 0.62 + 0.38 * smoothstep( 0.0, 0.22, y ) );
+	float edge = abs( x ) / max( w, 1e-3 ) + ( n - 0.5 ) * 0.7 * ( 0.2 + y );
+	// the root rounded off (it sits down among the coals, so no straight cut shows)
+	if ( y < 0.2 ) edge = max( edge, length( vec2( abs( x ) / 0.7, ( 0.2 - y ) / 0.2 ) ) );
+	float body = 1.0 - smoothstep( 0.6, 1.0, edge );
+	float lick = smoothstep( 0.62, 0.85, y ) * smoothstep( 0.45, 0.65, fNoise( vec2( x * 3.0 + vSeed * 17.0, y * 4.5 - uTime * 4.2 ) ) );
+	body *= ( 1.0 - lick ) * ( 1.0 - smoothstep( 0.75, 1.0, y + ( n - 0.5 ) * 0.4 ) );
 	if ( body < 0.02 ) discard;
-	// banded heat: a white-gold heart, orange, a red edge (a few flat steps, like paint)
-	float heat = body * ( 1.0 - y * 0.75 ) * ( 0.75 + 0.35 * n );
-	vec3 col = vec3( 0.6, 0.09, 0.02 );
-	col = mix( col, vec3( 1.0, 0.38, 0.07 ), step( 0.3, heat ) );
-	col = mix( col, vec3( 1.0, 0.66, 0.24 ), step( 0.55, heat ) );
-	col = mix( col, vec3( 1.0, 0.88, 0.6 ), step( 0.82, heat ) );
-	// the red edge is thin and see-through; overlapping tongues build the white heart
-	float a = smoothstep( 0.02, 0.2, body ) * mix( 0.35, 1.0, smoothstep( 0.1, 0.5, heat ) );
-	gl_FragColor = vec4( col * a * ( 0.45 + 0.35 * vHeat ), 1.0 );
+	// colour by layer, each a flat wash with a darker rim: orange going red at the edge and the tip outside,
+	// yellow within, a white core at the root. Added up they make the gold heart without washing out to white
+	float rim = smoothstep( 0.35, 0.95, edge );
+	vec3 col;
+	float e;
+	// each wash also covers a little of what is behind it, as paint would, so the colours stay rich over the lit
+	// floor instead of fading to a pale glow
+	float cover;
+	if ( vLayer < 0.5 ) {
+		col = mix( vec3( 1.0, 0.3, 0.04 ), vec3( 0.78, 0.09, 0.02 ), max( rim, smoothstep( 0.45, 0.9, y ) ) );
+		e = 0.42;
+		cover = 0.65;
+	} else if ( vLayer < 1.5 ) {
+		col = mix( vec3( 1.0, 0.66, 0.16 ), vec3( 1.0, 0.4, 0.06 ), max( rim, smoothstep( 0.4, 0.85, y ) ) );
+		e = 0.4;
+		cover = 0.45;
+	} else {
+		col = mix( vec3( 1.0, 0.94, 0.78 ), vec3( 1.0, 0.74, 0.34 ), rim );
+		e = 0.75;
+		cover = 0.3;
+	}
+	float a = smoothstep( 0.02, 0.25, body );
+	gl_FragColor = vec4( col * a * e * ( 0.6 + 0.4 * vHeat ), a * cover );
+}
+`
+
+const COAL_VERT = /* glsl */ `
+${FIRE_UNIFORMS}
+attribute vec3 aCoal; // fire index, corner x, corner z (-1..1)
+varying vec2 vP;
+varying vec2 vW;
+varying float vK;
+void main() {
+	vec4 f = uFires[ int( aCoal.x ) ];
+	float r = 0.44 * ( 0.7 + 0.3 * f.w );
+	vec3 wp = f.xyz + vec3( aCoal.y * r, - 0.025, aCoal.z * r );
+	vP = aCoal.yz;
+	vW = wp.xz;
+	vK = f.w;
+	gl_Position = projectionMatrix * viewMatrix * vec4( wp, 1.0 );
+}
+`
+
+const COAL_FRAG = /* glsl */ `
+${FIRE_UNIFORMS}
+${NOISE}
+varying vec2 vP;
+varying vec2 vW;
+varying float vK;
+void main() {
+	if ( vK < 0.01 ) discard;
+	float d = length( vP ) + ( fNoise( vW * 9.0 ) - 0.5 ) * 0.3;
+	if ( d > 1.0 ) discard;
+	// a bed of coals: each lump glowing and dimming on its own, the cracks between them dark
+	vec2 g = vW / 0.065;
+	vec2 i = floor( g );
+	vec2 fr = fract( g );
+	float f1 = 9.0;
+	float f2 = 9.0;
+	float id = 0.0;
+	for ( int y = - 1; y <= 1; y ++ ) {
+		for ( int x = - 1; x <= 1; x ++ ) {
+			vec2 o = vec2( float( x ), float( y ) );
+			vec2 c = o + vec2( fHash( i + o ), fHash( i + o + 7.3 ) ) - fr;
+			float dd = dot( c, c );
+			if ( dd < f1 ) { f2 = f1; f1 = dd; id = fHash( i + o + 3.1 ); }
+			else if ( dd < f2 ) f2 = dd;
+		}
+	}
+	float crack = smoothstep( 0.02, 0.25, sqrt( f2 ) - sqrt( f1 ) );
+	float pulse = 0.55 + 0.45 * sin( uTime * ( 0.6 + id * 1.4 ) + id * 20.0 );
+	float heat = ( 1.0 - smoothstep( 0.15, 1.0, d ) ) * ( 0.35 + 0.65 * id ) * pulse * crack;
+	vec3 col = mix( vec3( 0.55, 0.07, 0.01 ), vec3( 1.0, 0.48, 0.1 ), smoothstep( 0.25, 0.75, heat ) );
+	gl_FragColor = vec4( col * heat * ( 0.7 + 0.9 * vK ), 1.0 );
 }
 `
 
@@ -209,24 +290,32 @@ export function createFiresView(world: WorldData): FiresView {
 
   // flames: TONGUES quads per fire
   const fl: number[] = []
+  const fla: number[] = []
   const fi: number[] = []
   for (let f = 0; f < MAX_FIRES; f++) {
     for (let t = 0; t < TONGUES; t++) {
       const seed = ((f * 7 + t * 13) % 31) / 31 + t * 0.07
+      const layer = t < 4 ? 0 : t < 8 ? 1 : 2
       const b = fl.length / 4
       fl.push(f, seed, -1, 0, f, seed, 1, 0, f, seed, 1, 1, f, seed, -1, 1)
+      fla.push(layer, layer, layer, layer)
       fi.push(b, b + 1, b + 2, b, b + 2, b + 3)
     }
   }
   const flameGeo = new BufferGeometry()
   flameGeo.setAttribute('aFlame', new BufferAttribute(new Float32Array(fl), 4))
+  flameGeo.setAttribute('aLayer', new BufferAttribute(new Float32Array(fla), 1))
   flameGeo.setAttribute('position', new BufferAttribute(new Float32Array(fl.length / 4 * 3), 3))
   flameGeo.setIndex(fi)
   const flameMat = new ShaderMaterial({
     vertexShader: FLAME_VERT,
     fragmentShader: FLAME_FRAG,
     uniforms: shared,
-    blending: AdditiveBlending,
+    // added light that also covers part of what is behind (premultiplied)
+    blending: CustomBlending,
+    blendEquation: AddEquation,
+    blendSrc: OneFactor,
+    blendDst: OneMinusSrcAlphaFactor,
     transparent: true,
     depthWrite: false,
   })
@@ -235,6 +324,36 @@ export function createFiresView(world: WorldData): FiresView {
   flames.renderOrder = 20
   flames.name = 'flames'
   root.add(flames)
+
+  // the coal beds: one flat quad per fire, glowing between the sticks and the stones
+  const co: number[] = []
+  const ci: number[] = []
+  for (let f = 0; f < MAX_FIRES; f++) {
+    const b = co.length / 3
+    co.push(f, -1, -1, f, 1, -1, f, 1, 1, f, -1, 1)
+    ci.push(b, b + 2, b + 1, b, b + 3, b + 2)
+  }
+  const coalGeo = new BufferGeometry()
+  coalGeo.setAttribute('aCoal', new BufferAttribute(new Float32Array(co), 3))
+  coalGeo.setAttribute('position', new BufferAttribute(new Float32Array(co.length), 3))
+  coalGeo.setIndex(ci)
+  const coalMat = new ShaderMaterial({
+    vertexShader: COAL_VERT,
+    fragmentShader: COAL_FRAG,
+    uniforms: shared,
+    blending: AdditiveBlending,
+    transparent: true,
+    depthWrite: false,
+    side: DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  })
+  const coals = new Mesh(coalGeo, coalMat)
+  coals.frustumCulled = false
+  coals.renderOrder = 18
+  coals.name = 'coals'
+  root.add(coals)
 
   const em: number[] = []
   for (let f = 0; f < MAX_FIRES; f++) for (let e = 0; e < EMBERS; e++) em.push(f, (e * 0.618034 + f * 0.137) % 1)
@@ -334,6 +453,8 @@ export function createFiresView(world: WorldData): FiresView {
     dispose() {
       flameGeo.dispose()
       flameMat.dispose()
+      coalGeo.dispose()
+      coalMat.dispose()
       emberGeo.dispose()
       emberMat.dispose()
       smokeGeo.dispose()
