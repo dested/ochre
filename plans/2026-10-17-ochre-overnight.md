@@ -686,17 +686,17 @@ controller, cameras and verbs that make each stage of life feel different; and t
   beach and the frame is near black apart from the shell (`held-shell-prompt.png`). held.shell happens in light:
   either before sunset + 0.25 h, or, when later, by the hearth so the fire lights her hand.
 
-- (2026-10-17 05:20, lead) **QA rebuilt at 72f5abc** on :4090 (held.shell fix, people anim, world haze). **ui:** fresh-eyes run of
+- (2026-10-17 05:14, lead) **QA rebuilt at 72f5abc** on :4090 (held.shell fix, people anim, world haze). **ui:** fresh-eyes run of
   the later chapters now via Chapters: Coming of age, Provider, Elder, through to the summary and Continue as heir. Report
   defects ranked by what a first-time player would notice; shots in `/w/junk/sim-80k/ui/shots/late/`. **play:** recheck
   held.shell there. After play's F3 lands, the lead builds a second snapshot on **:4091** for ui's final held → small run,
   so the :4090 run is never disturbed.
 
-- (2026-10-17 05:30, lead) **Second snapshot at d9cad52 on :4091** (play F3 b2ab195, world tide 38795f4). **play:** verify F3
+- (2026-10-17 05:16, lead) **Second snapshot at d9cad52 on :4091** (play F3 b2ab195, world tide 38795f4). **play:** verify F3
   there (no phantom tags on held.faces / small.follow; held.faces starts at 0/4). **ui:** after the late-chapter run on
   :4090, the final held → small run is on :4091. Both servers stay frozen until ui reports.
 
-- (2026-10-17 05:37, lead) From people's whale check (`/w/junk/sim-80k/people/p4/whale/`, shot on a10f6ba). **people:** the
+- (2026-10-17 05:18, lead) From people's whale check (`/w/junk/sim-80k/people/p4/whale/`, shot on a10f6ba). **people:** the
   whale is there but reads as an orca (black and white, a dorsal fin). Make it a southern right whale, the whale of this
   coast: no dorsal fin, dark grey-black all over, pale callosities on the head, the bowed jaw line. That comes before sing,
   the hip flap and the skirt. **play:** the "Hadun / Niece" tag draws through the whale (`beside.png`); add the carcass
@@ -707,15 +707,15 @@ controller, cameras and verbs that make each stage of life feel different; and t
 
 ## Ledger (lead, updated 2026-10-17 01:05)
 
-Board: down · Last pushed: 38795f4 (main, 05:29) · Gate: install 0, typecheck 0, test 0 (73), build 0 at 38795f4 · Deploy: CI running (prev a10f6ba live)
+Board: down · Last pushed: 38795f4 (main, 05:16) · Gate: install 0, typecheck 0, test 0 (73), build 0 at 38795f4 · Deploy: CI running (prev a10f6ba live)
 
 | Agent | Model | Owns | Item now | Last sha / artifact | Status |
 | --- | --- | --- | --- | --- | --- |
-| world | opus-xhigh | world-gen, game/world, game/render | whale-beach shadow line check (:4091), terrain LOD seams, lace tune, baked cave AO, W3 notes if time; stop new work 07:00 | F1e 51f3f3b passed 05:40 (figure fill + rim); F1d 38795f4 passed 05:24 (glassy shelf, lace; loops read as worms → tune); F1a-haze 9edfc74 passed 05:11 (murk was raw flat bounce; light now from the mouth); spike a6034f1 passed 05:08 (cave brow slab across the path top, seen edge-on); F1c 4d09eba passed 04:48 (youth 112/958k); F1b 9bb5669 + F1a 5da59ed passed 04:34; W3 4–5 passed 04:20 (421b1a6 tris: cave 126/805k high, 97/484k medium; e988dd0 gold); W3 1–3 passed 04:10 (aeb266c, 500a203, 25aa317); tris 12f7386/3812240; W2 86a96f0 passed 03:20; W1 82b261e passed | working |
-| people | opus-xhigh | game/actors | P4 0 (whale on the beach), then lie-dead hip flap, then squat skirt drape; stop new work 07:00 | 0a + 0b a11e556 passed 05:33 (child's head clear in crouch, palm offer); anim 1f9c701 + 4509871 passed 05:15; graze 5c3087b, thumbs 8d2599d passed; wrinkles cca08b3 + necklace 126c800 passed 04:30 | working |
+| world | opus-xhigh | world-gen, game/world, game/render | whale-beach shadow line check (:4091), terrain LOD seams, lace tune, baked cave AO, W3 notes if time; stop new work 07:00 | F1e 51f3f3b passed 05:19 (figure fill + rim); F1d 38795f4 passed 05:15 (glassy shelf, lace; loops read as worms → tune); F1a-haze 9edfc74 passed 05:11 (murk was raw flat bounce; light now from the mouth); spike a6034f1 passed 05:08 (cave brow slab across the path top, seen edge-on); F1c 4d09eba passed 04:48 (youth 112/958k); F1b 9bb5669 + F1a 5da59ed passed 04:34; W3 4–5 passed 04:20 (421b1a6 tris: cave 126/805k high, 97/484k medium; e988dd0 gold); W3 1–3 passed 04:10 (aeb266c, 500a203, 25aa317); tris 12f7386/3812240; W2 86a96f0 passed 03:20; W1 82b261e passed | working |
+| people | opus-xhigh | game/actors | P4 0 (whale on the beach), then lie-dead hip flap, then squat skirt drape; stop new work 07:00 | 0a + 0b a11e556 passed 05:17 (child's head clear in crouch, palm offer); anim 1f9c701 + 4509871 passed 05:15; graze 5c3087b, thumbs 8d2599d passed; wrinkles cca08b3 + necklace 126c800 passed 04:30 | working |
 | sim | opus-high | sim | on call | F3-3 fe854ee passed 05:10 (held.shell by the hearth after sunset + 0.25 h); S7 88e8bd3 passed 04:52 (Tuk teaches tracking and silcrete); look-only 2 passed 04:48 (all reach summary); S6 d5d5e8d passed 04:46 (memories, storm wood, great-aunt, skip); look-only run passed 04:31 (all objectives complete); F2 0624283 passed (whale at rise + 3); F1 adc88d1 passed (50 tests); pacing 972f17c passed (47 tests, waits 29–91 s real); aside 74bce0a passed; S5c 95e8327 passed; S5b rest 69428c6 passed (41 tests; covers S5c 1–2); f683e42 superseded; S5b part 6aa3225 passed (held 18:20, follow walk); S5 209a09c passed (7 moments); S4 d0549fd passed; S2 071949a passed | working |
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | late chapters on :4090 (72f5abc), then the final held → small run on :4091 after play's F3 | held.* recheck at a10f6ba all pass 05:05; 6d21ae8 + d30ee64 passed; 8ca2317 male small/youth/provider cards passed 04:42; f491768 male elder/summary painting passed 04:39; recheck #9/#11 passed 04:37 (663f793 captions under hidden HUD, 6e14e84 scrollbars); F1 mark 23acc39 passed; U7 passed (bdc3b86); chatter 830a7ab; U6 ce615bc passed; U5, U3 passed | working |
-| play | opus-high | game/play, game/audio, app/play.tsx | verify F3 on :4091 (d9cad52), then look-only playthrough | F3 b2ab195 reviewed 05:28 (cull behind camera, no pop-in, gaze in front + unblocked + out of fade); bec6050 extras + 13c1824 periwinkle passed 04:55; F2 passed 04:49 (a10f6ba + edd2e50: held.faces level 4/4, held.sea, held.shell, look, tags, tell, mark lift, captions at black); F1 play 7e42a4a passed (all 9; dd47469 summary hang fixed); PL3 runs 1–2 reached the summary, no errors; 8c75080 aim, 8f774e0 tags, 7a6f0e5 spoor passed; 9a7684d passed (E verb, seated camera); PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
+| play | opus-high | game/play, game/audio, app/play.tsx | verify F3 on :4091 (d9cad52), then look-only playthrough | F3 b2ab195 reviewed 05:16 (cull behind camera, no pop-in, gaze in front + unblocked + out of fade); bec6050 extras + 13c1824 periwinkle passed 04:55; F2 passed 04:49 (a10f6ba + edd2e50: held.faces level 4/4, held.sea, held.shell, look, tags, tell, mark lift, captions at black); F1 play 7e42a4a passed (all 9; dd47469 summary hang fixed); PL3 runs 1–2 reached the summary, no errors; 8c75080 aim, 8f774e0 tags, 7a6f0e5 spoor passed; 9a7684d passed (E verb, seated camera); PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
 
 Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); QA server :4090 (prod build of a10f6ba, log /w/junk/sim-80k/qa-server.log); Drydock portal :4400 (Windows bun, log in
 scratchpad drydock-portal.log)
