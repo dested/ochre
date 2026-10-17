@@ -61,9 +61,9 @@ function CaptionLine({ caption, large }: { caption: Caption; large: boolean }) {
     // softer than talk aimed at you: smaller, dimmer, the name in the same muted tone as the words
     return (
       <p
-        className="ui-wash ui-wash-tight animate-ui-rise font-sans text-bone ui-halo"
-        style={{ fontSize: 16 * scale, lineHeight: 1.4, opacity: 0.72 }}>
-        {caption.speaker && <span className="mr-2 opacity-75">{caption.speaker}</span>}
+        className="ui-wash ui-wash-tight animate-ui-rise font-sans text-bone/75 ui-halo"
+        style={{ fontSize: 16 * scale, lineHeight: 1.4 }}>
+        {caption.speaker && <span className="mr-2 text-bone/55">{caption.speaker}</span>}
         <span>{caption.text}</span>
       </p>
     )
