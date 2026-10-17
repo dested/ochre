@@ -82,6 +82,8 @@ export const createWorldView: CreateWorldView = (data: WorldData, pipeline: Rend
   const sc = sun.shadow.camera
   sc.near = 1
   sc.far = 1600
+  // the shafts in the cave mouth read the light's own matrix, which three updates in place as it renders
+  LIGHT.uShadowMatrix.value = sun.shadow.matrix
 
   const hemi = new HemisphereLight(0xffffff, 0x000000, Math.PI)
   hemi.name = 'fill'
@@ -149,6 +151,11 @@ export const createWorldView: CreateWorldView = (data: WorldData, pipeline: Rend
       spray.update(weather)
       rain.update(weather)
       sunOnScreen(camera, LIGHT.uSunDir.value, POST.rays.value)
+      // sunbeams in the cave mouth while the camera is near it; moonbeams are fainter
+      LIGHT.uShadowMap.value = sun.shadow.map?.depthTexture ?? null
+      const toCave = Math.hypot(camPos.x - LIGHT.uCave.value.x, camPos.z - LIGHT.uCave.value.y)
+      const near = 1 - Math.min(1, Math.max(0, (toCave - 60) / 50))
+      LIGHT.uShafts.value.x = LIGHT.uShadowMap.value && q !== 'low' ? near * (key.isMoon ? 0.5 : 1) : 0
     },
     dispose() {
       terrain.dispose()

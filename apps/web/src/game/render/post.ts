@@ -28,10 +28,59 @@ uniform float uFar;
 uniform vec4 uHaze;
 uniform float uSeaLevel;
 uniform vec3 uLagoon;
+uniform sampler2DShadow tShadow;
+uniform mat4 uShadowMatrix;
+uniform vec4 uShafts;
+uniform vec4 uCave;
+uniform vec4 uCave2;
+uniform vec3 uKeyDir;
+uniform vec3 uKeyColor;
 varying vec2 vUv;
 ${SKY_UNIFORMS_GLSL}
 ${NOISE_GLSL}
 ${SKY_GLSL}
+// sunbeams in the cave mouth: the key light through the dusty, smoky air of the mouth and the cave, marched through
+// the shadow map, so the rim and every rock and bush at the lip cut their own shafts
+vec3 ocShafts( vec3 ro, vec3 rd, float dist ) {
+	if ( uShafts.x < 0.01 ) return vec3( 0.0 );
+	// into the cave's frame: x outward from the drip line, y up from the floor, z across
+	vec2 o = ro.xz - uCave.xy;
+	vec3 lo = vec3( o.x * uCave.z + o.y * uCave.w, ro.y - uCave2.x, o.x * uCave.w - o.y * uCave.z );
+	vec3 ld = vec3( rd.x * uCave.z + rd.z * uCave.w, rd.y, rd.x * uCave.w - rd.z * uCave.z );
+	vec3 bmin = vec3( - uCave2.y - 1.0, - 0.5, - uCave2.z - 1.0 );
+	vec3 bmax = vec3( 6.0, uCave2.w + 1.5, uCave2.z + 1.0 );
+	vec3 safe = vec3( abs( ld.x ) < 1e-5 ? 1e-5 : ld.x, abs( ld.y ) < 1e-5 ? 1e-5 : ld.y, abs( ld.z ) < 1e-5 ? 1e-5 : ld.z );
+	vec3 t0 = ( bmin - lo ) / safe;
+	vec3 t1 = ( bmax - lo ) / safe;
+	vec3 tlo = min( t0, t1 );
+	vec3 thi = max( t0, t1 );
+	float tn = max( max( tlo.x, tlo.y ), max( tlo.z, 0.0 ) );
+	float tf = min( min( thi.x, thi.y ), min( thi.z, dist ) );
+	if ( tf <= tn ) return vec3( 0.0 );
+	float stepL = ( tf - tn ) / 20.0;
+	float jit = fract( 52.9829189 * fract( dot( gl_FragCoord.xy, vec2( 0.06711056, 0.00583715 ) ) ) );
+	float acc = 0.0;
+	for ( int i = 0; i < 20; i ++ ) {
+		float t = tn + ( float( i ) + jit ) * stepL;
+		vec3 lp = lo + ld * t;
+		// dust and smoke: thickest low down and in the mouth, thinning past the drip line and toward the walls
+		float dens = exp( - max( lp.y, 0.0 ) / 3.2 )
+			* smoothstep( 3.0, - 1.0, lp.x ) * smoothstep( - uCave2.y - 1.0, - uCave2.y + 6.0, lp.x )
+			* ( 1.0 - smoothstep( uCave2.z - 3.0, uCave2.z + 1.0, abs( lp.z ) ) );
+		// in drifting strands, not an even fog
+		dens *= 0.35 + 1.3 * smoothstep( 0.3, 0.8, ocNoise( lp.xz * 0.45 + vec2( lp.y * 0.3, uTime * 0.05 ) ) );
+		if ( dens < 0.01 ) continue;
+		vec4 sc = uShadowMatrix * vec4( ro + rd * t, 1.0 );
+		sc.xyz /= sc.w;
+		float lit = 1.0;
+		if ( sc.x > 0.0 && sc.x < 1.0 && sc.y > 0.0 && sc.y < 1.0 && sc.z < 1.0 ) lit = texture( tShadow, vec3( sc.xy, sc.z - 0.0004 ) );
+		acc += lit * dens * stepL;
+	}
+	// mostly forward scatter: the beams blaze looking toward the sun and are a soft haze across it
+	float mu = max( dot( rd, uKeyDir ), 0.0 );
+	float phase = 0.2 + 0.35 * pow( mu, 1.5 ) + 0.9 * pow( mu, 8.0 );
+	return uKeyColor * acc * phase * uShafts.x * 0.014;
+}
 // rain beyond the streaks drawn in the world: fine slanted strokes falling down the screen, over the far land and
 // the sky only (k), a little lighter than what they cross, like a painter's dry-brushed veil
 vec3 ocRainVeil( vec3 c, float k ) {
@@ -69,13 +118,14 @@ void main() {
 	#else
 		bool sky = depth >= 1.0;
 	#endif
+	vec4 rc = uProjInv * vec4( vUv * 2.0 - 1.0, 1.0, 1.0 );
+	vec3 rv = rc.xyz / rc.w;
 	if ( sky ) {
-		gl_FragColor = vec4( ocRainVeil( sc.rgb, 1.0 ), 1.0 );
+		vec3 sd = normalize( ( uCamWorld * vec4( rv, 0.0 ) ).xyz );
+		gl_FragColor = vec4( ocRainVeil( sc.rgb + ocShafts( uCamPos, sd, 1e4 ), 1.0 ), 1.0 );
 		return;
 	}
 	float viewZ = perspectiveDepthToViewZ( depth, uNear, uFar );
-	vec4 rc = uProjInv * vec4( vUv * 2.0 - 1.0, 1.0, 1.0 );
-	vec3 rv = rc.xyz / rc.w;
 	vec3 vp = rv * ( viewZ / rv.z );
 	vec3 wp = ( uCamWorld * vec4( vp, 1.0 ) ).xyz;
 	vec3 d = wp - uCamPos;
@@ -113,7 +163,7 @@ void main() {
 	vec3 sdBlue = normalize( vec3( dir.x * 0.6, 0.62, dir.z * 0.6 ) );
 	vec3 sdLow = normalize( vec3( dir.x, max( dir.y, 0.0 ) * 0.6 + 0.06, dir.z ) );
 	vec3 inscatter = mix( ocSkyBase( sdBlue ) * 0.9, ocSkyBase( sdLow ), smoothstep( 0.3, 1.0, 1.0 - T ) );
-	vec3 c = sc.rgb * Tm + mistCol * ( 1.0 - Tm );
+	vec3 c = sc.rgb * Tm + mistCol * ( 1.0 - Tm ) + ocShafts( uCamPos, dir, dist );
 	gl_FragColor = vec4( ocRainVeil( c * T + inscatter * ( 1.0 - T ), smoothstep( 12.0, 70.0, dist ) ), 1.0 );
 }
 `

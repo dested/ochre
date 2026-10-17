@@ -3,7 +3,10 @@
  * the post chain point their uniforms at these objects, and the world view writes them once per frame from the
  * colour script. Module-level so paint() can be a free function (the people agent calls it with no handle).
  */
-import { Color, Vector2, Vector3, Vector4 } from 'three'
+import { Color, Matrix4, type Texture, Vector2, Vector3, Vector4 } from 'three'
+
+/** the key light's shadow map (a depth texture with compare; null until the first frame renders it) */
+const shadowMap: { value: Texture | null } = { value: null }
 
 export const LIGHT = {
   /** unit vector toward the sun */
@@ -56,6 +59,11 @@ export const LIGHT = {
   uFireGlow2: { value: new Vector4(0, -1000, 0, 0) },
   /** the camera's world position */
   uCamPos: { value: new Vector3() },
+  /** the key light's shadow map and world → shadow-map matrix (the light's own, by reference), for the shafts */
+  uShadowMap: shadowMap,
+  uShadowMatrix: { value: new Matrix4() },
+  /** sunbeams in the cave mouth: x strength (0 = off) */
+  uShafts: { value: new Vector4(0, 0, 0, 0) },
   /** viewport size in pixels */
   uViewport: { value: new Vector2(1, 1) },
 }
