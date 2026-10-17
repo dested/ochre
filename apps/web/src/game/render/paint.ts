@@ -119,6 +119,9 @@ const AMBIENT = /* glsl */ `
 	{
 		vec3 ocN = normalize( ( vec4( geometryNormal, 0.0 ) * viewMatrix ).xyz );
 		irradiance = ocAmbient( ocN, vOcWorld ) * 3.14159;
+		// people (uPaint.w) take more of the sky and the sunlit ground in their shade, so a dark-skinned figure in
+		// shadow or against the light still reads as a face and a body, not a hole
+		irradiance *= 1.0 + 0.85 * uPaint.w;
 	}
 `
 
@@ -130,6 +133,8 @@ const RIM = /* glsl */ `
 		float facing = clamp( dot( ocN, uKeyDir ) * 0.6 + 0.5, 0.0, 1.0 );
 		float behind = clamp( - dot( ocV, uKeyDir ) * 0.5 + 0.5, 0.0, 1.0 );
 		reflectedLight.directDiffuse += uRimColor * fr * facing * ( 0.4 + 0.6 * behind ) * uPaint.y * diffuseColor.rgb * ocCaveSky( vOcWorld );
+		// against the light a figure's outline glows: light through hair and the skin's edge, paler than the skin
+		reflectedLight.directDiffuse += uRimColor * fr * ( 0.25 + 0.75 * behind * behind ) * uPaint.w * mix( diffuseColor.rgb, vec3( 0.3, 0.26, 0.22 ), 0.55 ) * 0.9 * ocCaveSky( vOcWorld );
 		// wet things shine with the sky at a grazing look
 		reflectedLight.directSpecular += uSkyAmb * fr * fr * ocWet * 0.3;
 	}
@@ -140,9 +145,11 @@ function opt(v: number | undefined, d: number): number {
 }
 
 /** Patch a standard material into the painted look, with optional injected GLSL. In place; returns it. */
-export function patchPaint(material: MeshStandardMaterial, opts: PaintOptions = {}, extra?: PaintExtra): MeshStandardMaterial {
+export function patchPaint(material: MeshStandardMaterial, opts: PaintOptions = {}, extra?: PaintExtra, figure = false): MeshStandardMaterial {
   const skin = opts.skin === true
-  const uPaint = { value: new Vector4(opt(opts.brush, 0.5), opt(opts.rim, skin ? 0.45 : 0.3), skin ? 1 : 0, 0) }
+  // people's own materials come through here with an 'actor…' extra; they are figures too
+  const fig = figure || (extra?.key.startsWith('actor') ?? false)
+  const uPaint = { value: new Vector4(opt(opts.brush, 0.5), opt(opts.rim, skin ? 0.45 : 0.3), skin ? 1 : 0, fig ? 1 : 0) }
   const prev = material.onBeforeCompile
   const key = `paint:${skin ? 's' : 'n'}:${extra?.key ?? ''}`
   material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms, renderer) => {
@@ -184,4 +191,5 @@ export function patchPaint(material: MeshStandardMaterial, opts: PaintOptions = 
   return material
 }
 
-export const paint: PaintMaterial = (material: MeshStandardMaterial, opts?: PaintOptions) => patchPaint(material, opts)
+/** the contract export, for the people, animals and props: figures get more sky fill and a rim against the light */
+export const paint: PaintMaterial = (material: MeshStandardMaterial, opts?: PaintOptions) => patchPaint(material, opts, undefined, true)
