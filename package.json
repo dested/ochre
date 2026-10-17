@@ -48,7 +48,6 @@
     "build": "bun run --cwd apps/web build",
     "start": "bun run --cwd apps/web start",
     "start:local": "bun run --cwd apps/web start:local",
-    "release": "bun run --cwd apps/desktop release",
     "typecheck": "tsc --noEmit && bun run --filter '*' typecheck",
     "test": "bun run --filter '*' test",
     "test:e2e": "bun run --cwd apps/web test:e2e",
