@@ -21,9 +21,11 @@ React Router 7, tRPC, Prisma 7, Tailwind 4); the game itself is imperative three
 - **Installs: bun 1.3.14 only** (`/w/junk/sim-80k/bun13/bun-linux-x64/bun install`). Local bun 1.4 rewrites `bun.lock` to v2, which Drydock's bun 1.3 image can't read
 - **Type-check:** `bun run typecheck` · **Tests:** `bun run test` (sim and world-gen tests: `cd apps/web && bun test src/sim src/world-gen`)
 - **Headless sim day:** `bun apps/web/src/sim/run-day.ts --seed 1 --days 2`
-- **Images:** GPT Image 2.5 Flare via the `openai-image` skill; key `OPENAI_API_KEY` in the root `.env` (keys vault, project `sim-80k`)
+- **Images:** GPT Image 2.5 Flare via the `openai-image` skill; key `OPENAI_API_KEY` in the root `.env` (keys vault, project `sim-80k`). The org's credit ran out on 2026-10-17 after 47 images; top up before generating more
 - **Units/axes:** metres, +Y up, +X east, +Z south (the sea is south); heading 0 faces +Z, π/2 faces +X
 - **Health:** `GET /healthz`
+- **Frozen QA build (overnight run):** a production build of a fixed sha on http://localhost:4090 (`/w/junk/sim-80k/qa-server`, rebuilt by `/w/junk/sim-80k/lead/rebuild-qa.sh`); `?qa` exposes the play session's QA handles in production builds
+- **Perf numbers:** report draw calls and triangles; fps from bx (Intel UHD 770 iGPU, ~10 fps on high) says nothing about a real GPU. `?gpu=1` in the world lab times each render stage
 
 ## The game: module map
 
@@ -40,7 +42,7 @@ React Router 7, tRPC, Prisma 7, Tailwind 4); the game itself is imperative three
 | Sim | `src/sim/` | sim | three-free clock driving, band, needs, watch-to-learn, AI, animals, food/fire, director + chapters, save |
 | Play | `src/game/play/`, `src/app/play.tsx` | play | the session at `/`: composition, controller, cameras, verbs, spear, events → bridge |
 | UI | `src/ui/`, `src/content/field-notes.ts`, `public/art/` | ui | title, intro, HUD, captions, chapter cards, Field Notes, lineage, minigames |
-| Audio | `src/game/audio/` | ui | procedural WebAudio ambience, sfx, music cues |
+| Audio | `src/game/audio/` | play | procedural WebAudio ambience, sfx, music cues |
 | Labs | `src/app/lab/*.tsx` → module `lab.ts` `mount(el)` via `src/app/client-mount.tsx` | each owner | per-module sample pages |
 | Concept art | `public/art/concept/` | lead | the visual targets (world, people) |
 
@@ -194,7 +196,7 @@ Routes are explicit in `src/app/routes.tsx` (no file-based routing). The root ro
 | Route         | Serves                | File                             | Loader                                   |
 | ------------- | --------------------- | -------------------------------- | ---------------------------------------- |
 | `/`           | The game (title → play) | `src/app/play.tsx` → `src/game/play/session.ts` + `src/ui/GameUI.tsx` | `rootLoader` (session) |
-| `/lab/world`  | World lab (views, hour, moon) | `src/app/lab/world.tsx` → `src/game/world/lab.ts` | — |
+| `/lab/world`  | World lab (views, hour, moon, weather; `?people=1`, `?spoor=x,z,heading`, `?gpu=1`) | `src/app/lab/world.tsx` → `src/game/world/lab.ts` | — |
 | `/lab/people` | People lab (lineup, anims, close-ups; `?crowd=25`, `?animals=1`) | `src/app/lab/people.tsx` → `src/game/actors/lab.ts` | — |
 | `/lab/sim`    | Sim lab (top-down band, time controls, director panel) | `src/app/lab/sim.tsx` → `src/sim/lab.ts` | — |
 | `/lab/ui`     | UI lab (every screen and HUD state, audio panel) | `src/app/lab/ui.tsx` | — |
@@ -295,6 +297,8 @@ Add `e2e/*.spec.ts`; screenshot only stable views; `bun run test:e2e:update` to 
 - **No `tailwind.config`** — Tailwind v4, tokens in `tokens.css`. Tailwind pinned 4.1.12 + lightningcss 1.30.1 for NativeWind 5 rc.
 - **EAS runs from `apps/mobile` only.** At the root it creates a stray EAS project + root `app.json`/`eas.json`. `EAS_NO_VCS=1` uploads only the cwd: add `EAS_PROJECT_ROOT=../..` or Metro dies with ENOENT on workspace paths.
 - Use `log.*` from `server/logger.ts`, not raw `console.log`, in server code.
+- **Reversed depth inverts three 0.185's sort lists.** The host sets `reversedDepthBuffer: true`; anything that needs a draw order (sky, sea, transparent foliage, decals) sets compensating `renderOrder`. Cameras: near 0.1, far ≥ 30000.
+- **The game talks to the UI only through `src/game/bridge.ts`**, and modules talk only through `src/game/contracts.ts`; world-gen and the sim import nothing from three or the DOM (they run under `bun:test`).
 - **Desktop IPC has no superjson** — never add a transformer other than `ipcTransformer` to the desktop router or `ipcLink`. Every procedure output must survive structured clone (no functions, no class instances you need back).
 - **Desktop preload must stay tiny and CJS** — import only `@app/trpc-ipc/preload`; anything else lands in the sandboxed preload bundle.
 - **Electron pins respect the 3-day `minimumReleaseAge`** in the global bunfig; a same-week Electron won't install.
