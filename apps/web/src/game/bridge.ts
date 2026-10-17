@@ -14,6 +14,7 @@ import type {
   Needs,
   Objective,
   Quality,
+  Sex,
   SkillId,
 } from './contracts'
 
@@ -63,6 +64,8 @@ export type NameTag = {
 export type HudState = {
   visible: boolean
   name: string
+  /** the player's; absent until the session writes it (the summary and the elder card pick their painting by it) */
+  sex?: Sex
   ageYears: number
   stage: LifeStageId
   needs: Needs | null
