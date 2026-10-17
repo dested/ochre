@@ -1056,18 +1056,19 @@ const provider: Chapter = {
         run((d) => order(d, 'child', null)),
         // a free while, then on to the morning the whale comes
         ...freeHours(null),
-        ...cutTo(1, (d) => sun(d).rise + 0.75),
+        ...cutTo(1, whaleHour),
       ],
     },
     {
       id: 'provider.whale',
       steps: [
-        // the whale comes in by daylight, whatever brought the story here
+        // the whale comes in by full daylight (the sun well up, so even the cave reads as day), whatever brought the
+        // story here: the normal flow, a chapter started from the menu, or a QA skip
         ...when(
-          (d) => !hourNowGE(d, sun(d).rise + 0.5) || hourNowGE(d, sun(d).set - 3),
+          (d) => !hourNowGE(d, whaleHour(d) - 0.5) || hourNowGE(d, sun(d).set - 3),
           ...fadeOut(1.5),
           run((d) => {
-            skipTo(d, sun(d).rise + 0.75, 0.5)
+            skipTo(d, whaleHour(d), 0.5)
             seatPlayer(d, 0.5)
           }),
           ...fadeIn(1.5),
@@ -1228,6 +1229,11 @@ function departedName(d: D): string {
   const g = d.ctx.state.people.find((p) => p.id === d.st.cast.departed)
   if (!g) return 'your grandmother'
   return relationTo(d, g) === 'Grandmother' ? 'your grandmother' : g.name
+}
+
+/** the morning the whale comes: three hours after sunrise, the winter sun near 30° */
+function whaleHour(d: D): number {
+  return sun(d).rise + 3
 }
 
 function hourNowGE(d: D, h: number): boolean {

@@ -16,6 +16,11 @@ function director(sim: Sim) {
   return d
 }
 
+/** the sun's height above the horizon */
+function sunDegrees(sim: Sim): number {
+  return (Math.asin(sim.state.clock.sunDir.y) * 180) / Math.PI
+}
+
 function player(sim: Sim) {
   const p = sim.state.people.find((q) => q.id === sim.state.playerId)
   if (!p) throw new Error('no player')
@@ -361,7 +366,7 @@ describe('director', () => {
     expect(sim.state.chapter.beatId).toBe('provider.whale')
     steps(sim, 15, events)
     const caps = events.flatMap((e) => (e.type === 'caption' ? [e.caption.text] : []))
-    expect(sim.state.clock.daylight).toBeGreaterThan(0.5)
+    expect(sunDegrees(sim)).toBeGreaterThan(20)
     expect(caps).toContain('A whale! A whale on the sand!')
     expect(caps).toContain('Bring the knives! Bring everyone!')
     expect(sim.state.chapter.objective?.text.startsWith('Tell the others')).toBe(true)
@@ -370,6 +375,25 @@ describe('director', () => {
     const beach = world.poi('whale-beach')
     const running = sim.state.people.filter((p) => !p.isPlayer && Math.hypot(p.position.x - beach.x, p.position.z - beach.z) < 30)
     expect(running.length).toBeGreaterThanOrEqual(1)
+  }, 60_000)
+
+  test('the whale is in full daylight on the normal path too: teach, its free wait, the cut to morning', () => {
+    const sim = newSim('provider')
+    const dir = director(sim)
+    for (let i = 0; i < 20 && sim.state.chapter.beatId !== 'provider.teach'; i++) {
+      dir.completeBeat()
+      steps(sim, 0.2)
+    }
+    // the lesson done, the free wait and the cut run on their own
+    dir.completeBeat({ toFree: true })
+    let whaleAt: number | null = null
+    for (let i = 0; i < 30 * 200 && sim.state.chapter.objective?.text.startsWith('Tell the others') !== true; i++) {
+      sim.step(1 / 30)
+      if (whaleAt === null && sim.state.chapter.beatId === 'provider.whale') whaleAt = sunDegrees(sim)
+    }
+    expect(sim.state.chapter.objective?.text.startsWith('Tell the others')).toBe(true)
+    expect(whaleAt ?? 0).toBeGreaterThan(20)
+    expect(sunDegrees(sim)).toBeGreaterThan(20)
   }, 60_000)
 
   test('elder.walk opens on the elder standing at the path top, not still seated from the story', () => {
