@@ -578,14 +578,15 @@ const ROCK_NORMAL = /* glsl */ `
 	normal = normalize( normal + ( viewMatrix * vec4( ocFacetR.xyz, 0.0 ) ).xyz * 0.45 );
 `
 
-function foliageMaterial(key: string, flex: number, brush: number, leaf: number): MeshStandardMaterial {
+/** `glow`: how much light the plant lets through against the light (thin blades most, a leafy clump a little) */
+function foliageMaterial(key: string, flex: number, brush: number, leaf: number, glow = 0): MeshStandardMaterial {
   const m = new MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 })
   patchPaint(m, { brush, rim: 0.4 }, {
     key: `foliage-${key}`,
     vertexHead: 'uniform float uFlex;',
     vertexPre: flex > 0 ? WIND_PRE : '',
     fragmentHead: `${PAINT_HEAD}\nuniform float uLeaf;`,
-    albedo: leaf > 0 ? LEAF_ALBEDO : '',
+    albedo: `${glow > 0 ? `ocGlow = ${glow.toFixed(2)};` : ''}\n${leaf > 0 ? LEAF_ALBEDO : ''}`,
     normal: leaf > 0 ? LEAF_NORMAL : '',
     uniforms: { uFlex: { value: flex }, uLeaf: { value: leaf } },
   })
@@ -739,7 +740,7 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
     slots: makeSlots(
       [fynbosGeo(11, 0), fynbosGeo(23, 3), fynbosGeo(37, 1), fynbosGeo(41, 2), fynbosGeo(53, 0)],
       [fynbosGeo(11, 0, true), fynbosGeo(23, 3, true), fynbosGeo(37, 1, true), fynbosGeo(41, 2, true), fynbosGeo(53, 0, true)],
-      foliageMaterial('fyn', 0.35, 0.6, 11),
+      foliageMaterial('fyn', 0.35, 0.6, 11, 0.35),
       7000,
       true,
       'fynbos',
@@ -782,7 +783,7 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
   // proteas, in patches through the fynbos
   kind({
     name: 'protea',
-    slots: makeSlots([proteaGeo(5), proteaGeo(9)], null, foliageMaterial('protea', 0.25, 0.4, 0), 900, true, 'protea'),
+    slots: makeSlots([proteaGeo(5), proteaGeo(9)], null, foliageMaterial('protea', 0.25, 0.4, 6, 0.4), 900, true, 'protea'),
     farFrom: NO_FAR,
     cell: 4.5,
     radius: { high: 75, medium: 55, low: 35 },
@@ -807,7 +808,7 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
   // restios: by the lagoon, on the dunes, and scattered through the fynbos
   kind({
     name: 'restio',
-    slots: makeSlots([restioGeo(3), restioGeo(17)], null, foliageMaterial('restio', 0.9, 0.3, 0), 2500, false, 'restio'),
+    slots: makeSlots([restioGeo(3), restioGeo(17)], null, foliageMaterial('restio', 0.9, 0.3, 0, 0.8), 2500, false, 'restio'),
     farFrom: NO_FAR,
     cell: 3.1,
     radius: { high: 70, medium: 50, low: 0 },
@@ -835,7 +836,7 @@ export function createFoliageView(world: WorldData, grid: TerrainGrid | null): F
   // grass tufts: thick on the grassland, between the shrubs, dune grass on the sand
   kind({
     name: 'grass',
-    slots: makeSlots([grassGeo(1), grassGeo(2)], null, foliageMaterial('grass', 1.6, 0.3, 0), 26000, false, 'grass'),
+    slots: makeSlots([grassGeo(1), grassGeo(2)], null, foliageMaterial('grass', 1.6, 0.3, 0, 1.0), 26000, false, 'grass'),
     farFrom: NO_FAR,
     cell: 0.62,
     radius: { high: 38, medium: 24, low: 0 },

@@ -68,6 +68,8 @@ ${PAINT_UNIFORMS_GLSL}
 // (a ledge's shadow on the bed below), and how wet and glossy the surface is (a tight glint of each light)
 float ocKeyOcc = 1.0;
 float ocSheen = 0.0;
+// and how much light a thin thing lets through when it stands against the light (blades, leaves)
+float ocGlow = 0.0;
 ${NOISE_GLSL}
 ${PAINT_GLSL}
 // the brush: a world-space variation of value and temperature, in strokes a hand might lay
@@ -105,6 +107,9 @@ void RE_Direct_Painted( const in IncidentLight directLight, const in vec3 geomet
 	}
 	vec3 irradiance = directLight.color * r * tint * ocKeyOcc;
 	reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseColor );
+	// looking toward the light, a blade or a leaf glows with what comes through it (still shadowed by what's above)
+	float back = max( dot( - geometryViewDir, directLight.direction ), 0.0 );
+	reflectedLight.directDiffuse += directLight.color * back * back * back * ocGlow * ocKeyOcc * BRDF_Lambert( material.diffuseColor );
 	// a soft, broad sheen instead of a sharp highlight
 	vec3 h = normalize( directLight.direction + geometryViewDir );
 	float nh = max( dot( geometryNormal, h ), 0.0 );
