@@ -72,6 +72,7 @@ export function createAgent(id: string, sleepId: string, seat: number, bed: numb
     learn: {},
     gaze: 0,
     order: null,
+    catchingUp: false,
   }
 }
 
@@ -85,11 +86,16 @@ function inCamp(ctx: SimCtx, p: SimPerson): boolean {
   return dist(p.position, hearth(ctx)) < CAMP_RADIUS || ctx.world.inCave(p.position.x, p.position.z)
 }
 
+const SEATS_PER_RING = 11
+
 /** a seat in the ring around the hearth */
 export function seatPos(ctx: SimCtx, ag: Agent, ring = 1): Vec2 {
   const h = hearth(ctx)
-  const ang = ag.seat * 2.39996 // golden angle spreads the seats
-  const r = (2.4 + (ag.seat % 3) * 0.9) * ring
+  // two even rings of eleven, the outer one offset half a seat so nobody sits behind a head
+  const k = ag.seat % (SEATS_PER_RING * 2)
+  const outer = k >= SEATS_PER_RING
+  const ang = ((k % SEATS_PER_RING) + (outer ? 0.5 : 0)) * ((Math.PI * 2) / SEATS_PER_RING)
+  const r = (outer ? 3.7 : 2.6) * ring
   return findWalkable(ctx, { x: h.x + Math.sin(ang) * r, z: h.z + Math.cos(ang) * r }, 8)
 }
 
@@ -320,7 +326,8 @@ function chooseDay(ctx: SimCtx, p: SimPerson, ag: Agent): void {
   if (kind === 'hunt' && ctx.state.clock.hour < set - 4) {
     const herd = ctx.herds[0]
     if (herd) {
-      setPlan(ctx, p, ag, 'hunt', stagingPoint(ctx, herd.center, ag), { hunt: { stage: 'stage', attempts: 0 } })
+      const range = ctx.world.pois.find((q) => q.kind === 'eland-range')
+      setPlan(ctx, p, ag, 'hunt', stagingPoint(ctx, herd.center, ag), { targetId: range?.id ?? null, hunt: { stage: 'stage', attempts: 0 } })
       return
     }
   }
@@ -765,17 +772,18 @@ function eat(ctx: SimCtx, p: SimPerson, ag: Agent): void {
   }
   const total = h.meat * FOOD_VALUE.meat + h.corms * FOOD_VALUE.corms + h.shellfish * FOOD_VALUE.shellfish
   let want = Math.min(Math.max(0, 1 - p.needs.fed), total / (waiting + 1))
-  const take = (key: 'meat' | 'corms' | 'shellfish') => {
+  const take = (key: 'meat' | 'corms' | 'shellfish', share: number) => {
     const value = FOOD_VALUE[key]
-    const units = Math.min(h[key], Math.ceil(want / value))
+    const units = Math.min(h[key], Math.ceil((want * share) / value))
     h[key] -= units
     want -= units * value
     p.needs.fed = Math.min(1, p.needs.fed + units * value)
   }
-  // shellfish first, they spoil soonest; corms keep
-  take('shellfish')
-  if (want > 0) take('meat')
-  if (want > 0) take('corms')
+  // a mixed meal: mostly shellfish (they spoil soonest), some meat and corms; then whatever is left fills up
+  take('shellfish', 0.5)
+  if (want > 0) take('meat', 0.5)
+  if (want > 0) take('corms', 0.6)
+  for (const key of ['shellfish', 'meat', 'corms'] as const) if (want > 0) take(key, 1)
 }
 
 function hunt(ctx: SimCtx, p: SimPerson, ag: Agent, plan: Plan, dt: number): void {
@@ -936,12 +944,17 @@ export function updatePerson(ctx: SimCtx, p: SimPerson, ag: Agent, dt: number, m
     }
     // keep close: re-aim when the leader has moved on
     if (dist(plan.dest, leader.position) > 6) {
-      plan.dest = { x: leader.position.x, z: leader.position.z }
+      // each follower aims at its own spot beside the leader, so two children don't walk in one body
+      const side = ag.seat * 2.39996
+      plan.dest = findWalkable(ctx, { x: leader.position.x + Math.sin(side) * 1.3, z: leader.position.z + Math.cos(side) * 1.3 }, 4)
       ag.path = []
       if (ag.pathReq) ctx.paths.cancel(ag.pathReq)
       ag.pathReq = null
     }
-    const near = dist(p.position, leader.position) < 3.5
+    const gap = dist(p.position, leader.position)
+    if (gap > 4.5) ag.catchingUp = true
+    else if (gap < 2.5) ag.catchingUp = false
+    const near = !ag.catchingUp
     if (!near && travel(ctx, p, ag, plan.dest, walkSpeed(p) * 1.15, mdt) === 'failed') {
       abandon(ctx, p, ag)
       return
@@ -1176,5 +1189,45 @@ export function setOrder(ctx: SimCtx, id: string, order: Partial<Order> & { kind
     area: null,
     arrived: false,
     ...order,
+  }
+}
+
+const PERSONAL_SPACE = 0.65
+
+/** people standing or sitting still ease apart so no two share a spot (the player and director holds stay put) */
+export function keepApart(ctx: SimCtx, realDt: number): void {
+  const people = ctx.state.people
+  const k = Math.min(1, realDt * 2)
+  const sea = ctx.state.clock.seaLevel
+  const fixed = (p: SimPerson) => (p.isPlayer && ctx.playerControlled) || ctx.agents.get(p.id)?.order?.kind === 'hold'
+  for (let i = 0; i < people.length; i++) {
+    const a = people[i]
+    if (!a || !a.alive || a.carriedBy || a.speed > 0 || a.task.kind === 'sleep') continue
+    for (let j = i + 1; j < people.length; j++) {
+      const b = people[j]
+      if (!b || !b.alive || b.carriedBy || b.speed > 0 || b.task.kind === 'sleep') continue
+      const dx = b.position.x - a.position.x
+      const dz = b.position.z - a.position.z
+      const d = Math.hypot(dx, dz)
+      if (d >= PERSONAL_SPACE) continue
+      const fa = fixed(a)
+      const fb = fixed(b)
+      if (fa && fb) continue
+      // exactly on top of each other: part along a direction from their ids, so it stays deterministic
+      const ux = d > 1e-4 ? dx / d : Math.sin(i * 2.39996 + j)
+      const uz = d > 1e-4 ? dz / d : Math.cos(i * 2.39996 + j)
+      const push = (PERSONAL_SPACE - d) * k
+      const shareA = fa ? 0 : fb ? 1 : 0.5
+      const nudge = (p: SimPerson, s: number) => {
+        const nx = p.position.x + ux * s
+        const nz = p.position.z + uz * s
+        if (ctx.paths.passableAt(nx, nz, sea)) {
+          p.position.x = nx
+          p.position.z = nz
+        }
+      }
+      if (shareA > 0) nudge(a, -push * shareA)
+      if (shareA < 1) nudge(b, push * (1 - shareA))
+    }
   }
 }

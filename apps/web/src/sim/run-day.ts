@@ -38,6 +38,8 @@ const poiLabel = (id: string | null) => {
   if (p) return p.label
   const person = s.people.find((q) => q.id === id)
   if (person) return person.name
+  const animal = s.animals.find((q) => q.id === id)
+  if (animal) return `${/^[aeiou]/.test(animal.kind) ? 'an' : 'a'} ${animal.kind}`
   return id
 }
 

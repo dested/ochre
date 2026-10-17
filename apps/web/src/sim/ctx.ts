@@ -146,6 +146,8 @@ export type Agent = {
   gaze: number
   /** the director's hold on this person, if any */
   order: Order | null
+  /** a follower walking to catch up (starts past 4.5 m, stops inside 2.5 m, so it doesn't stutter at one edge) */
+  catchingUp: boolean
 }
 
 export type AnimalBrain = {

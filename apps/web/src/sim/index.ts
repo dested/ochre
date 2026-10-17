@@ -5,7 +5,7 @@
 import { clockAt, DEFAULT_TIME_SCALE } from '../core/clock'
 import { hashString, mix32, Rng } from '../core/rng'
 import type { CreateSim, FireState, PlayerCommand, Sim, SimEvent, SimOptions, SimState } from '../game/contracts'
-import { createAgent, syncCarried, updatePerson } from './ai'
+import { createAgent, keepApart, syncCarried, updatePerson } from './ai'
 import { replenishHerds, startleHerd, updateAnimals, woundAnimal } from './animals'
 import { buildBand, PLAYER_ID } from './band'
 import { MAX_SUBSTEP, moveDt, PATH_BUDGET, type Agent, type SimCtx } from './ctx'
@@ -117,6 +117,7 @@ export function createSimWith(opts: SimOptions, flags: { director: boolean }): S
       const ag = ctx.agents.get(p.id)
       if (ag) updatePerson(ctx, p, ag, gameDt, moveDt(ctx, p.position, gameDt, realDt))
     }
+    keepApart(ctx, realDt)
     for (const p of state.people) {
       if (!p.alive) continue
       if (p.carriedBy) syncCarried(ctx, p)

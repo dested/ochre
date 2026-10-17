@@ -69,6 +69,11 @@ function fmtHour(h: number): string {
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
 }
 
+/** "an eland", "a seal" */
+function animalLabel(kind: string | undefined): string | null {
+  return kind ? `${/^[aeiou]/.test(kind) ? 'an' : 'a'} ${kind}` : null
+}
+
 function hexToRgb(hex: string): [number, number, number] {
   const n = parseInt(hex.slice(1), 16)
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
@@ -658,7 +663,13 @@ export function mount(root: HTMLElement): () => void {
         const names = (ids: string[]) => ids.map((id) => person(id)?.name ?? id).join(', ') || '—'
         const bar = (v: number) => '█'.repeat(Math.round(v * 10)).padEnd(10, '·')
         const task = p.task
-        const target = task.targetId ? (world.pois.find((q) => q.id === task.targetId)?.label ?? person(task.targetId)?.name ?? task.targetId) : ''
+        const animal = (id: string) => s.animals.find((q) => q.id === id)
+        const target = task.targetId
+          ? (world.pois.find((q) => q.id === task.targetId)?.label ??
+            person(task.targetId)?.name ??
+            animalLabel(animal(task.targetId)?.kind) ??
+            task.targetId)
+          : ''
         text =
           `${p.name}${p.isPlayer ? ' (you)' : ''} · ${p.look.sex} · ${p.look.ageYears.toFixed(1)} y${rel ? ` · ${rel}` : ''}\n` +
           `Task: ${task.kind}${task.skill ? ` [${SKILL_LABEL[task.skill]}]` : ''}${target ? ` → ${target}` : ''}\n` +
