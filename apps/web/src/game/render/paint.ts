@@ -11,7 +11,7 @@ import type { MeshStandardMaterial, WebGLProgramParametersWithUniforms } from 't
 import { Vector4 } from 'three'
 import type { PaintMaterial, PaintOptions } from '../contracts'
 import { NOISE_GLSL, PAINT_GLSL, PAINT_UNIFORMS_GLSL } from './glsl'
-import { LIGHT } from './uniforms'
+import { LIGHT, POST } from './uniforms'
 
 export type PaintExtra = {
   /** a key for the program cache: one per distinct extra */
@@ -63,6 +63,7 @@ const FRAG_HEAD = /* glsl */ `
 varying vec3 vOcWorld;
 varying vec3 vOcNormalW;
 uniform vec4 uPaint;
+uniform float uOcExposure;
 ${PAINT_UNIFORMS_GLSL}
 // set by a material's albedo GLSL: how much of the direct light gets past small relief the shadow map can't see
 // (a ledge's shadow on the bed below), and how wet and glossy the surface is (a tight glint of each light)
@@ -125,10 +126,11 @@ void RE_Direct_Painted( const in IncidentLight directLight, const in vec3 geomet
 const AMBIENT = /* glsl */ `
 	{
 		vec3 ocN = normalize( ( vec4( geometryNormal, 0.0 ) * viewMatrix ).xyz );
-		irradiance = ocAmbient( ocN, vOcWorld ) * 3.14159;
 		// people (uPaint.w) take more of the sky and the sunlit ground in their shade, so a dark-skinned figure in
-		// shadow or against the light still reads as a face and a body, not a hole
-		irradiance *= 1.0 + 0.85 * uPaint.w;
+		// shadow or against the light still reads as a face and a body, not a hole; the hearth's fill is left out of
+		// that lift, or a face by the fire goes to a blob
+		vec3 ocFF = ocFireFill( uFireGlow, ocN, vOcWorld ) + ocFireFill( uFireGlow2, ocN, vOcWorld );
+		irradiance = ( ( ocAmbient( ocN, vOcWorld ) - ocFF ) * ( 1.0 + 0.85 * uPaint.w ) + ocFF ) * 3.14159;
 	}
 `
 
@@ -144,6 +146,18 @@ const RIM = /* glsl */ `
 		reflectedLight.directDiffuse += uRimColor * fr * ( 0.25 + 0.75 * behind * behind ) * uPaint.w * mix( diffuseColor.rgb, vec3( 0.3, 0.26, 0.22 ), 0.55 ) * 0.9 * ocCaveSky( vOcWorld );
 		// wet things shine with the sky at a grazing look
 		reflectedLight.directSpecular += uSkyAmb * fr * fr * ocWet * 0.3;
+	}
+`
+
+// a figure's highlights roll off before the grade: a body a step from the hearth would otherwise burn to a white-yellow
+// blob, so past a knee (in exposed terms) the colour is scaled down whole and keeps its hue, a warm face, not a flare
+const FIGURE_KNEE = /* glsl */ `
+	if ( uPaint.w > 0.5 ) {
+		float ocX = max( max( gl_FragColor.r, gl_FragColor.g ), gl_FragColor.b ) * uOcExposure;
+		if ( ocX > 0.8 ) {
+			float ocY = 0.8 + ( ocX - 0.8 ) / ( 1.0 + ( ocX - 0.8 ) / 0.5 );
+			gl_FragColor.rgb *= ocY / ocX;
+		}
 	}
 `
 
@@ -177,6 +191,7 @@ export function patchPaint(material: MeshStandardMaterial, opts: PaintOptions = 
     u.uWeather = LIGHT.uWeather
     u.uTime = LIGHT.uTime
     u.uWind = LIGHT.uWind
+    u.uOcExposure = POST.exposure
     if (extra?.uniforms) for (const [k, v] of Object.entries(extra.uniforms)) u[k] = v
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\n${VERT_HEAD}\nuniform float uTime;\nuniform vec3 uWind;\n${extra?.vertexHead ?? ''}`)
@@ -189,7 +204,7 @@ export function patchPaint(material: MeshStandardMaterial, opts: PaintOptions = 
       .replace('#include <lights_physical_pars_fragment>', `#include <lights_physical_pars_fragment>\n${DIRECT}`)
       .replace('#include <lights_fragment_begin>', `#include <lights_fragment_begin>\n${AMBIENT}\n${extra?.ambient ?? ''}`)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\n${RIM}`)
-      .replace('#include <dithering_fragment>', `#include <dithering_fragment>\n${extra?.fragmentEnd ?? ''}\n\t// a NaN here would spread through the bloom pyramid to the whole frame\n\tif ( any( isnan( gl_FragColor.rgb ) ) || any( isinf( gl_FragColor.rgb ) ) ) gl_FragColor.rgb = vec3( 0.0 );`)
+      .replace('#include <dithering_fragment>', `#include <dithering_fragment>\n${FIGURE_KNEE}\n${extra?.fragmentEnd ?? ''}\n\t// a NaN here would spread through the bloom pyramid to the whole frame\n\tif ( any( isnan( gl_FragColor.rgb ) ) || any( isinf( gl_FragColor.rgb ) ) ) gl_FragColor.rgb = vec3( 0.0 );`)
   }
   const prevKey = material.customProgramCacheKey
   material.customProgramCacheKey = () => `${prevKey.call(material)}|${key}`
