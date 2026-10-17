@@ -623,6 +623,10 @@ controller, cameras and verbs that make each stage of life feel different; and t
   reach their props (fire stick to the hearth, engraving stone in the off hand and point on the stone), no limb passes
   through the body or the hides, and `lie-dead` lies flat on the ground with no limb clipping into it. Fix what fails;
   list what you changed per anim in the ready line, with the sheet paths.
+  **P4 item 0a, before everything (04:50):** in held.shell, with Ama crouched, the back-carried infant's head sits
+  inside hers (0.1 m apart, in front of her body centre): the back carry attach doesn't follow the crouch (play's
+  report). The infant on the back rides the carrier's spine and shoulders through every carrier pose (crouch, sit,
+  kneel, gather), head clear of hers by at least 0.18 m. Sheet: crouch, sit, kneel, walk, side and front.
   **P4 item 0, first (04:45):** in sim's provider.whale shot at 10:03 the beach shows no whale
   (`/w/junk/sim-80k/sim/f2-dev-beach.png`; the sim spawns it 15 m from the `whale-beach` POI). On :4080 with `?qa`,
   jump to provider.whale, walk to the whale beach and confirm the stranded whale renders, beached on the sand (not
@@ -641,7 +645,7 @@ Board: down · Last pushed: cca08b3 (main, 04:24) · Gate: install 0, typecheck 
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | recheck #9, #11 on 421b1a6; then held.* after F2 | F1 mark 23acc39 passed; U7 passed (bdc3b86); chatter 830a7ab; U6 ce615bc passed; U5, U3 passed | working |
 | play | opus-high | game/play, game/audio, app/play.tsx | F2 held opening (acked 04:21) | F1 play 7e42a4a passed (all 9; dd47469 summary hang fixed); PL3 runs 1–2 reached the summary, no errors; 8c75080 aim, 8f774e0 tags, 7a6f0e5 spoor passed; 9a7684d passed (E verb, seated camera); PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
 
-Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); QA server :4090 (prod build of f10a0dd, log /w/junk/sim-80k/qa-server.log); Drydock portal :4400 (Windows bun, log in
+Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); QA server :4090 (prod build of b5d9c29, log /w/junk/sim-80k/qa-server.log); Drydock portal :4400 (Windows bun, log in
 scratchpad drydock-portal.log)
 Images used: 47 / 200 (lead 2, ui 45). OpenAI credit exhausted 01:05; generation stopped (needs-sal Check 2)
 Waiting on Sal: none (needs-sal file: plans/2026-10-17-needs-sal.md)
