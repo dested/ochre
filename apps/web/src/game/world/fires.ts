@@ -171,27 +171,28 @@ void main() {
 	if ( vK < 0.01 ) discard;
 	float d = length( vP ) + ( fNoise( vW * 9.0 ) - 0.5 ) * 0.3;
 	if ( d > 1.0 ) discard;
-	// a bed of coals: each lump glowing and dimming on its own, the cracks between them dark
-	vec2 g = vW / 0.065;
+	float core = 1.0 - smoothstep( 0.1, 0.95, d );
+	// the glow under the ash: soft, broken patches that breathe as the air moves over them (no cells, no cracks)
+	float n1 = fNoise( vW * 7.0 + vec2( 0.0, uTime * 0.05 ) );
+	float n2 = fNoise( vW * 17.0 - vec2( uTime * 0.08, 0.0 ) + 4.0 );
+	float breath = 0.75 + 0.25 * sin( uTime * 0.9 + n1 * 6.0 );
+	float glow = smoothstep( 0.35, 0.85, n1 * 0.65 + n2 * 0.35 + core * 0.35 ) * core * breath;
+	// ember flecks: grains of live coal showing through the ash, each brightening and fading on its own; far off
+	// they melt into the glow rather than sparkle
+	vec2 g = vW / 0.03;
 	vec2 i = floor( g );
-	vec2 fr = fract( g );
-	float f1 = 9.0;
-	float f2 = 9.0;
-	float id = 0.0;
-	for ( int y = - 1; y <= 1; y ++ ) {
-		for ( int x = - 1; x <= 1; x ++ ) {
-			vec2 o = vec2( float( x ), float( y ) );
-			vec2 c = o + vec2( fHash( i + o ), fHash( i + o + 7.3 ) ) - fr;
-			float dd = dot( c, c );
-			if ( dd < f1 ) { f2 = f1; f1 = dd; id = fHash( i + o + 3.1 ); }
-			else if ( dd < f2 ) f2 = dd;
-		}
-	}
-	float crack = smoothstep( 0.02, 0.25, sqrt( f2 ) - sqrt( f1 ) );
-	float pulse = 0.55 + 0.45 * sin( uTime * ( 0.6 + id * 1.4 ) + id * 20.0 );
-	float heat = ( 1.0 - smoothstep( 0.15, 1.0, d ) ) * ( 0.35 + 0.65 * id ) * pulse * crack;
-	vec3 col = mix( vec3( 0.55, 0.07, 0.01 ), vec3( 1.0, 0.48, 0.1 ), smoothstep( 0.25, 0.75, heat ) );
-	gl_FragColor = vec4( col * heat * ( 0.7 + 0.9 * vK ), 1.0 );
+	vec2 c = vec2( fHash( i ), fHash( i + 7.3 ) );
+	float r = length( fract( g ) - 0.2 - 0.6 * c );
+	float sz = 0.16 + 0.2 * fHash( i + 9.1 );
+	float ph = fHash( i + 3.1 );
+	float pulse = 0.5 + 0.5 * sin( uTime * ( 0.7 + ph * 1.8 ) + ph * 40.0 );
+	pulse *= pulse;
+	float px = fwidth( g.x ) + fwidth( g.y );
+	float dot_ = 1.0 - smoothstep( sz * 0.4, sz + px * 0.5, r );
+	float fleck = step( 0.55, fHash( i + 1.7 ) ) * mix( dot_, 0.06, smoothstep( 0.3, 0.9, px ) ) * pulse * smoothstep( 0.05, 0.6, core );
+	vec3 col = vec3( 0.6, 0.07, 0.01 ) * glow * 1.1 + vec3( 1.0, 0.3, 0.04 ) * smoothstep( 0.5, 1.0, glow ) * 0.55;
+	col += mix( vec3( 0.9, 0.18, 0.02 ), vec3( 1.0, 0.5, 0.12 ), pulse ) * fleck * 1.2;
+	gl_FragColor = vec4( col * ( 0.7 + 0.9 * vK ), 1.0 );
 }
 `
 
