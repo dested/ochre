@@ -10,7 +10,7 @@ import { useRecent, useRevealKey } from '../hooks'
 import { Dial } from './Dial'
 import { ControlHints } from './Hints'
 import { Captions, ObjectiveLine } from './Lines'
-import { GazeMark, NameTags, Prompt, Reticle, WatchRing } from './Marks'
+import { GazeMark, NameTags, ObjectiveMarker, Prompt, Reticle, WatchRing } from './Marks'
 import { NeedGlyphs } from './Needs'
 import { Toasts } from './Toasts'
 
@@ -24,6 +24,7 @@ export function Hud({ dimmed = false }: { dimmed?: boolean }) {
   const toasts = useBridge((s) => s.toasts)
   const nameTags = useBridge((s) => s.nameTags)
   const choosing = useBridge((s) => s.choice !== null)
+  const objectiveMark = useBridge((s) => s.objectiveMark)
   const largeCaptions = useBridge((s) => s.settings.largeCaptions)
   const reveal = useRevealKey()
 
@@ -42,6 +43,8 @@ export function Hud({ dimmed = false }: { dimmed?: boolean }) {
     objective ? `${objective.id}.${objective.text}.${objective.done}` : 'none',
     12000
   )
+  // the mark waits 4 s after a new objective, so the line is read before the arrow pulls the eye
+  const markWaiting = useRecent(objective ? objective.id : 'none', 4000)
 
   if (!hud.visible) return null
   const held = hud.stage === 'held'
@@ -56,6 +59,11 @@ export function Hud({ dimmed = false }: { dimmed?: boolean }) {
       <div style={{ opacity: choosing ? 0 : 1, transition: 'opacity 300ms ease' }}>
         <NameTags tags={nameTags} />
       </div>
+
+      <ObjectiveMarker
+        mark={objectiveMark}
+        show={!markWaiting && !choosing && objective !== null}
+      />
 
       <div className="absolute top-[clamp(18px,3.4vh,36px)] left-[clamp(20px,3vw,44px)]">
         <div className="ui-scale">

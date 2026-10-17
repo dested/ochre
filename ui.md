@@ -91,7 +91,7 @@ so cells stay slightly narrower than tall.
  objective (top left)        watch ring (top centre)                 toasts (top right)
 
                               [ the world: nothing here ]
-                                  reticle when aiming
+                        reticle when aiming · objective mark / edge arrow
 
  dial + needs (bottom left)     prompt, then captions (bottom centre)
 ```
@@ -117,6 +117,11 @@ canvases or full-screen backdrops; an offset that must clear a zoomed block mult
 - **Name tags**: name, relation, a small tick down to the head; warmer with the bond; a voice mark while speaking.
   At most four at once (speaking, then kin, then bond, then nearness); a stranger's "Keda's daughter" line shows only
   while that person speaks, kin relations always. They fade out while a choice card is up.
+- **Objective mark** (`ObjectiveMarker`, from `objectiveMark`): on screen a small ochre diamond with a bone edge
+  floating over the target; off screen a small diamond with a chevron ahead of it, at the clamped edge point (kept
+  44 px inside) and turned toward the target. Both sit on a soft soot pool. It fades in 4 s after a new objective
+  id (the line is read first), hides under a choice and fades out when the mark goes null. `/lab/ui` → Objective
+  mark → orbit runs a mock target around and off the screen.
 - **Gaze mark**: a dashed bone ring at the centre during `held.faces`, so a baby who can only look knows where it is
   looking.
 - **Toasts**: "Rebal learned Tides" slips for the same skill fold into one ("Rebal, Wume and 2 others learned

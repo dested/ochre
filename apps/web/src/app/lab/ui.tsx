@@ -180,6 +180,7 @@ function applyPreset(name: string) {
   bridge.set({
     captions: [],
     objective: null,
+    objectiveMark: null,
     prompt: null,
     toasts: [],
     nameTags: [],
@@ -228,12 +229,47 @@ function cardFor(stage: LifeStageId) {
   return { stage, title: s.title, subtitle: s.line, ageYears: s.ageYears }
 }
 
+/**
+ * A mock objectiveMark like play publishes: a target that circles wider than the screen (12 s a lap), so it passes
+ * on and off screen; off screen it is clamped to the edge along the ray from the centre.
+ */
+function mockMark(t: number): NonNullable<BridgeState['objectiveMark']> {
+  const w = window.innerWidth
+  const h = window.innerHeight
+  const a = (t / 12) * Math.PI * 2
+  const dx = Math.cos(a) * w * 0.75
+  const dy = Math.sin(a * 2) * h * 0.45 + Math.sin(a) * h * 0.2
+  const onScreen = Math.abs(dx) < w / 2 && Math.abs(dy) < h / 2
+  const k = onScreen ? 1 : Math.min(w / 2 / Math.max(1e-6, Math.abs(dx)), h / 2 / Math.max(1e-6, Math.abs(dy)))
+  return {
+    x: w / 2 + dx * k,
+    y: h / 2 + dy * k,
+    onScreen,
+    angle: Math.atan2(dx, -dy),
+    distance: 30,
+  }
+}
+
 export function UiLab() {
   const [bg, setBg] = useState<BgName>('cave')
   const [panel, setPanel] = useState(true)
   const [hour, setHour] = useState(9.1)
+  const [marking, setMarking] = useState(false)
   const screen = useBridge((s) => s.screen)
   const hud = useBridge((s) => s.hud)
+
+  // the mock mark at play's ~15 Hz
+  useEffect(() => {
+    if (!marking) return
+    const start = performance.now()
+    const tick = () => bridge.set({ objectiveMark: mockMark((performance.now() - start) / 1000) })
+    tick()
+    const t = setInterval(tick, 66)
+    return () => {
+      clearInterval(t)
+      bridge.set({ objectiveMark: null })
+    }
+  }, [marking])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -367,6 +403,22 @@ export function UiLab() {
             <Btn on={() => bridge.set({ toasts: [...bridge.get().toasts, toast('note', 'New Field Note', 'Corms of the fynbos', 'corms')] })}>note</Btn>
             <Btn on={() => bridge.set({ toasts: [...bridge.get().toasts, toast('bond', 'Kaya is glad of you')] })}>bond</Btn>
             <Btn on={() => bridge.set({ captions: [], toasts: [] })}>clear</Btn>
+          </Group>
+          <Group label="Objective mark">
+            <Btn
+              active={marking}
+              on={() => {
+                if (!marking) {
+                  bridge.set({
+                    screen: 'playing',
+                    objective: { id: id('lab.mark'), text: 'Follow Ama to the rocks', done: null, total: null },
+                  })
+                  bridge.setHud({ visible: true })
+                }
+                setMarking((m) => !m)
+              }}>
+              {marking ? 'stop' : 'orbit (new objective)'}
+            </Btn>
           </Group>
           <Group label={`Hour ${hour.toFixed(1)}`}>
             <input

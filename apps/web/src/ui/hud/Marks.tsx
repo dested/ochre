@@ -1,5 +1,6 @@
-/** The HUD's marks: the interaction prompt, the watch ring, the aim reticle and the name tags. */
-import type { NameTag, PromptState } from '~/game/bridge'
+/** The HUD's marks: the interaction prompt, the watch ring, the aim reticle, the objective mark and the name tags. */
+import { useRef } from 'react'
+import type { NameTag, ObjectiveMark, PromptState } from '~/game/bridge'
 import type { SkillId } from '~/game/contracts'
 import { SKILL_LABELS } from '~/content/skills'
 import { C, mix } from '../palette'
@@ -289,5 +290,105 @@ function SpeakingMark() {
         <path d="M9 1 Q 11.8 6 9 11" />
       </g>
     </svg>
+  )
+}
+
+/** keeps the objective mark this far inside the screen edge, so the arrow is never cut */
+const MARK_EDGE = 44
+/** a soft soot pool behind the mark, so ochre reads on bright sand and on dark rock alike */
+const MARK_POOL =
+  'radial-gradient(closest-side, rgb(22 17 14 / 0.42), rgb(22 17 14 / 0.14) 65%, transparent)'
+
+/**
+ * The objective's target: a small ochre diamond floating over it while on screen, and an edge arrow at the clamped
+ * point turned toward it (angle clockwise from up) while off screen. `show` gates the fade; the last mark is kept
+ * so a null fades out in place instead of vanishing.
+ */
+export function ObjectiveMarker({ mark, show }: { mark: ObjectiveMark | null; show: boolean }) {
+  const last = useRef<ObjectiveMark | null>(null)
+  if (mark) last.current = mark
+  const m = mark ?? last.current
+  if (!m) return null
+  const visible = show && mark !== null
+  const deg = (m.angle * 180) / Math.PI
+  return (
+    <div
+      className="absolute top-0 left-0"
+      aria-hidden
+      style={{
+        // ~15 Hz positions: glide like the name tags; clamp inside the edge so the arrow stays whole
+        transform: `translate(clamp(${MARK_EDGE}px, ${m.x}px, calc(100vw - ${MARK_EDGE}px)), clamp(${MARK_EDGE}px, ${m.y}px, calc(100vh - ${MARK_EDGE}px))) translate(-50%, -50%)`,
+        opacity: visible ? 1 : 0,
+        transition: visible
+          ? 'opacity 900ms ease, transform 70ms linear'
+          : 'opacity 400ms ease, transform 70ms linear',
+        filter: 'drop-shadow(0 1px 3px rgb(22 17 14 / 0.75))',
+      }}>
+      <div className="relative h-[46px] w-[46px]">
+        {/* on screen: the diamond rides a little above the target point */}
+        <svg
+          width="46"
+          height="46"
+          viewBox="0 0 36 36"
+          className="absolute inset-0"
+          style={{
+            opacity: m.onScreen ? 1 : 0,
+            transition: 'opacity 250ms ease',
+            translate: '0 -18px',
+            background: MARK_POOL,
+          }}>
+          <g style={{ filter: 'url(#ui-brush-soft)' }}>
+            <path
+              d="M18 9 L25 18 L18 27 L11 18 Z"
+              fill={C.ochreBright}
+              fillOpacity="0.9"
+              stroke={C.bone}
+              strokeOpacity="0.85"
+              strokeWidth="1.4"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M18 27 L18 33"
+              stroke={C.bone}
+              strokeOpacity="0.7"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+            />
+          </g>
+        </svg>
+        {/* off screen: a small diamond with a chevron ahead of it, turned toward the target */}
+        <svg
+          width="46"
+          height="46"
+          viewBox="0 0 36 36"
+          className="absolute inset-0"
+          style={{
+            opacity: m.onScreen ? 0 : 1,
+            transition: 'opacity 250ms ease',
+            rotate: `${deg}deg`,
+            background: MARK_POOL,
+          }}>
+          <g style={{ filter: 'url(#ui-brush-soft)' }}>
+            <path
+              d="M18 14 L23 20 L18 26 L13 20 Z"
+              fill={C.ochreBright}
+              fillOpacity="0.9"
+              stroke={C.bone}
+              strokeOpacity="0.85"
+              strokeWidth="1.3"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M11 10.5 L18 3.5 L25 10.5"
+              fill="none"
+              stroke={C.bone}
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </g>
+        </svg>
+      </div>
+    </div>
   )
 }
