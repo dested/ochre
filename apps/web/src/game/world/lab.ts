@@ -13,6 +13,7 @@ import { LIGHT, POST, createRenderPipeline, isPaintedPipeline } from '../render/
 import { createWorldData } from '../../world-gen/index'
 import { CAVE, caveWorld } from '../../world-gen/layout'
 import { createWorldView } from './index'
+import { createSpoor } from './spoor'
 
 export type WorldLabApi = {
   view(name: string): void
@@ -301,6 +302,19 @@ export function mount(el: HTMLElement): () => void {
       band.push(p)
     })
   }
+  // ?spoor=x,z,heading: an eland trail of 18 strides from there, wandering, fresh at the head and old at the tail
+  const spoor = createSpoor(world)
+  scene.add(spoor.root)
+  const sp = q.get('spoor')?.split(',').map(Number)
+  if (sp && sp.length >= 2) {
+    let [tx = -146, tz = 116, th = 1.4] = sp
+    for (let i = 0; i < 18; i++) {
+      spoor.add(tx, tz, th, (17 - i) * 100)
+      th += Math.sin(i * 1.7) * 0.12
+      tx += Math.sin(th) * 2.2
+      tz += Math.cos(th) * 2.2
+    }
+  }
   let frames = 0
   let raw = q.get('post') === '0'
   const offFrame = host.onFrame((dt) => {
@@ -369,6 +383,7 @@ export function mount(el: HTMLElement): () => void {
     canvas.removeEventListener('wheel', onWheel)
     if (import.meta.env.DEV) Object.assign(window, { __lab: undefined })
     for (const p of band) p.dispose()
+    spoor.dispose()
     view.dispose()
     pipeline.dispose()
     panel.remove()
