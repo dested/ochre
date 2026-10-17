@@ -1,6 +1,7 @@
 /**
- * Family: the band laid out by generation around the player, with the bond to each person drawn as a ring
- * that fills with warmth. Your own family sits on the tree; everyone else in the band sits below it.
+ * Family: the player's family laid out by generation from the bridge's mother/father/partner links (couples side
+ * by side, children under their parents), the bond to each person drawn as a ring that fills with warmth.
+ * Everyone else in the band sits below the tree.
  */
 import { useEffect } from 'react'
 import { bridge, useBridge, type LineageEntry } from '~/game/bridge'
@@ -9,16 +10,75 @@ import { CrossHatch } from '../motifs'
 import { C, mix } from '../palette'
 import { MenuButton } from '../widgets'
 
-/** −2 grandparents … +2 grandchildren; null for the wider band */
-function generationOf(relation: string): number | null {
-  const r = relation.toLowerCase()
-  if (r.includes("'s ")) return null
-  if (/grand(son|daughter|child)/.test(r)) return 2
-  if (/grand(mother|father|parent)/.test(r)) return -2
-  if (/^(mother|father|aunt|uncle|parent)/.test(r)) return -1
-  if (/^(son|daughter|child)/.test(r)) return 1
-  if (/^(sister|brother|partner|husband|wife|cousin|you)/.test(r)) return 0
-  return null
+/**
+ * The player's family: every ancestor, everyone descended from an ancestor (siblings, aunts, cousins), and their
+ * partners. Everyone else in the band sits below the tree.
+ */
+function familyIds(all: readonly LineageEntry[], playerId: string): Set<string> {
+  const byId = new Map(all.map((p) => [p.id, p]))
+  const blood = new Set<string>([playerId])
+  const up = [playerId]
+  while (up.length > 0) {
+    const p = byId.get(up.pop() ?? '')
+    for (const parent of [p?.motherId, p?.fatherId]) {
+      if (parent && byId.has(parent) && !blood.has(parent)) {
+        blood.add(parent)
+        up.push(parent)
+      }
+    }
+  }
+  for (let grew = true; grew; ) {
+    grew = false
+    for (const p of all) {
+      if (blood.has(p.id)) continue
+      if ((p.motherId && blood.has(p.motherId)) || (p.fatherId && blood.has(p.fatherId))) {
+        blood.add(p.id)
+        grew = true
+      }
+    }
+  }
+  const family = new Set(blood)
+  for (const p of all) {
+    if (blood.has(p.id) && p.partnerId && byId.has(p.partnerId)) family.add(p.partnerId)
+    if (p.partnerId && blood.has(p.partnerId)) family.add(p.id)
+  }
+  return family
+}
+
+type Unit = LineageEntry[]
+
+/** one generation as units (a person, or a couple side by side), children ordered under their parents */
+function orderRow(row: readonly LineageEntry[], above: readonly LineageEntry[]): Unit[] {
+  const ids = new Set(row.map((p) => p.id))
+  const NONE = Number.POSITIVE_INFINITY
+  const parentIndex = (p: LineageEntry) => {
+    const i = above.findIndex((a) => a.id === p.motherId || a.id === p.fatherId)
+    return i < 0 ? NONE : i
+  }
+  const partnerIn = (p: LineageEntry) => (p.partnerId && ids.has(p.partnerId) ? row.find((q) => q.id === p.partnerId) : undefined)
+  // an in-law (no parents in the row above) sits beside their partner instead of sorting on their own
+  const followsPartner = (p: LineageEntry) => {
+    const partner = partnerIn(p)
+    return partner !== undefined && parentIndex(p) === NONE && parentIndex(partner) !== NONE
+  }
+  const anchors = row.filter((p) => !followsPartner(p))
+  const sorted = anchors
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => parentIndex(a.p) - parentIndex(b.p) || (a.p.isPlayer ? 0.5 : 0) - (b.p.isPlayer ? 0.5 : 0) || a.i - b.i)
+    .map((x) => x.p)
+  const placed = new Set<string>()
+  const units: Unit[] = []
+  for (const p of sorted) {
+    if (placed.has(p.id)) continue
+    placed.add(p.id)
+    const partner = partnerIn(p)
+    if (partner && !placed.has(partner.id)) {
+      placed.add(partner.id)
+      units.push([p, partner])
+    } else units.push([p])
+  }
+  for (const p of row) if (!placed.has(p.id)) units.push([p])
+  return units
 }
 
 function bondWord(bond: number): string {
@@ -48,14 +108,7 @@ export function LineageScreen() {
     return () => window.removeEventListener('keydown', key)
   }, [])
 
-  const rows = new Map<number, LineageEntry[]>()
-  const band: LineageEntry[] = []
-  for (const p of lineage) {
-    const g = generationOf(p.relation)
-    if (g === null) band.push(p)
-    else rows.set(g, [...(rows.get(g) ?? []), p])
-  }
-  const you: LineageEntry = {
+  const player: LineageEntry = lineage.find((p) => p.isPlayer) ?? {
     id: 'you',
     name: hud.name,
     relation: 'You',
@@ -63,12 +116,25 @@ export function LineageScreen() {
     alive: true,
     bond: 1,
     skills: [],
+    motherId: null,
+    fatherId: null,
+    partnerId: null,
+    generation: 0,
+    isPlayer: true,
   }
-  const gen0 = rows.get(0) ?? []
-  // you stand in the middle of your generation
-  const mid = Math.ceil(gen0.length / 2)
-  rows.set(0, [...gen0.slice(0, mid), you, ...gen0.slice(mid)])
-  const gens = [...rows.keys()].sort((a, b) => a - b)
+  const everyone = lineage.some((p) => p.isPlayer) ? lineage : [...lineage, player]
+  const family = familyIds(everyone, player.id)
+  const band = everyone.filter((p) => !family.has(p.id))
+  const byGen = new Map<number, LineageEntry[]>()
+  for (const p of everyone) if (family.has(p.id)) byGen.set(p.generation, [...(byGen.get(p.generation) ?? []), p])
+  const gens = [...byGen.keys()].sort((a, b) => a - b)
+  const rows: { gen: number; units: Unit[] }[] = []
+  let above: LineageEntry[] = []
+  for (const g of gens) {
+    const units = orderRow(byGen.get(g) ?? [], above)
+    rows.push({ gen: g, units })
+    above = units.flat()
+  }
 
   return (
     <div className="fixed inset-0 animate-ui-fade overflow-hidden bg-soot ui-grain">
@@ -91,15 +157,22 @@ export function LineageScreen() {
         </div>
 
         <div className="flex flex-col items-center">
-          {gens.map((g, i) => (
-            <div key={g} className="flex w-full flex-col items-center">
+          {rows.map(({ gen, units }, i) => (
+            <div key={gen} className="flex w-full flex-col items-center">
               {i > 0 && <Connector />}
               <h3 className="mb-3 font-serif text-[15px] italic text-bone-dim" style={{ fontVariationSettings: '"opsz" 18' }}>
-                {ROW_LABELS[g] ?? ''}
+                {ROW_LABELS[gen] ?? ''}
               </h3>
-              <div className="flex flex-wrap justify-center gap-x-[clamp(16px,2.4vw,40px)] gap-y-5">
-                {(rows.get(g) ?? []).map((p) => (
-                  <Person key={p.id} p={p} self={p.id === 'you'} />
+              <div className="flex flex-wrap justify-center gap-x-[clamp(20px,3vw,52px)] gap-y-5">
+                {units.map((unit) => (
+                  <div key={unit.map((p) => p.id).join('+')} className="flex items-center gap-3">
+                    {unit.map((p, j) => (
+                      <div key={p.id} className="flex items-center gap-3">
+                        {j > 0 && <PartnerMark />}
+                        <Person p={p} self={p.isPlayer} />
+                      </div>
+                    ))}
+                  </div>
                 ))}
               </div>
             </div>
@@ -120,6 +193,18 @@ export function LineageScreen() {
         )}
       </div>
     </div>
+  )
+}
+
+/** two short strokes bound by a crossing: partners */
+function PartnerMark() {
+  return (
+    <svg width="26" height="18" viewBox="0 0 26 18" aria-label="partners" className="shrink-0">
+      <g fill="none" stroke={C.amber} strokeOpacity="0.7" strokeWidth="1.4" strokeLinecap="round" style={{ filter: 'url(#ui-brush)' }}>
+        <path d="M2 9 L24 9" />
+        <path d="M9 4 L17 14 M17 4 L9 14" strokeOpacity="0.5" />
+      </g>
+    </svg>
   )
 }
 

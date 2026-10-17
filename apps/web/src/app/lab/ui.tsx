@@ -67,14 +67,30 @@ const BASE_HUD: BridgeState['hud'] = {
   aiming: false,
 }
 
+type Person = BridgeState['lineage'][number]
+const person = (p: Partial<Person> & Pick<Person, 'id' | 'name' | 'relation' | 'ageYears' | 'generation'>): Person => ({
+  alive: true,
+  bond: 0.5,
+  skills: [],
+  motherId: null,
+  fatherId: null,
+  partnerId: null,
+  isPlayer: false,
+  ...p,
+})
+
 const LINEAGE: BridgeState['lineage'] = [
-  { id: 'oro', name: 'Oro', relation: 'Grandmother', ageYears: 62, alive: true, bond: 0.8, skills: ['corms', 'medicine', 'stories', 'ochre', 'engraving'] },
-  { id: 'ama', name: 'Ama', relation: 'Mother', ageYears: 28, alive: true, bond: 0.95, skills: ['shellfish', 'tides', 'corms', 'beads', 'hides'] },
-  { id: 'tuk', name: 'Tuk', relation: 'Father', ageYears: 31, alive: true, bond: 0.7, skills: ['knapping', 'heat', 'hafting', 'tracking', 'spear'] },
-  { id: 'kaya', name: 'Kaya', relation: 'Sister', ageYears: 10, alive: true, bond: 0.75, skills: ['shellfish'] },
-  { id: 'nehe', name: 'Nehe', relation: 'Neighbour', ageYears: 33, alive: true, bond: 0.35, skills: ['hides', 'corms'] },
-  { id: 'ilu', name: 'Ilu', relation: "Nehe's son", ageYears: 8, alive: true, bond: 0.4, skills: [] },
-  { id: 'sabo', name: 'Sabo', relation: "Nehe's daughter", ageYears: 5, alive: true, bond: 0.3, skills: [] },
+  person({ id: 'oro', name: 'Oro', relation: 'Grandmother', ageYears: 62, generation: -2, bond: 0.8, partnerId: 'gau', skills: ['corms', 'medicine', 'stories', 'ochre', 'engraving'] }),
+  person({ id: 'gau', name: 'Gau', relation: 'Grandfather', ageYears: 64, generation: -2, alive: false, bond: 0.2, partnerId: 'oro', skills: ['tracking'] }),
+  person({ id: 'ama', name: 'Ama', relation: 'Mother', ageYears: 28, generation: -1, bond: 0.95, motherId: 'oro', fatherId: 'gau', partnerId: 'tuk', skills: ['shellfish', 'tides', 'corms', 'beads', 'hides'] }),
+  person({ id: 'tuk', name: 'Tuk', relation: 'Father', ageYears: 31, generation: -1, bond: 0.7, partnerId: 'ama', skills: ['knapping', 'heat', 'hafting', 'tracking', 'spear'] }),
+  person({ id: 'sefu', name: 'Sefu', relation: 'Uncle', ageYears: 25, generation: -1, bond: 0.45, motherId: 'oro', fatherId: 'gau', skills: ['spear'] }),
+  person({ id: 'kaya', name: 'Kaya', relation: 'Sister', ageYears: 10, generation: 0, bond: 0.75, motherId: 'ama', fatherId: 'tuk', skills: ['shellfish'] }),
+  person({ id: 'teni', name: 'Teni', relation: 'You', ageYears: 6, generation: 0, bond: 1, motherId: 'ama', fatherId: 'tuk', isPlayer: true }),
+  person({ id: 'lino', name: 'Lino', relation: 'Cousin', ageYears: 3, generation: 0, bond: 0.5, fatherId: 'sefu' }),
+  person({ id: 'nehe', name: 'Nehe', relation: 'Neighbour', ageYears: 33, generation: -1, bond: 0.35, skills: ['hides', 'corms'] }),
+  person({ id: 'ilu', name: 'Ilu', relation: "Nehe's son", ageYears: 8, generation: 0, bond: 0.4, motherId: 'nehe' }),
+  person({ id: 'sabo', name: 'Sabo', relation: "Nehe's daughter", ageYears: 5, generation: 0, bond: 0.3, motherId: 'nehe' }),
 ]
 
 type Preset = Partial<Omit<BridgeState, 'hud'>> & { hud?: Partial<BridgeState['hud']> }
@@ -178,6 +194,7 @@ function applyPreset(name: string) {
 function goScreen(screen: Screen) {
   const extra: Partial<BridgeState> = {}
   if (screen === 'loading') extra.loadingProgress = 0.62
+  if (screen === 'lineage' && bridge.get().lineage.length === 0) extra.lineage = LINEAGE
   if (screen === 'chapter-card' && !bridge.get().chapter) extra.chapter = cardFor('small')
   if (screen === 'notes' && bridge.get().notesUnlocked.length === 0) {
     extra.notesUnlocked = FIELD_NOTE_IDS.slice(0, 15)
