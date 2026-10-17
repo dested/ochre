@@ -93,8 +93,11 @@ vec3 ocSkyBase( vec3 d ) {
 	vec3 hs = sqrt( uHorizon );
 	vec3 zs = sqrt( uZenith );
 	vec3 pale = mix( hs, zs, 0.5 );
-	pale = mix( pale, vec3( dot( pale, vec3( 0.3, 0.55, 0.15 ) ) ) * vec3( 1.04, 1.02, 0.95 ), 0.4 ) * 1.06;
-	vec3 cs = t < 0.3 ? mix( hs, pale, smoothstep( 0.0, 0.3, t ) ) : mix( pale, zs, smoothstep( 0.3, 1.0, t ) );
+	// with the sun low the gold climbs higher and the band between stays warm (peach, not grey)
+	float gold = smoothstep( 0.45, 0.08, uSunDir.y ) * smoothstep( - 0.1, 0.02, uSunDir.y );
+	pale = mix( pale, vec3( dot( pale, vec3( 0.3, 0.55, 0.15 ) ) ) * vec3( 1.04, 1.02, 0.95 ), 0.4 - 0.28 * gold ) * 1.06;
+	float split = 0.3 + 0.14 * gold;
+	vec3 cs = t < split ? mix( hs, pale, smoothstep( 0.0, split, t ) ) : mix( pale, zs, smoothstep( split, 1.0, t ) );
 	vec3 col = cs * cs;
 	// a brighter band hugging the horizon
 	col = mix( col, uHorizon * 1.08, exp( - up * 18.0 ) * 0.35 );
