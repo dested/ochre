@@ -19,7 +19,7 @@ import { createStubAudio } from './stubs/audio'
 import { createStubSpoor } from './stubs/spoor'
 import { createStubAnimal, createStubPerson } from './stubs/actors'
 import { createStubPipeline } from './stubs/pipeline'
-import { createStubSim } from './stubs/sim'
+import { createSim } from '../../sim'
 import { createStubWorldData } from './stubs/world-data'
 import { createStubWorldView } from './stubs/world-view'
 
@@ -43,7 +43,7 @@ export const modules: Modules = {
   createWorldData: createStubWorldData,
   createWorldView: createStubWorldView,
   createRenderPipeline: createStubPipeline,
-  createSim: createStubSim,
+  createSim,
   createPerson: createStubPerson,
   createAnimal: createStubAnimal,
   createAudio: createStubAudio,
