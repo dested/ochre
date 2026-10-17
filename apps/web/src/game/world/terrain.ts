@@ -271,8 +271,9 @@ void ocLedge( inout OcBed b, inout vec2 g, float d, float dh, vec2 n, vec2 s, ve
 		b.gapD = min( b.gapD, abs( d - w ) );
 	} else {
 		// on top of a ledge: the rounded lip falls away to the edge
-		float lip = ( 1.0 - smoothstep( 0.0, 0.08, d ) ) * smoothstep( 0.03, 0.14, - dh );
-		g -= n * lip * 1.3;
+		// (wide and gentle: a narrow bright lip along every step reads as a drawn line)
+		float lip = ( 1.0 - smoothstep( 0.0, 0.14, d ) ) * smoothstep( 0.03, 0.14, - dh );
+		g -= n * lip * 0.8;
 		b.lip = max( b.lip, lip );
 		b.gapD = min( b.gapD, d - dh * 0.5 );
 	}
@@ -456,7 +457,7 @@ const TERRAIN_ALBEDO = /* glsl */ `
 			// broken colour within each bed, and the grain of the bedding along it
 			shelf *= 0.88 + 0.2 * ocNoise( p * 1.4 + bd.id.yz * 7.0 ) + 0.06 * ocNoise( vec2( dot( p, vec2( 0.91, 0.42 ) ) * 0.6, dot( p, vec2( - 0.42, 0.91 ) ) * 6.0 ) );
 			// the lips dry and pale, the feet damp and dark
-			shelf = mix( shelf, shelf * 1.2 + ocLin( vec3( 0.05, 0.045, 0.04 ) ), bd.lip * 0.5 );
+			shelf = mix( shelf, shelf * 1.2 + ocLin( vec3( 0.05, 0.045, 0.04 ) ), bd.lip * 0.3 );
 			shelf *= 1.0 - 0.13 * bd.foot;
 			// pits weathered into the high beds, a grey crust of barnacles in the middle zone
 			float pit = ocEdge( 0.78, ocNoise( p * 15.0 + 3.0 ) * 0.7 + ocNoise( p * 37.0 ) * 0.3 ) * hi * near;
@@ -466,9 +467,12 @@ const TERRAIN_ALBEDO = /* glsl */ `
 			// weed: brown and olive wrack in a broken fringe along each ledge's foot, spreading over the beds lowest down;
 			// a little sea lettuce at the water
 			float low = smoothstep( 0.4, - 1.0, y );
-			weed = ocEdge( 0.66, ocNoise( p * 3.0 + bd.id.yz * 5.0 ) * 0.4 + ocNoise( p * 9.0 ) * 0.15 + bd.foot * 0.55 * smoothstep( 1.6, 0.2, y ) + low * 0.4 );
+			// (its edge torn into fronds by fine noise and the inside streaked, so a patch reads as a heap of weed, not
+			// a flat blot of colour)
+			float frond = ocNoise( vec2( dot( p, vec2( 0.91, 0.42 ) ) * 9.0, dot( p, vec2( - 0.42, 0.91 ) ) * 26.0 ) );
+			weed = ocEdge( 0.66, ocNoise( p * 3.0 + bd.id.yz * 5.0 ) * 0.4 + ocNoise( p * 9.0 ) * 0.12 + ( frond - 0.5 ) * 0.22 + bd.foot * 0.55 * smoothstep( 1.6, 0.2, y ) + low * 0.4 );
 			vec3 wrack = mix( ocLin( vec3( 0.29, 0.26, 0.14 ) ), ocLin( vec3( 0.36, 0.28, 0.16 ) ), bd.id.y );
-			shelf = mix( shelf, wrack * ( 0.85 + 0.3 * ocNoise( p * 13.0 ) ), weed * 0.85 );
+			shelf = mix( shelf, wrack * ( 0.7 + 0.25 * ocNoise( p * 13.0 ) + 0.35 * frond ), weed * 0.85 );
 			float ulva = ocEdge( 0.8, ocNoise( p * 3.1 + 7.0 ) * 0.7 + ocNoise( p * 11.0 ) * 0.3 ) * smoothstep( - 0.4, - 1.2, y );
 			shelf = mix( shelf, ocLin( vec3( 0.27, 0.37, 0.15 ) ), ulva * 0.6 );
 			shelf = mix( shelf, ocLin( vec3( 0.66, 0.46, 0.48 ) ), smoothstep( - 0.7, - 1.4, y ) * step( 0.5, bd.id.y ) * 0.5 * ( 1.0 - weed ) );
