@@ -713,7 +713,8 @@ controller, cameras and verbs that make each stage of life feel different; and t
   lead's look at ui's late shots. Finish by 07:00, commit, ready line. **play:** (1) small.follow opens facing the sea with
   Ama ~110° behind: at a chapter start, set the camera yaw toward the objective's target. (2) held.faces: ease the look
   pitch back toward level as the view leaves Ama's face, so turning away shows the family ring, not the ceiling. (3) held
-  gaze cone 6° → 9°. (4) Check on :4091: the life summary renders after the elder's last beat (ui's
+  gaze cone 6° → 9°. (3b) Hide tags on heads closer than ~2 m (Nehul in f3b-small.png was a real head 1.2 m away whose
+  tag projected high over the hearth); when the objective names a person in range, the prompt prefers them. (4) Check on :4091: the life summary renders after the elder's last beat (ui's
   `youth-summary.png` is pure black, maybe just the fade); and in `youth-16-elder.evening.png` the elder seen from
   behind seems to show a lit face, as if the head looks back at the camera. Fix it if it's real. **sim:** (5) in held,
   Ama says "There is a hole in my bag. Hold this for me." to the infant she's cradling: no errand/request lines aimed at
