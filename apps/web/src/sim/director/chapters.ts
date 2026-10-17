@@ -215,6 +215,12 @@ function herdNearest(d: D, from: Vec2): { id: string; d: number; calm: boolean }
   return best
 }
 
+/** where Ama turns to show the shell: the rocks on the shore, or the fire when she is back at the hearth */
+function shellFace(d: D): Vec2 {
+  const m = person(d, 'mother')
+  return m && dist(m.position, hearth(d)) < 10 ? hearth(d) : poi(d, 'shore-limpets')
+}
+
 /** small.follow: has Ama come as far as `mark` on the walk down to the mussels (or is she not walking at all)? */
 function walkedDown(d: D, mark: 'shore-path-top' | 'mid' | 'shelf', near: number): boolean {
   const m = person(d, 'mother')
@@ -383,14 +389,28 @@ const held: Chapter = {
       id: 'held.shell',
       scale: 20,
       steps: [
-        run((d) => order(d, 'mother', { kind: 'hold', slot: 'back', pose: OFFER_SHELL, face: poi(d, 'shore-limpets') })),
+        // a slow start can bring the shore to full dark: then the shell is offered back at the fire, where it shows
+        ...when(
+          (d) => hourNowGE(d, sun(d).set + 0.25) || d.ctx.state.clock.hour < 5,
+          ...fadeOut(1.5),
+          run((d) => {
+            const s = hearthSeat(d, 0.9, 2.8)
+            place(d, 'mother', s.at, s.heading)
+            const m = person(d, 'mother')
+            if (m) teleport(d, m.position, m.heading)
+            const fire = d.ctx.fuel['hearth-main']
+            if (fire) fire.fuel = Math.max(fire.fuel, 1)
+          }),
+          ...fadeIn(1.5),
+        ),
+        run((d) => order(d, 'mother', { kind: 'hold', slot: 'back', pose: OFFER_SHELL, face: shellFace(d) })),
         obj('Reach for what she offers'),
         until((d) => counter(d, 'reach') > 0),
         run((d) => {
           const pl = player(d)
           pl.held.right = 'shell'
           const m = person(d, 'mother')
-          if (m) order(d, 'mother', { kind: 'hold', slot: 'back', pose: pose('scripted', 'crouch'), face: poi(d, 'shore-limpets') })
+          if (m) order(d, 'mother', { kind: 'hold', slot: 'back', pose: pose('scripted', 'crouch'), face: shellFace(d) })
         }),
         say('Look. Small, like you.', 'mother', 4),
         note('shell-beads'),

@@ -429,6 +429,46 @@ describe('director', () => {
     expect(sunDegrees(sim)).toBeGreaterThan(20)
   }, 60_000)
 
+  test('held.shell is in light: on the shore before dusk, at the fire when a slow start runs into the night', () => {
+    const toShell = (sim: Sim) => {
+      // the faces are skipped; Ama's walk to the shore plays out as it would
+      director(sim).completeBeat()
+      for (let i = 0; i < 30 * 200 && sim.state.chapter.objective?.text !== 'Reach for what she offers'; i++) sim.step(1 / 30)
+      expect(sim.state.chapter.beatId).toBe('held.shell')
+      expect(sim.state.chapter.objective?.text).toBe('Reach for what she offers')
+    }
+    const hearth = world.poi('hearth-main')
+    const set = (sim: Sim) => {
+      const ctx = debugCtx(sim)
+      if (!ctx) throw new Error('no ctx')
+      return sunTimes(ctx, sim.state.clock.dayOfYear).set
+    }
+    const mum = (sim: Sim) => sim.state.people.find((p) => p.id === 'ama')
+
+    // Begin a life at a brisk pace: the shell comes on the shore, before sunset + 0.25 h
+    const quick = newSim('held')
+    steps(quick, 1)
+    toShell(quick)
+    expect(quick.state.clock.hour).toBeLessThan(set(quick) + 0.25)
+    const m1 = mum(quick)
+    expect(m1 && Math.hypot(m1.position.x - hearth.x, m1.position.z - hearth.z)).toBeGreaterThan(10)
+
+    // a slow look at the faces runs past dusk: she offers it by the fire, facing it, with the fire up
+    const slow = newSim('held')
+    steps(slow, 1)
+    for (let i = 0; i < 30 * 600 && slow.state.clock.hour < set(slow) + 0.6; i++) slow.step(1 / 30)
+    expect(slow.state.chapter.beatId).toBe('held.faces')
+    toShell(slow)
+    const m2 = mum(slow)
+    if (!m2) throw new Error('no Ama')
+    expect(Math.hypot(m2.position.x - hearth.x, m2.position.z - hearth.z)).toBeLessThan(4)
+    const toFire = Math.atan2(hearth.x - m2.position.x, hearth.z - m2.position.z)
+    const off = Math.abs(((m2.heading - toFire + Math.PI * 3) % (Math.PI * 2)) - Math.PI)
+    expect(off).toBeLessThan(0.6)
+    expect(player(slow).carriedBy).toBe('ama')
+    expect((slow.state.fires.find((f) => f.id === 'hearth-main')?.intensity ?? 0) > 0.5).toBe(true)
+  }, 60_000)
+
   test('storm firewood: walking at 1.4 m/s to the wood and back finishes with 40% of the time to spare', () => {
     const sim = newSim('provider')
     const dir = director(sim)
