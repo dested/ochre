@@ -335,7 +335,8 @@ export function mount(el: HTMLElement): () => void {
   const onHide = () => save()
   window.addEventListener('pagehide', onHide)
 
-  if (import.meta.env.DEV) {
+  // QA handles: always in dev, and in a production build only with ?qa (the frozen QA server)
+  if (import.meta.env.DEV || new URLSearchParams(window.location.search).has('qa')) {
     window.__game = {
       runtime: rt,
       qaState: () => {
