@@ -108,6 +108,10 @@ vec3 ocSkyBase( vec3 d ) {
 	float band = exp( - abs( y ) * 5.0 );
 	float sunUp = smoothstep( - 0.28, 0.02, uSunDir.y );
 	col += uSunGlow * ( pow( m, 5.0 ) * ( 0.1 + 0.9 * band ) * 0.4 + pow( m, 28.0 ) * 0.85 + pow( m, 400.0 ) * 2.0 ) * sunUp;
+	// a low sun warms its whole half of the sky, high up too
+	col += uSunGlow * pow( m, 1.5 ) * 0.2 * gold;
+	// and the far side of the sky goes dusty lavender rather than blue
+	col *= mix( vec3( 1.0 ), vec3( 1.12, 0.97, 0.84 ), gold * ( 1.0 - m ) * smoothstep( 0.0, 0.3, y ) );
 	// the earth's shadow and the pink belt opposite the sun at twilight
 	float twi = smoothstep( 0.18, 0.0, abs( uSunDir.y + 0.02 ) );
 	float anti = max( - mu, 0.0 );

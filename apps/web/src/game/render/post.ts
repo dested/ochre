@@ -243,11 +243,11 @@ void main() {
 	c = mix( c, bl, uBloom.x ) + bl * ( max( bm - uBloom.z, 0.0 ) / max( bm, 1e-4 ) ) * uBloom.y;
 	// god rays
 	c += texture2D( tRays, vUv ).rgb * uRayColor * uRays.x;
-	// the infant's dream: softened everywhere, more so toward the edges
+	// the infant's dream: a soft glow gathering only in the corners, the middle left sharp
 	if ( uDream > 0.001 ) {
 		vec2 cc = ( vUv - 0.5 ) * vec2( uRes.x / uRes.y, 1.0 );
-		float rad = smoothstep( 0.15, 0.85, length( cc ) );
-		c = mix( c, bl * 1.05, uDream * ( 0.45 + 0.55 * rad ) );
+		float rad = smoothstep( 0.4, 1.0, length( cc ) );
+		c = mix( c, bl * 1.05, uDream * 0.6 * rad * rad );
 		c *= mix( vec3( 1.0 ), vec3( 1.08, 0.96, 0.86 ), uDream );
 	}
 	c *= uExposure;
@@ -293,7 +293,6 @@ void main() {
 	#endif
 	float dist = sky ? uFar : - perspectiveDepthToViewZ( depth, uNear, uFar );
 	float radius = mix( uRadius.x, uRadius.y, smoothstep( 4.0, uRadius.z, dist ) );
-	radius = mix( radius, uRadius.y * 1.2, uDream );
 	if ( radius < 0.7 ) {
 		gl_FragColor = texture2D( tSrc, vUv );
 		return;
@@ -512,7 +511,7 @@ void main() {
 	float vr = dot( cc, cc );
 	float vig = smoothstep( 0.18, 0.9, vr ) * uVignette.w;
 	vec3 vcol = mix( uVignette.rgb, vec3( 0.75, 0.42, 0.22 ), uDream );
-	vig = max( vig, smoothstep( 0.08, 0.6, vr ) * uDream * 0.85 );
+	vig = max( vig, smoothstep( 0.2, 0.75, vr ) * uDream * 0.6 );
 	c = mix( c, c * vcol, vig );
 	c *= 1.0 - uFade;
 	gl_FragColor = vec4( clamp( c, 0.0, 1.0 ), 1.0 );

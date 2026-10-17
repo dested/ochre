@@ -164,6 +164,33 @@ uniform vec4 uHearthSoot;
 vec4 ocFacetT = vec4( 0.0 );
 vec4 ocFacetS = vec4( 0.0 );
 vec3 ocLinR( vec3 c ) { return pow( c, vec3( 2.2 ) ); }
+// near the eye: small chips split by thin cracks, so rock a metre off has grain rather than flat blobs
+vec4 ocChipT = vec4( 0.0 );
+float ocChipNear = 0.0;
+vec4 ocChip( vec3 wp, vec3 nw, float size, out float edge ) {
+	vec3 an = abs( nw );
+	vec3 U = vec3( 1.0, 0.0, 0.0 );
+	vec3 V = vec3( 0.0, 1.0, 0.0 );
+	if ( an.y > 0.72 ) V = vec3( 0.0, 0.0, 1.0 );
+	else if ( an.x > an.z ) U = vec3( 0.0, 0.0, 1.0 );
+	vec2 p = vec2( dot( wp, U ) / ( size * 1.7 ), dot( wp, V ) / size );
+	vec2 i = floor( p );
+	vec2 f = fract( p );
+	float d1 = 9.0;
+	float d2 = 9.0;
+	vec2 id = vec2( 0.0 );
+	for ( int y = - 1; y <= 1; y ++ ) {
+		for ( int x = - 1; x <= 1; x ++ ) {
+			vec2 o = vec2( float( x ), float( y ) );
+			vec2 r = o + ocHash2( i + o ) - f;
+			float d = dot( r, r );
+			if ( d < d1 ) { d2 = d1; d1 = d; id = i + o; } else if ( d < d2 ) { d2 = d; }
+		}
+	}
+	edge = sqrt( d2 ) - sqrt( d1 );
+	vec2 h = ocHash2( id + 31.0 ) - 0.5;
+	return vec4( U * h.x + V * h.y, ocHash( id + 9.1 ) );
+}
 `
 
 const ROCK_ALBEDO = /* glsl */ `
@@ -190,6 +217,19 @@ const ROCK_ALBEDO = /* glsl */ `
 		soot *= ( 0.75 + 0.25 * ocNoise( wp.xz * 1.7 ) ) * smoothstep( 0.95, 0.5, sky );
 		// (kept short of black so the ceiling still catches the firelight)
 		warm = mix( warm, ocLinR( vec3( 0.2, 0.16, 0.13 ) ), clamp( soot, 0.0, 1.0 ) * 0.7 );
+		// within a few metres of the eye: chips with their own tone, thin dark cracks, fine grit
+		ocChipNear = 1.0 - smoothstep( 5.0, 22.0, length( wp - cameraPosition ) );
+		if ( ocChipNear > 0.0 ) {
+			float edge = 1.0;
+			ocChipT = ocChip( wp, nW, 0.24, edge );
+			// only some joints open into cracks, the rest are just a change of tone
+			float crack = 1.0 - smoothstep( 0.015, 0.06, edge + ( ocNoise( wp.xy * 9.0 + wp.z * 5.0 ) - 0.5 ) * 0.04 );
+			crack *= smoothstep( 0.42, 0.62, ocNoise( vec2( wp.x - wp.z, wp.y ) * 1.9 + 7.0 ) );
+			float grit = ocNoise( vec2( wp.x + wp.z * 0.7, wp.y ) * 31.0 ) - 0.5;
+			vec3 near = warm * ( 0.93 + 0.14 * ocChipT.w + grit * 0.12 );
+			near *= 1.0 - crack * 0.45;
+			warm = mix( warm, near, ocChipNear );
+		}
 		// damp, darker toward the back
 		warm *= mix( 0.8, 1.0, sky );
 		diffuseColor.rgb = warm;
@@ -199,7 +239,7 @@ const ROCK_ALBEDO = /* glsl */ `
 /** a little extra relief: the facets tilt the normal */
 const ROCK_NORMAL = /* glsl */ `
 	{
-		vec3 g = ocFacetT.xyz * 0.55 + ocFacetS.xyz * 0.3;
+		vec3 g = ocFacetT.xyz * 0.55 + ocFacetS.xyz * 0.3 + ocChipT.xyz * 0.28 * ocChipNear;
 		vec3 gv = ( viewMatrix * vec4( g, 0.0 ) ).xyz;
 		normal = normalize( normal + gv );
 	}
