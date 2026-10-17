@@ -1,32 +1,49 @@
 # ochre — CliffNotes
 
 > Living map of the project. Read this before any coding session.
-> Last updated: 2026-10-07. Deep briefing → `CLAUDE.md` · human quickstart → `README.md`.
+> Last updated: 2026-10-17 (overnight build in progress). Design → `plans/2026-10-17-ochre-design.md` · run plan + Ledger → `plans/2026-10-17-ochre-overnight.md` · contracts → `apps/web/src/game/contracts.ts` · plumbing briefing → `CLAUDE.md`.
 
 ## What this is
 
-An SSR React starter template, now a Bun workspace with an optional Expo iOS app and an optional Electron desktop app — clone it, run `bun run init <name> [--mobile] [--desktop | --desktop-only]`, and build a real product on top. The whole point is a _minimal but bulletproof_ base: Express 5 + Vite SSR, React Router 7, tRPC, Prisma 7, better-auth, Tailwind v4/shadcn in `apps/web`; Expo SDK 57 + Expo Router + NativeWind 5 in `apps/mobile`, talking to the same server; Electron 44 + electron-vite in `apps/desktop`, with its own tRPC router over IPC. Keep files minimal; add features, don't gold-plate the scaffolding.
+**OCHRE**: a web-based, stylized painterly 3D life simulator. You live one human life on the southern Cape coast of
+South Africa about 80,000 years ago, in five stages (Held, Small, Coming of age, Provider, Elder), each with its own
+body, camera and verbs; then you continue as your child. Knowledge is learned by watching, every mechanic is grounded
+in real archaeology, and Field Notes explain the evidence. Built on sal-starter (`apps/web`: Express 5 + Vite SSR,
+React Router 7, tRPC, Prisma 7, Tailwind 4); the game itself is imperative three.js under a React overlay.
 
-**Paths in the web sections below are relative to `apps/web/`** unless they start with `apps/`, `packages/` or `scripts/`.
+**Paths below are relative to `apps/web/`** unless they start with `plans/`, `apps/`, `packages/` or `scripts/`.
 
 ## Quick Reference
 
-- **Ports:** API **4080** (web + `/api/*`), Metro **4081** (mobile only), desktop renderer **4082** (desktop dev only). All come from `project.json` (`apiPort`, `metroPort`, `desktopPort`); `init` picks a per-name base. Never 3000/3001/5173/5174/8000/8080/4200/5000
-- **Dev:** `bun run dev` (root) → web on http://localhost:4080 (HMR shares the port) + Metro on 4081 if `apps/mobile` exists + the Electron window (renderer on 4082) if `apps/desktop` exists. `bun run dev web|mobile|desktop` for one
-- **New project:** `git clone … <name> && git remote rename origin upstream && bun install && bun run init <name> [--mobile] [--desktop | --desktop-only]` then (web) `createdb <name>` → `bun run db:migrate` → `bun run dev`
-- **Template updates:** `bun run sync` (merge `upstream/main`, never commits) · `bun run add:mobile` / `add:desktop` (bring a dropped app back)
-- **Desktop release:** `bun run release` → `release/win-unpacked/<name>.exe` (unpacked, no installer)
-- **Entry point:** `apps/web/server.ts` (Express; same file dev + prod) → SSR via `src/entry-server.tsx`; client hydrates via `src/index.tsx`. Mobile: `apps/mobile/src/app/_layout.tsx`
-- **Type-check:** `bun run typecheck` (`tsc --noEmit`, TypeScript 7, root + every workspace; `strict` + `noUncheckedIndexedAccess`)
-- **Unit tests:** `bun run test` (`bun:test` in every workspace that has a `test` script)
-- **Build:** `bun run build` → `apps/web/dist/client` + `dist/server`
-- **E2E:** `bun run test:e2e` (Playwright; isolated DB `ochre_test` on :3100, migrated by global-setup, committed screenshots)
-- **Migrations:** `bun run db:migrate --name <what>` (dev) · `bun run db:migrate:create` (hand-written SQL) · `bun run db:deploy` (prod/CI)
-- **Ship a mobile fix (OTA):** in `apps/mobile`, `eas update --channel production --environment production` (`bun run ota:prod`); check `eas fingerprint:compare --build-id <id>` first. Run `eas` only in `apps/mobile`, never at the root
-- **Mobile checks:** `bun run --cwd apps/mobile doctor` · `bunx expo export --platform ios` (in `apps/mobile`) · `bun run --cwd apps/mobile fingerprint`
-- **Health:** `GET /healthz` (pings the DB)
-- **Verification recipes:** `verify.md`
-- **Day-one fact:** server-only code lives in `apps/web/server/` — never import it from `src/*.tsx` (or from mobile) except `import type`.
+- **Dev:** `bun run dev` → http://localhost:4080 (the game at `/`, labs at `/lab/world`, `/lab/people`, `/lab/sim`, `/lab/ui`, `/lab/play`; add `?stats=1` for fps · draw calls · triangles)
+- **Live:** https://ochre.dested.com (Drydock project `ochre`, deploys on push to `main`; repo `github.com/dested/ochre`, private)
+- **Ports:** API **4080** (web + `/api/*`). Never 3000/3001/5173/5174/8000/8080/4200/5000
+- **Installs: bun 1.3.14 only** (`/w/junk/sim-80k/bun13/bun-linux-x64/bun install`). Local bun 1.4 rewrites `bun.lock` to v2, which Drydock's bun 1.3 image can't read
+- **Type-check:** `bun run typecheck` · **Tests:** `bun run test` (sim and world-gen tests: `cd apps/web && bun test src/sim src/world-gen`)
+- **Headless sim day:** `bun apps/web/src/sim/run-day.ts --seed 1 --days 2`
+- **Images:** GPT Image 2.5 Flare via the `openai-image` skill; key `OPENAI_API_KEY` in the root `.env` (keys vault, project `sim-80k`)
+- **Units/axes:** metres, +Y up, +X east, +Z south (the sea is south); heading 0 faces +Z, π/2 faces +X
+- **Health:** `GET /healthz`
+
+## The game: module map
+
+| Module | Path | Owner (overnight) | What |
+| --- | --- | --- | --- |
+| Contracts | `src/game/contracts.ts` | lead | every cross-module type + factory signature, `REQUIRED_POIS`, `FIELD_NOTE_IDS` |
+| Bridge | `src/game/bridge.ts` | lead | game ⇄ UI store (`bridge.set`, `useBridge`, `bridge.actions`, `bridge.provide`) |
+| Host | `src/game/engine/host.ts` | lead | the one WebGLRenderer per page, frame loop, resize, `?stats=1` line |
+| Core | `src/core/clock.ts`, `src/core/rng.ts` | lead | sun/moon at 34° S, moon phase, spring/neap tides; mulberry32 `Rng`, `mix32` |
+| World-gen | `src/world-gen/` | world | three-free heightfield, surfaces, POIs, tide → `WorldData` |
+| Render | `src/game/render/` | world | painted-light post chain (`RenderPipeline`), `paint()` material patch |
+| World view | `src/game/world/` | world | terrain, sea, sky, foliage, cave, fires, weather (`WorldView`) |
+| Actors | `src/game/actors/` | people | procedural people (infant → elder) and animals, procedural animation |
+| Sim | `src/sim/` | sim | three-free clock driving, band, needs, watch-to-learn, AI, animals, food/fire, director + chapters, save |
+| Play | `src/game/play/`, `src/app/play.tsx` | play | the session at `/`: composition, controller, cameras, verbs, spear, events → bridge |
+| UI | `src/ui/`, `src/content/field-notes.ts`, `public/art/` | ui | title, intro, HUD, captions, chapter cards, Field Notes, lineage, minigames |
+| Audio | `src/game/audio/` | ui | procedural WebAudio ambience, sfx, music cues |
+| Labs | `src/app/lab/*.tsx` → module `lab.ts` `mount(el)` via `src/app/client-mount.tsx` | each owner | per-module sample pages |
+| Concept art | `public/art/concept/` | lead | the visual targets (world, people) |
+
 
 ## Stack
 
@@ -87,7 +104,9 @@ src/
 │   ├── routes.tsx       RouteObject[] tree + loaders (root/dashboard/redirectIfSignedIn)
 │   ├── layout.tsx       nav + <Outlet/>; sign-out lives here
 │   ├── error-boundary.tsx  root ErrorBoundary → 404 / error UI
-│   ├── home.tsx         /
+│   ├── play.tsx         / (the game)
+│   ├── lab/             /lab/* sample pages (one per module)
+│   ├── client-mount.tsx client-only dynamic mount for imperative three modules
 │   ├── sign-in.tsx      /sign-in
 │   ├── sign-up.tsx      /sign-up
 │   └── dashboard.tsx    /dashboard (protected; posts list + create form)
@@ -170,11 +189,16 @@ apps/desktop/
 
 ## Routes / URLs
 
-Routes are explicit in `src/app/routes.tsx` (no file-based routing). All page routes nest under the root `Layout`.
+Routes are explicit in `src/app/routes.tsx` (no file-based routing). The root route is a bare `Shell` (`<Outlet/>`): the game and the labs render full-bleed; the starter's auth pages nest under its nav `Layout`.
 
 | Route         | Serves                | File                             | Loader                                   |
 | ------------- | --------------------- | -------------------------------- | ---------------------------------------- |
-| `/`           | Landing               | `src/app/home.tsx`               | `rootLoader` (session)                   |
+| `/`           | The game (title → play) | `src/app/play.tsx` → `src/game/play/session.ts` + `src/ui/GameUI.tsx` | `rootLoader` (session) |
+| `/lab/world`  | World lab (views, hour, moon) | `src/app/lab/world.tsx` → `src/game/world/lab.ts` | — |
+| `/lab/people` | People lab (lineup, anims, close-ups; `?crowd=25`, `?animals=1`) | `src/app/lab/people.tsx` → `src/game/actors/lab.ts` | — |
+| `/lab/sim`    | Sim lab (top-down band, time controls, director panel) | `src/app/lab/sim.tsx` → `src/sim/lab.ts` | — |
+| `/lab/ui`     | UI lab (every screen and HUD state, audio panel) | `src/app/lab/ui.tsx` | — |
+| `/lab/play`   | Controller sandbox | `src/app/lab/play.tsx` → `src/game/play/lab.ts` | — |
 | `/sign-in`    | Sign in               | `src/app/sign-in.tsx`            | `redirectIfSignedIn`                     |
 | `/sign-up`    | Sign up               | `src/app/sign-up.tsx`            | `redirectIfSignedIn`                     |
 | `/dashboard`  | Protected app         | `src/app/dashboard.tsx`          | `dashboardLoader` (redirects + prefetch) |
