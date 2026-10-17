@@ -4,7 +4,7 @@
  */
 import { clockAt, DEFAULT_TIME_SCALE } from '../core/clock'
 import { hashString, mix32, Rng } from '../core/rng'
-import type { CreateSim, FireState, PlayerCommand, SimEvent, SimState } from '../game/contracts'
+import type { CreateSim, FireState, PlayerCommand, Sim, SimEvent, SimState } from '../game/contracts'
 import { createAgent, syncCarried, updatePerson } from './ai'
 import { replenishHerds, spawnAnimals, startleHerd, updateAnimals, woundAnimal } from './animals'
 import { buildBand, PLAYER_ID } from './band'
@@ -20,6 +20,13 @@ export { createTestWorld } from './test-world'
 export { randomLook } from './looks'
 
 const SLEEP_SPOTS = ['sleep-1', 'sleep-2', 'sleep-3', 'sleep-4', 'sleep-5', 'sleep-6']
+
+const contexts = new WeakMap<Sim, SimCtx>()
+
+/** the sim's internals, for the lab and tests only */
+export function debugCtx(sim: Sim): SimCtx | undefined {
+  return contexts.get(sim)
+}
 
 export const createSim: CreateSim = (opts) => {
   const { world, seed, stage, playerName } = opts
@@ -203,7 +210,7 @@ export const createSim: CreateSim = (opts) => {
     return encodeSave(payload)
   }
 
-  return {
+  const sim: Sim = {
     state,
     step,
     command,
@@ -211,6 +218,8 @@ export const createSim: CreateSim = (opts) => {
     relationOf: (id) => relationOf(ctx, id),
     serialize,
   }
+  contexts.set(sim, ctx)
+  return sim
 }
 
 function restore(ctx: SimCtx, s: SavePayload): void {

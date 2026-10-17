@@ -165,7 +165,7 @@ const SPEECH: Partial<Record<PlanKind, readonly string[]>> = {
 
 function say(ctx: SimCtx, p: SimPerson, kind: PlanKind): void {
   const lines = SPEECH[kind]
-  if (!lines || !ctx.rng.chance(0.3)) return
+  if (!lines || !ctx.rng.chance(kind === 'eat' || kind === 'sleep' ? 0.08 : 0.3)) return
   p.speech = { text: ctx.rng.pick(lines), until: ctx.state.clock.t + 5 * ctx.state.timeScale }
 }
 
