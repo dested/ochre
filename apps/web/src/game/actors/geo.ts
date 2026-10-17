@@ -49,7 +49,8 @@ export type LatheOpts = {
   open?: boolean
 }
 
-export type GridPoint = { x: number; y: number; z: number; c: Color }
+/** a grid vertex: position, colour and a roughness offset (`g`, reset to the part's own before each call) */
+export type GridPoint = { x: number; y: number; z: number; c: Color; g: number }
 
 const POLE_EPS = 1e-5
 
@@ -65,12 +66,14 @@ export class MeshBuilder {
 
   private pos: number[] = []
   private col: number[] = []
+  private rgh: number[] = []
   private sIdx: number[] = []
   private sW: number[] = []
   private idx: number[] = []
   private m = new Matrix4()
   private flip = false
   private skin: SkinFn = rigid(0)
+  private roughK = 0
   private tmp = new Vector3()
 
   /** transform + skin for every part added until the next `at` */
@@ -78,6 +81,16 @@ export class MeshBuilder {
     this.m.copy(m)
     this.flip = m.determinant() < 0
     this.skin = skin
+    this.roughK = 0
+    return this
+  }
+
+  /**
+   * roughness offset for every part added until the next `at`: negative is a skin sheen, positive dulls a part
+   * (the eyeballs) past the shared material's roughness
+   */
+  rough(k: number): this {
+    this.roughK = k
     return this
   }
 
@@ -90,11 +103,12 @@ export class MeshBuilder {
   }
 
   /** emit one vertex in the current frame; returns its index */
-  vertex(v: Vtx, c: Color): number {
+  vertex(v: Vtx, c: Color, rough = this.roughK): number {
     const p = this.tmp.set(v.x, v.y, v.z).applyMatrix4(this.m)
     const i = this.pos.length / 3
     this.pos.push(p.x, p.y, p.z)
     this.col.push(c.r, c.g, c.b)
+    this.rgh.push(rough)
     const s = this.skin(p.x, p.y, p.z)
     let total = 0
     for (let k = 0; k < 4; k++) total += s.w[k] ?? 0
@@ -329,13 +343,14 @@ export class MeshBuilder {
     const nu = lodN(nuIn, this.q, opts.wrapU ? 6 : 3)
     const nv = lodN(nvIn, this.q, 3)
     const cols = opts.wrapU ? nu : nu + 1
-    const out: GridPoint = { x: 0, y: 0, z: 0, c: new Color() }
+    const out: GridPoint = { x: 0, y: 0, z: 0, c: new Color(), g: 0 }
     const rows: number[][] = []
     for (let i = 0; i <= nv; i++) {
       const row: number[] = []
       for (let j = 0; j < cols; j++) {
+        out.g = this.roughK
         f(j / nu, i / nv, out)
-        row.push(this.vertex(out, out.c))
+        row.push(this.vertex(out, out.c, out.g))
       }
       rows.push(row)
     }
@@ -356,6 +371,7 @@ export class MeshBuilder {
     const base = this.pos.length / 3
     for (const v of o.pos) this.pos.push(v)
     for (const v of o.col) this.col.push(v)
+    for (const v of o.rgh) this.rgh.push(v)
     for (const v of o.sIdx) this.sIdx.push(v)
     for (const v of o.sW) this.sW.push(v)
     for (const i of o.idx) this.idx.push(i + base)
@@ -400,6 +416,7 @@ export class MeshBuilder {
     g.setAttribute('position', new BufferAttribute(pos, 3))
     g.setAttribute('normal', new BufferAttribute(nrm, 3))
     g.setAttribute('color', new BufferAttribute(new Float32Array(this.col), 3))
+    g.setAttribute('aRough', new BufferAttribute(new Float32Array(this.rgh), 1))
     g.setAttribute('skinIndex', new Uint16BufferAttribute(this.sIdx, 4))
     g.setAttribute('skinWeight', new Float32BufferAttribute(this.sW, 4))
     g.setIndex(pos.length / 3 > 65535 ? new Uint32BufferAttribute(idx, 1) : new Uint16BufferAttribute(idx, 1))

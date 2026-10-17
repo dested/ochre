@@ -16,18 +16,26 @@ function hairlineFn(ctx: BuildCtx, hs: HeadShape): (th: number) => number {
   const { d } = ctx
   const m = smooth(0, 15, d.age)
   const recede = d.female ? 0 : smooth(45, 70, d.age) * 0.12
+  // the forehead stands a full hand-width of skin above the brow; the line rounds back over the temples, drops in
+  // front of the ear and runs under the occiput to the nape (men's temples sit a little higher: a soft M)
+  const temple = d.female ? 0 : 0.035 * d.puberty
   const p = profile([
-    [0, lerp(0.38, 0.5, m) + recede],
-    [0.5, lerp(0.34, 0.4, m) + recede * 1.4],
-    [1.0, hs.earYn + lerp(0.38, 0.4, m)],
-    [1.45, hs.earYn + 0.24],
-    [1.85, hs.earYn + 0.06],
+    [0, lerp(0.42, 0.6, m) + recede],
+    [0.35, lerp(0.41, 0.6, m) + recede * 1.2],
+    [0.6, lerp(0.38, 0.55, m) + temple + recede * 1.5],
+    [0.95, hs.earYn + lerp(0.36, 0.42, m)],
+    [1.2, hs.earYn + 0.2],
+    [1.45, hs.earYn + 0.16],
+    [1.85, hs.earYn + 0.04],
     [2.3, hs.earYn - 0.18],
     [Math.PI, lerp(-0.42, -0.5, m)],
   ])
+  const seed = (ctx.look.seed * 7 + 0x51) & 0xffff
   return (th: number) => {
     const a = Math.abs(Math.atan2(Math.sin(th), Math.cos(th)))
-    return p(a)
+    // a living edge: small irregular waves, never a drawn arc
+    const n = fbm3(Math.cos(th) * 3.2, Math.sin(th) * 3.2, 0.37, seed) - 0.5
+    return p(a) + 0.07 * n
   }
 }
 
@@ -56,7 +64,7 @@ function shell(ctx: BuildCtx, hs: HeadShape, o: ShellOpts): (th: number, Y: numb
   const surf = (th: number, Y: number, out: Vector3): Vector3 => {
     hs.point(th, Y, P)
     const h = line(th)
-    const grow = smooth(h - 0.02, h + 0.16, Y)
+    const grow = smooth(h - 0.015, h + 0.2, Y)
     const topK = 1 + (o.top ?? 0.3) * smooth(0, 0.9, Y)
     let t = o.vol * ry * grow * topK
     t += (o.crown ?? 0) * ry * smooth(0.55, 1, Y) * grow
@@ -67,24 +75,28 @@ function shell(ctx: BuildCtx, hs: HeadShape, o: ShellOpts): (th: number, Y: numb
     out.z -= (o.back ?? 0) * ry * smooth(0.3, 1, Y) * grow
     return out
   }
-  const segs = 60
-  const rings = 26
+  const segs = ctx.gear.q >= 1 ? 72 : 60
+  const rings = ctx.gear.q >= 1 ? 32 : 26
   const c = new Color()
   const dark = tone(o.color, 0.55)
   const light = hairSheen(o.color, 1.2)
+  // at the hairline the hair thins to a dark fuzz over the skin, so the edge dissolves instead of drawing a line
+  const fuzz = o.color.clone().lerp(ctx.skinC, 0.45).multiplyScalar(0.8)
   ctx.gear.at(hs.centre, rigid(B.head)).grid(
     segs,
     rings,
     (u, v, out: GridPoint) => {
       const th = 2 * Math.PI * u
       const h = line(th)
-      const Y = lerp(h - 0.015, 1, 1 - (1 - v) ** 1.4)
+      const Y = lerp(h - 0.015, 1, v < 0.25 ? (v / 0.25) * 0.16 : 0.16 + ((v - 0.25) / 0.75) * 0.84)
       surf(th, Y, P)
       out.x = P.x
       out.y = P.y
       out.z = P.z
       const n = fbm3(P.x * o.freq * 1.7, P.y * o.freq * 1.7, P.z * o.freq * 1.7, seed ^ 0x55)
       c.copy(o.color).lerp(n > 0.5 ? light : dark, Math.abs(n - 0.5) * 1.6)
+      const f2 = fbm3(P.x * o.freq * 3.1, P.y * o.freq * 3.1, P.z * o.freq * 3.1, seed ^ 0x77)
+      c.lerp(fuzz, smooth(h + 0.06 + 0.05 * f2, h - 0.01, Y))
       out.c.copy(c)
     },
     { wrapU: true },
@@ -119,6 +131,27 @@ function bobbles(ctx: BuildCtx, hs: HeadShape, surf: (th: number, Y: number, out
   }
 }
 
+/** small tight coils along the hairline, so the mass meets the skin in a broken edge, not a helmet rim */
+function edgeCoils(ctx: BuildCtx, hs: HeadShape, surf: (th: number, Y: number, out: Vector3) => Vector3, count: number, size: number, color: Color): void {
+  const ry = ctx.d.ry
+  const rng = ctx.rng.fork(0xed6e)
+  const line = hairlineFn(ctx, hs)
+  const P = new Vector3()
+  const q = ctx.gear.q
+  const n = q < 1 ? Math.round(count * q) : count
+  for (let i = 0; i < n; i++) {
+    const th = rng.range(-2.3, 2.3)
+    const Y = line(th) + rng.range(0.01, 0.08)
+    surf(th, Y, P)
+    const r = ry * size * rng.range(0.6, 1.2)
+    const len = P.length() || 1
+    P.multiplyScalar(1 - (r * 0.3) / len)
+    const col = hairSheen(color, rng.range(0, 0.3))
+    const dark = tone(col, 0.6)
+    ctx.gear.at(mul(hs.centre, T(P.x, P.y, P.z)), rigid(B.head)).ellipsoid(r, r * 0.85, r * 0.8, (_y, _t, v) => (v.y < -r * 0.2 ? dark : col), q < 1 ? 5 : 6, q < 1 ? 3 : 4)
+  }
+}
+
 export function buildHair(ctx: BuildCtx, hs: HeadShape): void {
   const { d, look } = ctx
   const ry = d.ry
@@ -141,6 +174,7 @@ export function buildHair(ctx: BuildCtx, hs: HeadShape): void {
       const vol = (0.1 + rng.range(0, 0.12) + (d.female ? 0.04 : 0)) * babyK * lerp(0.6, 1, smooth(1, 8, d.age))
       const surf = shell(ctx, hs, { vol, top: 0.45, amp: 0.035, freq: 70, color: hairC })
       bobbles(ctx, hs, surf, infant ? 36 : 120, infant ? 0.06 : 0.08, hairC, -0.7)
+      if (!infant) edgeCoils(ctx, hs, surf, 46, 0.045, hairC)
       break
     }
     case 'knots': {
@@ -196,15 +230,16 @@ function locs(ctx: BuildCtx, hs: HeadShape, surf: (th: number, Y: number, out: V
       const a = lerp(0.85, Math.PI * 2 - 0.85, (i + 0.5) / n) + rng.range(-0.06, 0.06)
       const Y = lerp(0.1, 0.45, rng.next())
       surf(a, Y, P)
-      const root = P.clone()
+      // the root starts inside the mass and swells out of it: a loc grows from the scalp
+      const root = P.clone().multiplyScalar(1 - (lr * 0.8) / (P.length() || 1))
       const outward = new Vector3(root.x, 0, root.z).normalize()
       const pts: Vector3[] = []
       const L = len * rng.range(0.8, 1.15)
-      for (let k = 0; k < 7; k++) {
-        const t = k / 6
-        pts.push(root.clone().addScaledVector(outward, lr * 1.2 * Math.sin(t * Math.PI * 0.6) + t * L * 0.12).add(new Vector3(0, -t * L, 0)).applyMatrix4(hs.centre))
+      for (let k = 0; k < 8; k++) {
+        const t = k / 7
+        pts.push(root.clone().addScaledVector(outward, lr * 1.9 * Math.sin(t * Math.PI * 0.6) + t * L * 0.12).add(new Vector3(0, -t * L, 0)).applyMatrix4(hs.centre))
       }
-      ctx.gear.at(new Matrix4(), rigid(B.head)).tube(pts, (t) => lr * (1 - 0.25 * t), twist, 6)
+      ctx.gear.at(new Matrix4(), rigid(B.head)).tube(pts, (t) => lr * (1 - 0.25 * t) * (0.5 + 0.5 * smooth(0, 0.16, t)), twist, 6)
     }
     return
   }
@@ -214,11 +249,13 @@ function locs(ctx: BuildCtx, hs: HeadShape, surf: (th: number, Y: number, out: V
   crownP.y += ry * 0.12
   crownP.z -= ry * 0.06
   const line = hairlineFn(ctx, hs)
-  const n = 22
+  const n = ctx.gear.q < 1 ? 22 : 34
   for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2
-    surf(a, Math.max(line(a) + 0.06, -0.3), P)
-    const root = P.clone().multiplyScalar(1 - (lr * 0.7) / (P.length() || 1))
+    // sections: locs come in loose groups with a parting between them
+    const sec = Math.floor((i / n) * 9)
+    const a = ((sec + 0.15 + 0.7 * (((i / n) * 9) % 1)) / 9) * Math.PI * 2 + rng.range(-0.03, 0.03)
+    surf(a, Math.max(line(a) + 0.03, -0.3), P)
+    const root = P.clone().multiplyScalar(1 - (lr * 0.9) / (P.length() || 1))
     const pts: Vector3[] = []
     const r0 = root.length()
     const r1 = crownP.length()
@@ -231,7 +268,7 @@ function locs(ctx: BuildCtx, hs: HeadShape, surf: (th: number, Y: number, out: V
       q.multiplyScalar(lerp(r0, r1, t) + lr * 0.9 * Math.sin(t * Math.PI))
       pts.push(q.applyMatrix4(hs.centre))
     }
-    ctx.gear.at(new Matrix4(), rigid(B.head)).tube(pts, () => lr * 0.85, twist, 6)
+    ctx.gear.at(new Matrix4(), rigid(B.head)).tube(pts, (t) => lr * 0.8 * (0.45 + 0.55 * smooth(0, 0.14, t)), twist, 6)
   }
   // the bun: loops of locs
   const bunR = ry * 0.32
@@ -295,10 +332,10 @@ function buildBeard(ctx: BuildCtx, hs: HeadShape): void {
   if (style === 'none') return
   const ry = d.ry
   const full = style === 'full'
-  const color = full ? ctx.hairC : ctx.hairC.clone().lerp(ctx.skinC, 0.35)
-  const dark = tone(color, 0.6)
+  const color = ctx.hairC.clone()
+  const dark = tone(color, full ? 0.5 : 0.6)
   const light = hairSheen(color, 1)
-  const thick = full ? ry * rng.range(0.07, 0.12) : ry * 0.025
+  const thick = full ? ry * rng.range(0.05, 0.075) : ry * 0.028
   const { mouthYn, noseBaseYn, earYn } = hs
   const topAt = profile([
     [0, mouthYn - 0.13],
@@ -307,11 +344,12 @@ function buildBeard(ctx: BuildCtx, hs: HeadShape): void {
     [0.9, noseBaseYn - 0.04],
     [1.35, earYn],
   ])
-  const fade = tone(ctx.skinC, 0.82)
+  // the skin under a thinning edge: shadowed, with the hair speckled over it
+  const fade = tone(ctx.skinC, 0.78).lerp(color, 0.12)
   const P = new Vector3()
   const seed = look.seed & 0xffff
   const beardSkin = (x: number, y: number, z: number) => blend2(B.head, B.jaw, hs.jawWeight(x / ry, (y - d.headCy) / ry, (z - d.headZ) / ry, 'auto'))
-  ctx.gear.at(hs.centre, beardSkin).grid(36, 14, (u, v, out) => {
+  ctx.gear.at(hs.centre, beardSkin).grid(ctx.gear.q >= 1 ? 60 : 36, ctx.gear.q >= 1 ? 22 : 14, (u, v, out) => {
     const th = lerp(-1.38, 1.38, u)
     const top = topAt(Math.abs(th))
     const Y = lerp(-1.02, top, v)
@@ -328,8 +366,10 @@ function buildBeard(ctx: BuildCtx, hs: HeadShape): void {
     out.y = P.y
     out.z = P.z
     out.c.copy(color).lerp(n > 0.5 ? light : dark, Math.abs(n - 0.5) * 1.4)
-    // the edges thin out into the skin rather than stopping at a line
-    out.c.lerp(fade, 1 - smooth(0, 0.3, v) * smooth(1, 0.62, v) * smooth(1.38, 1.05, Math.abs(th)))
+    // the edges thin out into the skin through a speckle of hair rather than stopping at a line
+    const dens = smooth(0, 0.3, v) * smooth(1, 0.6, v) * smooth(1.38, 1.02, Math.abs(th))
+    const sp = fbm3(P.x * 520, P.y * 520, P.z * 520, seed ^ 0x3c1)
+    out.c.lerp(fade, 1 - smooth(0.25, 0.75, dens + (sp - 0.5) * 0.7))
   })
   // moustache: a curved band above the upper lip
   const pts: Vector3[] = []
@@ -340,6 +380,14 @@ function buildBeard(ctx: BuildCtx, hs: HeadShape): void {
     const z = hs.frontZ(X * ry, Y) + ry * (0.015 + 0.05 * (1 - (2 * t - 1) ** 2))
     pts.push(new Vector3(X * ry, Y * ry, z).applyMatrix4(hs.centre))
   }
-  ctx.gear.at(new Matrix4(), rigid(B.head)).tube(pts, (t) => ry * (full ? 0.04 : 0.022) * (0.6 + 0.4 * Math.sin(Math.PI * t)), color, 8, { flatten: 0.6, roll: Math.PI / 2 })
+  const mC = tone(color, full ? 0.62 : 0.9)
+  const mD = tone(mC, 0.6)
+  ctx.gear.at(new Matrix4(), rigid(B.head)).tube(
+    pts,
+    (t) => ry * (full ? 0.026 : 0.02) * (0.45 + 0.55 * Math.sin(Math.PI * t)) * (0.85 + 0.3 * fbm3(t * 9, 0.3, 0.7, seed)),
+    (t, a) => (fbm3(t * 40, a * 2, 1.3, seed ^ 0x99) > 0.5 ? mC : mD),
+    8,
+    { flatten: 0.6, roll: Math.PI / 2 },
+  )
   void clamp
 }

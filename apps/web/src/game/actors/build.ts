@@ -57,7 +57,8 @@ function buildParts(look: PersonLook, dims: BodyDims, q: number): BuildCtx {
     detail: new MeshBuilder(q),
     skinC: skinColor(look.skin),
     hairC: hairColor(look.seed, dims.age, look.adornments.includes('ochre-hair')),
-    has: (a) => look.adornments.includes(a),
+    // every adult wears some ochre on the face, arms and shins (the band's look), whatever the look lists
+    has: (a) => look.adornments.includes(a) || (dims.age >= 16 && (a === 'ochre-face' || a === 'ochre-body')),
   }
   const hs = headShape(ctx)
   const ts = torsoShape(ctx)

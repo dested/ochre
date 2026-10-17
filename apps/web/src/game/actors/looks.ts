@@ -54,9 +54,10 @@ export const randomLook = (seed: number, sex: Sex, ageYears: number): PersonLook
 
 /* ─── palette ──────────────────────────────────────────────────────────────────────────────────────────── */
 
-const SKIN_LIGHT = new Color('#9c6849')
-const SKIN_MID = new Color('#6a412c')
-const SKIN_DARK = new Color('#3b2419')
+// warm browns, kept a little short of saturated: the golden key and the skin's red terminator add the warmth
+const SKIN_LIGHT = new Color('#98694e')
+const SKIN_MID = new Color('#674331')
+const SKIN_DARK = new Color('#3a261c')
 
 /** the skin albedo for look.skin (0 medium brown .. 1 very dark brown), in linear space */
 export function skinColor(t: number): Color {
@@ -109,7 +110,8 @@ export const PUPIL = new Color('#070504')
 
 /** lips: a fixed multiply of the skin, never a separate lip colour */
 export function lipColor(skin: Color): Color {
-  return skin.clone().multiply(new Color(0.74, 0.58, 0.6))
+  // a darker warm brown than the skin, a touch of rose
+  return skin.clone().multiply(new Color(0.66, 0.5, 0.47))
 }
 
 /** hair catches a soft brown sheen on its coils (added, so it shows on near-black too) */

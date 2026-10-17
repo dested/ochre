@@ -11,6 +11,7 @@ import {
   DirectionalLight,
   Fog,
   HemisphereLight,
+  LOD,
   Mesh,
   MeshStandardMaterial,
   PCFShadowMap,
@@ -177,10 +178,20 @@ export function mount(el: HTMLElement): () => void {
     controls.target.set(0, 0.85, 0)
     controls.update()
   }
-  const closeup = (i: number): void => {
+  let closeDist = 0.4
+  let closeTurn = 0
+  let closeDy = 0
+  /**
+   * frame one face from `dist` metres, swung `turn` radians round the head toward its left (a 3/4 view at ~0.6),
+   * aimed `dy` metres above the head centre
+   */
+  const closeup = (i: number, dist = 0.4, turn = 0, dy = 0): void => {
     const p = people[i]
     if (!p) return
     closeIdx = i
+    closeDist = dist
+    closeTurn = turn
+    closeDy = dy
     if (anim === 'walk' || anim === 'run') setAnim('idle')
     camera.fov = 40
     camera.updateProjectionMatrix()
@@ -192,10 +203,11 @@ export function mount(el: HTMLElement): () => void {
     const p = people[closeIdx]
     if (!p) return
     p.headPosition(head)
-    // 40 cm in front of the face, along the body's facing, a touch to the key side
-    const yaw = p === infant ? 0 : p.object.rotation.y
+    head.y += closeDy
+    // in front of the face (40 cm unless asked), along the body's facing, a touch to the key side
+    const yaw = (p === infant ? 0 : p.object.rotation.y) + closeTurn
     const fwd = new Vector3(Math.sin(yaw), 0, Math.cos(yaw))
-    camera.position.copy(head).addScaledVector(fwd, 0.4).add(new Vector3(-0.06, 0.02, 0))
+    camera.position.copy(head).addScaledVector(fwd, closeDist).add(new Vector3(-0.06, 0.02, 0).multiplyScalar(closeDist / 0.4))
     controls.target.copy(head)
     controls.update()
   }
@@ -366,6 +378,22 @@ export function mount(el: HTMLElement): () => void {
       controls.update()
     },
     count: () => people.length + crowd.length,
+    /** triangles per detail level for person i (every level's meshes summed) */
+    tris: (i: number) => {
+      const p = people[i]
+      const out: number[] = []
+      p?.object.traverse((o) => {
+        if (!(o instanceof LOD)) return
+        for (const lv of o.levels) {
+          let n = 0
+          lv.object.traverse((m) => {
+            if (m instanceof Mesh) n += (m.geometry.index?.count ?? m.geometry.getAttribute('position').count) / 3
+          })
+          out.push(n)
+        }
+      })
+      return out
+    },
     /** mean CPU ms per frame for the actors' update and for render submission since the last call, and the fps */
     perf: () => {
       const n = Math.max(1, perf.n)
