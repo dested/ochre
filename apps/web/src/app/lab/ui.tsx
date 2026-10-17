@@ -123,7 +123,7 @@ const PRESETS: Record<string, () => Preset> = {
   low: () => ({
     screen: 'playing',
     hud: { needs: { fed: 0.15, warmth: 0.32, energy: 0.2, health: 0.6 }, clock: clockFor(19.6) },
-    objective: { id: 'provider.wood', text: 'Bring firewood before dark (2/5)', done: 2, total: 5 },
+    objective: { id: 'provider.wood', text: 'Bring firewood before dark', done: 2, total: 5 },
     captions: [cap('narration', 'The wind turns cold. The fire needs feeding.')],
   }),
   disabled: () => ({
@@ -152,7 +152,7 @@ const PRESETS: Record<string, () => Preset> = {
   held: () => ({
     screen: 'playing',
     hud: { stage: 'held', ageYears: 0, needs: null, wind: null },
-    objective: { id: 'held.faces', text: 'Look at the faces around you (2/4)', done: 2, total: 4 },
+    objective: { id: 'held.faces', text: 'Look at the faces around you', done: 2, total: 4 },
     captions: [cap('narration', 'Warmth. A heartbeat. A voice you already know.')],
     toasts: [toast('face', 'Mother · Ama')],
   }),
