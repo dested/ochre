@@ -444,7 +444,7 @@ Board: down · Last pushed: 2078087 (main, 01:15) · Gate: install 0, typecheck 
 | --- | --- | --- | --- | --- | --- |
 | world | opus-xhigh | world-gen, game/world, game/render | W1 | 2edee96 wip (lab washed out at 01:20, not yet ready) | working |
 | people | opus-xhigh | game/actors | P1 fix | c66a392 → fix sent 01:35 (budget 7 calls/97k tris per person, 40 cm face, garments, arms) | working |
-| sim | opus-high | sim | S2 | 2aa80e7 director in (24 beats, in place, heir); lab panel next. S1 854d192 passed | working |
+| sim | opus-high | sim | S3 | S2 071949a passed (whole life headless to summary; real coast). S1 notes resent 01:55 | working |
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | U6 | U5 1fa2a6b passed; U3 bf4973b passed | working |
 | play | opus-high | game/play, game/audio, app/play.tsx | PL3 (director in; real world + people swapped) | PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
 
