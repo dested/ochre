@@ -3,21 +3,27 @@
  * wordmark over the Blombos band, and a short menu. "Chapters" opens the five stages over the same painting.
  */
 import { useEffect, useRef, useState } from 'react'
-import { bridge, useBridge } from '~/game/bridge'
+import { bridge, useBridge, type BridgeState } from '~/game/bridge'
 import { LIFE_STAGES } from '~/game/contracts'
 import { STAGES } from '~/content/stages'
+import { ageLabel } from '../format'
 import { CrossHatch, Wordmark } from '../motifs'
 import { jitter } from '../palette'
 import { MenuButton } from '../widgets'
+import { clearHints } from '../hud/Hints'
 import { AboutScreen } from './About'
 
 export function TitleScreen() {
   const hasLife = useBridge((s) => s.hasLife)
+  const saved = useBridge((s) => s.saved)
   const notesCount = useBridge((s) => s.notesUnlocked.length)
   const [name, setName] = useState('Teni')
   const [picker, setPicker] = useState(false)
   const [about, setAbout] = useState(false)
-  const begin = () => bridge.actions.newLife(name.trim() || 'Teni')
+  const begin = () => {
+    clearHints()
+    bridge.actions.newLife(name.trim() || 'Teni')
+  }
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-soot">
@@ -67,7 +73,11 @@ export function TitleScreen() {
                 />
               </label>
             </form>
-            {hasLife && <MenuButton onClick={() => bridge.actions.continueLife()}>Continue</MenuButton>}
+            {saved ? (
+              <ContinueCard saved={saved} />
+            ) : (
+              hasLife && <MenuButton onClick={() => bridge.actions.continueLife()}>Continue</MenuButton>
+            )}
             <MenuButton onClick={() => setPicker(true)}>Chapters</MenuButton>
             <MenuButton onClick={() => bridge.actions.openNotes()}>
               Field Notes
@@ -207,7 +217,10 @@ export function ChapterPicker({ onClose }: { onClose: () => void }) {
             <button
               key={id}
               type="button"
-              onClick={() => bridge.actions.chooseChapter(id)}
+              onClick={() => {
+                clearHints()
+                bridge.actions.chooseChapter(id)
+              }}
               className="group relative aspect-[3/4] animate-ui-rise overflow-hidden rounded-[4px] text-left outline-none ring-amber/80 focus-visible:ring-2"
               style={{ animationDelay: `${i * 90}ms` }}>
               <div
@@ -230,5 +243,34 @@ export function ChapterPicker({ onClose }: { onClose: () => void }) {
         })}
       </div>
     </div>
+  )
+}
+
+/** the saved life: its chapter's painting, the name and where the life stands; a click picks it up again */
+function ContinueCard({ saved }: { saved: NonNullable<BridgeState['saved']> }) {
+  const stage = STAGES[saved.stage]
+  return (
+    <button
+      type="button"
+      onClick={() => bridge.actions.continueLife()}
+      className="group my-1 flex items-center gap-4 rounded-[4px] bg-soot/45 p-2 pr-6 text-left outline-none ring-amber/80 backdrop-blur-[2px] transition-colors duration-300 hover:bg-soot/65 focus-visible:ring-2">
+      <span className="relative block aspect-[3/2] w-[112px] shrink-0 overflow-hidden rounded-[3px]">
+        <span
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-[1200ms] ease-out group-hover:scale-[1.08]"
+          style={{ backgroundImage: `url(${stage.painting})` }}
+        />
+        <span className="absolute inset-0 rounded-[3px] border border-bone/15 transition-colors group-hover:border-bone/45" />
+      </span>
+      <span className="flex flex-col">
+        <span
+          className="font-serif text-[clamp(22px,1.9vw,28px)] leading-tight text-bone transition-colors duration-300 group-hover:text-amber"
+          style={{ fontVariationSettings: '"opsz" 72, "SOFT" 100', fontWeight: 420 }}>
+          Continue as {saved.name}
+        </span>
+        <span className="mt-0.5 font-serif text-[16px] italic text-amber" style={{ fontVariationSettings: '"opsz" 24' }}>
+          {stage.title} · {ageLabel(saved.ageYears)}
+        </span>
+      </span>
+    </button>
   )
 }

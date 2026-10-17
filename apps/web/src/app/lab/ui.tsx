@@ -194,6 +194,7 @@ function applyPreset(name: string) {
 function goScreen(screen: Screen) {
   const extra: Partial<BridgeState> = {}
   if (screen === 'loading') extra.loadingProgress = 0.62
+  if (screen === 'title' && !bridge.get().saved) extra.saved = { name: 'Teni', stage: 'youth', ageYears: 14 }
   if (screen === 'lineage' && bridge.get().lineage.length === 0) extra.lineage = LINEAGE
   if (screen === 'chapter-card' && !bridge.get().chapter) extra.chapter = cardFor('small')
   if (screen === 'notes' && bridge.get().notesUnlocked.length === 0) {
