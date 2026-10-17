@@ -141,6 +141,14 @@ post chains under `packages/engine/src/look/`, the toon ramp) with a one-line cr
 2. `W2`: foliage (fynbos clumps, proteas, restios, milkwoods in gullies, instanced grass with wind), rocks and
    boulders, the cliff path, the hearths inside the cave with fire, weather (`WeatherState`: clouds, rain, wind,
    fog, a storm look), and the real `paint()`. Ready with the same four shots plus a rain shot.
+   **W2 addition (02:55, lead): night by the fire.** Much of the game is spent at the hearth after dark (the held
+   night, the elder's evenings, the moon dance), and play's `W:\junk\sim-80k\play\pl3-elder-seated.png` is mud: the
+   fire lights a 2 m disc of ground and nothing else. Targets: (a) faces and bodies across a 3 m hearth read warm
+   orange, with the lit side clearly brighter than the shadow side; the fire light reaches about 8 m with a soft
+   falloff and flickers slowly. (b) The cave wall and ceiling behind the hearth catch the firelight. (c) Away from the
+   fire, night is moonlit blue-violet, not brown-black: on a full moon you can read the shore and the people's
+   silhouettes. (d) Exposure at night lifts so the frame averages a dark mid-tone, not black. Ready with the same seated
+   view (cave hearth, 21:00, full moon) and a wide shot from the shelf looking at the cave.
 3. `W3`: polish and performance: LOD, quality levels, the sea on the rocks, dawn lagoon mist, god rays at the cave
    mouth, a tracking-marks helper (`src/game/world/spoor.ts`: `createSpoor(world): { root; add(x, z, heading, age);
    clear() }` painted hoof prints on the ground), and anything the lead's review asks for.
