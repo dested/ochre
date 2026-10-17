@@ -2,6 +2,7 @@
 import { useEffect } from 'react'
 import { bridge, useBridge } from '~/game/bridge'
 import { STAGES } from '~/content/stages'
+import { isInfant } from '../format'
 import { useAfter } from '../hooks'
 import { CrossHatch } from '../motifs'
 
@@ -26,7 +27,7 @@ export function ChapterCardScreen() {
 
   if (!card) return null
   const stage = STAGES[card.stage]
-  const age = card.ageYears === 0 ? 'Born at the end of winter' : `Age ${card.ageYears}`
+  const age = card.ageYears === 0 ? 'Born at the end of winter' : isInfant(card.ageYears) ? 'A few months old' : `Age ${Math.floor(card.ageYears)}`
   return (
     <div
       className="fixed inset-0 animate-ui-fade cursor-pointer overflow-hidden bg-soot ui-grain"
@@ -66,7 +67,7 @@ export function ChapterCardScreen() {
         <p
           className="mt-2 animate-ui-rise font-sans text-[clamp(15px,1.2vw,18px)] leading-relaxed text-bone/85 ui-halo"
           style={{ animationDelay: '1500ms' }}>
-          {(card.subtitle || stage.line).replace(/\.\s*$/, '')}
+          {card.subtitle || stage.line}
         </p>
       </div>
       <p

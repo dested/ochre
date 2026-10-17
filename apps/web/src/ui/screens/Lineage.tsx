@@ -8,6 +8,7 @@ import { bridge, useBridge, type LineageEntry } from '~/game/bridge'
 import { SKILL_LABELS } from '~/content/skills'
 import { CrossHatch } from '../motifs'
 import { C, mix } from '../palette'
+import { ageShort } from '../format'
 import { MenuButton } from '../widgets'
 
 /**
@@ -256,7 +257,7 @@ function Person({ p, self = false, small = false }: { p: LineageEntry; self?: bo
         </p>
         <p className="whitespace-nowrap font-sans text-[13px] text-bone-dim">
           {p.relation}
-          {p.ageYears > 0 ? ` · ${p.ageYears}` : ''}
+          {p.ageYears > 0 ? ` · ${ageShort(p.ageYears)}` : ''}
         </p>
         {!self && <p className="font-sans text-[12px]" style={{ color: warm }}>{bondWord(p.bond)}</p>}
         {!small && skills && <p className="mt-0.5 max-w-[200px] font-sans text-[12px] leading-snug text-bone/60">{skills}</p>}

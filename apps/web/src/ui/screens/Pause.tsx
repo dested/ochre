@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { bridge, useBridge } from '~/game/bridge'
 import { STAGES } from '~/content/stages'
 import { CrossHatch } from '../motifs'
+import { ageLabel } from '../format'
 import { MenuButton } from '../widgets'
 import { SettingsPanel } from './Settings'
 
@@ -30,7 +31,7 @@ export function PauseScreen() {
           {hud.name}
         </h2>
         <p className="mt-2 font-serif text-[19px] italic text-amber" style={{ fontVariationSettings: '"opsz" 24' }}>
-          {STAGES[hud.stage].title} · {hud.ageYears === 0 ? 'newborn' : `age ${hud.ageYears}`}
+          {STAGES[hud.stage].title} · {ageLabel(hud.ageYears)}
         </p>
         <CrossHatch width={200} height={14} className="mt-4" />
         {settings ? (
