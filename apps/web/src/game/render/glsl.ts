@@ -238,6 +238,8 @@ uniform vec4 uCave;
 uniform vec4 uCave2;
 uniform vec3 uCamPos;
 uniform float uSeaLevel;
+uniform vec4 uFireGlow;
+uniform vec4 uFireGlow2;
 `
 
 /** cave darkness and the painted ramp; needs PAINT_UNIFORMS_GLSL */
@@ -285,9 +287,18 @@ float ocRamp( float ndl ) {
 	float stepped = a * 0.58 + b * 0.42;
 	return mix( stepped, clamp( ndl * 1.1, 0.0, 1.0 ), 0.3 );
 }
+// a hearth as a big soft light: wrapped round the forms, falling off over about 8 m, no shadow (the point lights
+// do the hard modelling; this is the warm air of the fire that fills a cave and the faces round it)
+vec3 ocFireFill( vec4 f, vec3 nw, vec3 wp ) {
+	vec3 d = f.xyz - wp;
+	float r2 = dot( d, d );
+	float wrap = clamp( dot( nw, d * inversesqrt( max( r2, 1e-4 ) ) ) * 0.6 + 0.4, 0.0, 1.0 );
+	float fall = 1.0 / ( 1.0 + r2 * 0.11 ) * ( 1.0 - smoothstep( 100.0, 400.0, r2 ) );
+	return vec3( 1.0, 0.44, 0.16 ) * f.w * wrap * wrap * fall;
+}
 vec3 ocAmbient( vec3 nw, vec3 wp ) {
 	float up = nw.y * 0.5 + 0.5;
 	vec3 amb = mix( uGroundAmb, uSkyAmb, smoothstep( 0.0, 1.0, up ) );
-	return amb * ocCaveSky( wp );
+	return amb * ocCaveSky( wp ) + ocFireFill( uFireGlow, nw, wp ) + ocFireFill( uFireGlow2, nw, wp );
 }
 `

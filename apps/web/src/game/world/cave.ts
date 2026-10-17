@@ -188,7 +188,8 @@ const ROCK_ALBEDO = /* glsl */ `
 		float dh = length( wp.xz - uHearthSoot.xy );
 		float soot = ( 1.0 - smoothstep( 1.5, uHearthSoot.z, dh ) ) * smoothstep( uHearthSoot.w + 1.5, uHearthSoot.w + 5.0, wp.y );
 		soot *= ( 0.75 + 0.25 * ocNoise( wp.xz * 1.7 ) ) * smoothstep( 0.95, 0.5, sky );
-		warm = mix( warm, ocLinR( vec3( 0.11, 0.09, 0.08 ) ), clamp( soot, 0.0, 1.0 ) * 0.85 );
+		// (kept short of black so the ceiling still catches the firelight)
+		warm = mix( warm, ocLinR( vec3( 0.2, 0.16, 0.13 ) ), clamp( soot, 0.0, 1.0 ) * 0.7 );
 		// damp, darker toward the back
 		warm *= mix( 0.8, 1.0, sky );
 		diffuseColor.rgb = warm;

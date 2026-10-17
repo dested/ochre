@@ -6,7 +6,8 @@
  */
 import { PerspectiveCamera, Scene, Vector3 } from 'three'
 import { clockAt, type ClockEpoch } from '../../core/clock'
-import type { FireState, Quality, WeatherState } from '../contracts'
+import type { FireState, PersonActor, PersonAnim, Quality, Sex, WeatherState } from '../contracts'
+import { createPerson, randomLook } from '../actors'
 import { createHost } from '../engine/host'
 import { LIGHT, POST, createRenderPipeline, isPaintedPipeline } from '../render/index'
 import { createWorldData } from '../../world-gen/index'
@@ -272,6 +273,34 @@ export function mount(el: HTMLElement): () => void {
   const focus = { x: 0, y: 0, z: 0 }
   const fires: FireState[] = []
   const hearths = world.pois.filter((p) => p.kind === 'hearth')
+  // ?people=1: a band round the main hearth, to judge faces by firelight: four seated across a 3 m fire, two
+  // standing back at 4 and 7.5 m
+  const band: PersonActor[] = []
+  const h0 = hearths[0]
+  if (q.get('people') === '1' && h0) {
+    const inX = -Math.sin(CAVE.heading)
+    const inZ = -Math.cos(CAVE.heading)
+    const seats: [number, number, PersonAnim, Sex, number][] = [
+      [0.35, 1.5, 'sit', 'female', 64],
+      [-0.45, 1.5, 'sit', 'male', 34],
+      [1.6, 1.5, 'sit', 'female', 27],
+      [-1.75, 1.5, 'sit', 'male', 9],
+      [0.15, 4, 'idle', 'male', 30],
+      [-0.6, 7.5, 'idle', 'female', 22],
+    ]
+    seats.forEach(([ang, r, anim, sex, age], i) => {
+      const dx = inX * Math.cos(ang) - inZ * Math.sin(ang)
+      const dz = inZ * Math.cos(ang) + inX * Math.sin(ang)
+      const x = h0.x + dx * r
+      const z = h0.z + dz * r
+      const p = createPerson(randomLook(101 + i * 17, sex, age))
+      p.object.position.set(x, world.heightAt(x, z), z)
+      p.object.rotation.y = Math.atan2(h0.x - x, h0.z - z)
+      p.setAnim(anim, 0)
+      scene.add(p.object)
+      band.push(p)
+    })
+  }
   let frames = 0
   let raw = q.get('post') === '0'
   const offFrame = host.onFrame((dt) => {
@@ -309,6 +338,7 @@ export function mount(el: HTMLElement): () => void {
     if (firesOn) hearths.forEach((h, i) => fires.push({ id: h.id, x: h.x, z: h.z, intensity: i === 0 ? 1 : 0.65 }))
 
     view.update({ dt, clock, weather, camera, fires, focus })
+    for (const p of band) p.update(dt)
     if (raw) {
       host.renderer.setRenderTarget(null)
       host.renderer.clear(true, true, true)
@@ -338,6 +368,7 @@ export function mount(el: HTMLElement): () => void {
     canvas.removeEventListener('pointerup', onUp)
     canvas.removeEventListener('wheel', onWheel)
     if (import.meta.env.DEV) Object.assign(window, { __lab: undefined })
+    for (const p of band) p.dispose()
     view.dispose()
     pipeline.dispose()
     panel.remove()

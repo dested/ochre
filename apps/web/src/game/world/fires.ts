@@ -21,7 +21,7 @@ import type { FireState, Vec3, WorldData } from '../contracts'
 import { LIGHT } from '../render/uniforms'
 
 const MAX_FIRES = 8
-const TONGUES = 4
+const TONGUES = 6
 const EMBERS = 28
 const PUFFS = 7
 const LIGHTS = 4
@@ -44,9 +44,12 @@ void main() {
 	float k = f.w;
 	// each tongue leans and breathes on its own
 	float t = uTime * ( 1.6 + seed * 0.9 );
-	float hgt = ( 0.45 + 0.95 * k ) * ( 0.75 + 0.35 * sin( t * 2.3 + seed * 17.0 ) * 0.5 + 0.25 * sin( t * 5.1 + seed * 5.0 ) * 0.5 ) * ( 0.7 + 0.5 * fract( seed * 7.13 ) );
-	float wid = ( 0.32 + 0.4 * k ) * ( 0.8 + 0.4 * fract( seed * 3.7 ) );
-	vec3 base = f.xyz + vec3( ( fract( seed * 13.1 ) - 0.5 ) * 0.35 * k, 0.0, ( fract( seed * 29.7 ) - 0.5 ) * 0.35 * k );
+	// a hearth fire: knee-high tongues, the middle ones tallest, the outer ones low and quick
+	vec2 off = ( vec2( fract( seed * 13.1 ), fract( seed * 29.7 ) ) - 0.5 ) * ( 0.25 + 0.35 * k );
+	float mid = 1.0 - smoothstep( 0.05, 0.3, length( off ) );
+	float hgt = ( 0.3 + 0.55 * k ) * ( 0.8 + 0.2 * sin( t * 2.3 + seed * 17.0 ) + 0.12 * sin( t * 5.1 + seed * 5.0 ) ) * ( 0.6 + 0.35 * fract( seed * 7.13 ) + 0.2 * mid );
+	float wid = ( 0.2 + 0.2 * k ) * ( 0.75 + 0.5 * fract( seed * 3.7 ) );
+	vec3 base = f.xyz + vec3( off.x, 0.0, off.y );
 	// a billboard turning about the vertical axis toward the camera
 	vec3 toCam = cameraPosition - base;
 	vec3 right = normalize( vec3( toCam.z, 0.0, - toCam.x ) );
@@ -79,26 +82,31 @@ varying float vHeat;
 void main() {
 	if ( vHeat < 0.01 ) discard;
 	float y = vUv.y;
-	// a teardrop narrowing to a licking tip, torn by rising noise
+	// a teardrop, broad and round low down, swaying more the higher it goes, its tip torn into licks that break away
 	float n = fNoise( vec2( vUv.x * 2.5 + vSeed * 31.0, y * 3.0 - uTime * 3.2 ) ) * 0.6 + fNoise( vec2( vUv.x * 5.0, y * 6.0 - uTime * 5.5 + vSeed * 7.0 ) ) * 0.4;
-	float w = mix( 0.95, 0.05, pow( y, 0.8 ) ) * ( 1.0 - smoothstep( 0.0, 0.08, 0.04 - y ) );
-	float d = abs( vUv.x ) / max( w, 1e-3 );
-	float body = 1.0 - smoothstep( 0.55, 1.0, d + ( n - 0.5 ) * 0.9 * ( 0.3 + y ) );
-	body *= 1.0 - smoothstep( 0.55, 1.0, y + ( n - 0.5 ) * 0.5 );
+	float x = vUv.x + ( fNoise( vec2( y * 2.2 - uTime * 1.9, vSeed * 9.0 ) ) - 0.5 ) * 0.9 * y;
+	float w = pow( 1.0 - y, 0.8 ) * ( 0.6 + 0.4 * smoothstep( 0.0, 0.2, y ) );
+	float d = abs( x ) / max( w, 1e-3 );
+	float body = 1.0 - smoothstep( 0.55, 1.0, d + ( n - 0.5 ) * 0.8 * ( 0.25 + y ) );
+	float tear = smoothstep( 0.4, 0.75, y ) * smoothstep( 0.42, 0.62, fNoise( vec2( x * 3.0 + vSeed * 17.0, y * 4.5 - uTime * 4.2 ) ) );
+	body *= ( 1.0 - tear ) * smoothstep( 0.0, 0.07, y );
+	body *= 1.0 - smoothstep( 0.6, 1.0, y + ( n - 0.5 ) * 0.5 );
 	if ( body < 0.02 ) discard;
 	// banded heat: a white-gold heart, orange, a red edge (a few flat steps, like paint)
 	float heat = body * ( 1.0 - y * 0.75 ) * ( 0.75 + 0.35 * n );
-	vec3 col = vec3( 0.75, 0.12, 0.03 );
-	col = mix( col, vec3( 1.0, 0.42, 0.08 ), step( 0.28, heat ) );
-	col = mix( col, vec3( 1.0, 0.72, 0.28 ), step( 0.52, heat ) );
-	col = mix( col, vec3( 1.0, 0.9, 0.62 ), step( 0.8, heat ) );
-	float a = smoothstep( 0.02, 0.2, body );
-	gl_FragColor = vec4( col * a * ( 0.55 + 0.45 * vHeat ), 1.0 );
+	vec3 col = vec3( 0.6, 0.09, 0.02 );
+	col = mix( col, vec3( 1.0, 0.38, 0.07 ), step( 0.3, heat ) );
+	col = mix( col, vec3( 1.0, 0.66, 0.24 ), step( 0.55, heat ) );
+	col = mix( col, vec3( 1.0, 0.88, 0.6 ), step( 0.82, heat ) );
+	// the red edge is thin and see-through; overlapping tongues build the white heart
+	float a = smoothstep( 0.02, 0.2, body ) * mix( 0.35, 1.0, smoothstep( 0.1, 0.5, heat ) );
+	gl_FragColor = vec4( col * a * ( 0.45 + 0.35 * vHeat ), 1.0 );
 }
 `
 
 const EMBER_VERT = /* glsl */ `
 ${FIRE_UNIFORMS}
+uniform vec2 uViewport;
 attribute vec2 aEmber; // fire index, seed
 varying float vLife;
 varying float vSeedE;
@@ -117,7 +125,7 @@ void main() {
 	vec4 mv = viewMatrix * vec4( p, 1.0 );
 	gl_Position = projectionMatrix * mv;
 	float alive = step( 0.05, f.w ) * step( fract( seed * 17.3 ), f.w * 1.2 + 0.1 );
-	gl_PointSize = alive * clamp( ( 3.0 + 3.0 * fract( seed * 23.0 ) ) * ( 1.0 - life * 0.6 ) * 8.0 / max( - mv.z, 0.5 ), 1.0, 9.0 );
+	gl_PointSize = alive * clamp( ( 2.0 + 2.0 * fract( seed * 23.0 ) ) * ( 1.0 - life * 0.6 ) * 5.0 * uViewport.y / 1080.0 / max( - mv.z, 0.5 ), 1.0, 6.0 );
 }
 `
 
@@ -130,8 +138,8 @@ void main() {
 	if ( d > 0.5 ) discard;
 	float blink = 0.6 + 0.4 * sin( vLife * 40.0 + vSeedE * 60.0 );
 	float a = ( 1.0 - smoothstep( 0.15, 0.5, d ) ) * ( 1.0 - vLife ) * blink;
-	vec3 col = mix( vec3( 1.0, 0.75, 0.3 ), vec3( 0.9, 0.25, 0.05 ), vLife );
-	gl_FragColor = vec4( col * a * 2.2, 1.0 );
+	vec3 col = mix( vec3( 1.0, 0.62, 0.22 ), vec3( 0.85, 0.2, 0.04 ), vLife );
+	gl_FragColor = vec4( col * a * 1.6, 1.0 );
 }
 `
 
@@ -178,10 +186,10 @@ void main() {
 	float d = length( vUvS );
 	float n = fNoise( vUvS * 2.2 + vSeedS * 13.0 + uTime * 0.1 );
 	float a = 1.0 - smoothstep( 0.3, 1.0, d + ( n - 0.5 ) * 0.6 );
-	a *= smoothstep( 0.0, 0.15, vLifeS ) * ( 1.0 - smoothstep( 0.4, 1.0, vLifeS ) ) * 0.07 * min( 1.0, vK * 1.5 );
+	a *= smoothstep( 0.0, 0.15, vLifeS ) * ( 1.0 - smoothstep( 0.4, 1.0, vLifeS ) ) * 0.045 * min( 1.0, vK * 1.5 );
 	if ( a < 0.004 ) discard;
-	// lit from below by the fire when young, by the sky when old
-	vec3 col = mix( vec3( 0.55, 0.36, 0.22 ) * ( 0.6 + vK ), uSmokeLit, smoothstep( 0.0, 0.5, vLifeS ) );
+	// the sky's grey, warmed from below by the fire while it is young
+	vec3 col = uSmokeLit + vec3( 0.42, 0.18, 0.06 ) * vK * ( 1.0 - smoothstep( 0.0, 0.45, vLifeS ) );
 	gl_FragColor = vec4( col, a );
 }
 `
@@ -236,7 +244,7 @@ export function createFiresView(world: WorldData): FiresView {
   const emberMat = new ShaderMaterial({
     vertexShader: EMBER_VERT,
     fragmentShader: EMBER_FRAG,
-    uniforms: shared,
+    uniforms: { ...shared, uViewport: LIGHT.uViewport },
     blending: AdditiveBlending,
     transparent: true,
     depthWrite: false,
@@ -277,7 +285,7 @@ export function createFiresView(world: WorldData): FiresView {
 
   const lights: PointLight[] = []
   for (let i = 0; i < LIGHTS; i++) {
-    const l = new PointLight(0xff8a40, 0, 18, 2)
+    const l = new PointLight(0xff8a40, 0, 16, 1.5)
     l.castShadow = false
     l.name = `fire-light-${i}`
     root.add(l)
@@ -301,17 +309,23 @@ export function createFiresView(world: WorldData): FiresView {
         else v.set(0, -100, 0, 0)
       }
       const near = order.filter((o) => o.f.intensity > 0.01).sort((a, b) => a.d - b.d)
+      const glows = [LIGHT.uFireGlow.value, LIGHT.uFireGlow2.value]
       lights.forEach((l, i) => {
         const o = near[i]
+        const g = glows[i]
         if (!o) {
           l.intensity = 0
+          if (g) g.set(0, -1000, 0, 0)
           return
         }
         const k = o.f.intensity
-        const flick = 0.82 + 0.1 * Math.sin(t * 9.1 + i * 2) + 0.06 * Math.sin(t * 23.7 + i) + 0.05 * Math.sin(t * 4.3 + i * 5)
-        l.position.set(o.f.x + Math.sin(t * 3.3 + i) * 0.05, o.y + 0.7 + 0.35 * k, o.f.z + Math.cos(t * 2.9 + i) * 0.05)
-        l.intensity = 30 * k * flick
-        l.distance = 10 + 12 * k
+        // a slow breathing with a little quick life in it; the light lifts and sways with the flames
+        const flick = 0.86 + 0.07 * Math.sin(t * 1.7 + i * 2) + 0.05 * Math.sin(t * 3.9 + i) + 0.025 * Math.sin(t * 8.3 + i * 5)
+        l.position.set(o.f.x + Math.sin(t * 1.3 + i) * 0.08, o.y + 0.55 + 0.3 * k, o.f.z + Math.cos(t * 1.1 + i) * 0.08)
+        // reaches about 8 m with a soft fall-off (decay 1.5), even from a fire burned down to coals
+        l.intensity = 10 * (0.35 + 0.65 * k) * flick
+        l.distance = 20 + 6 * k
+        if (g) g.set(l.position.x, l.position.y, l.position.z, 0.44 * (0.35 + 0.65 * k) * flick)
       })
       const sky = LIGHT.uSkyAmb.value
       const keyC = LIGHT.uKeyColor.value

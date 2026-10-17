@@ -31,8 +31,8 @@ type Key = {
 }
 
 const DUSK: readonly Key[] = [
-  { e: -18, zenith: 0x060a1a, horizon: 0x18213a, glow: 0x000000, glowI: 0, key: 0x9ab4e8, keyI: 0.16, sky: 0x1e2c52, skyI: 0.3, ground: 0x12121a, groundI: 0.1, rim: 0x8aa0d0, rimI: 0.2, cloudLit: 0x3a4664, cloudShade: 0x12162a, haze: 0.8, exposure: 1.45, sat: 0.88, split: 1 },
-  { e: -9, zenith: 0x161b3e, horizon: 0x40365a, glow: 0x8a4458, glowI: 0.3, key: 0x9ab0e0, keyI: 0.1, sky: 0x2a2a52, skyI: 0.34, ground: 0x2a2028, groundI: 0.14, rim: 0x8090c0, rimI: 0.16, cloudLit: 0x6a5a7c, cloudShade: 0x262640, haze: 0.9, exposure: 1.3, sat: 0.95, split: 0.6 },
+  { e: -18, zenith: 0x080c20, horizon: 0x1c2442, glow: 0x000000, glowI: 0, key: 0xa4b4ec, keyI: 0.27, sky: 0x3c4278, skyI: 0.42, ground: 0x2a2638, groundI: 0.16, rim: 0x8aa0d0, rimI: 0.25, cloudLit: 0x3a4664, cloudShade: 0x12162a, haze: 0.8, exposure: 1.95, sat: 0.92, split: 1 },
+  { e: -9, zenith: 0x161b3e, horizon: 0x40365a, glow: 0x8a4458, glowI: 0.3, key: 0x9ab0e0, keyI: 0.16, sky: 0x3a3a6a, skyI: 0.42, ground: 0x2e2632, groundI: 0.16, rim: 0x8090c0, rimI: 0.18, cloudLit: 0x6a5a7c, cloudShade: 0x262640, haze: 0.9, exposure: 1.6, sat: 0.95, split: 0.6 },
   { e: -3.5, zenith: 0x2a3168, horizon: 0xc06a5e, glow: 0xe8604a, glowI: 0.75, key: 0xff7050, keyI: 0.18, sky: 0x4a3c6e, skyI: 0.45, ground: 0x5a3a3a, groundI: 0.22, rim: 0xff7050, rimI: 0.3, cloudLit: 0xe88676, cloudShade: 0x564470, haze: 1.1, exposure: 1.1, sat: 1.05, split: 0 },
   { e: 0.5, zenith: 0x3e4a8a, horizon: 0xf2905a, glow: 0xff7a3a, glowI: 1.3, key: 0xff8a46, keyI: 1.7, sky: 0x5e5a92, skyI: 0.48, ground: 0x9a5a3a, groundI: 0.35, rim: 0xff7a40, rimI: 0.75, cloudLit: 0xffa070, cloudShade: 0x7a5a88, haze: 1.35, exposure: 0.86, sat: 1.12, split: -0.9 },
   { e: 4, zenith: 0x3a50a2, horizon: 0xf89c4c, glow: 0xff8a3c, glowI: 1.1, key: 0xffb066, keyI: 2.5, sky: 0x6a6aa0, skyI: 0.55, ground: 0xb06840, groundI: 0.4, rim: 0xff9a50, rimI: 0.7, cloudLit: 0xffc890, cloudShade: 0x8a7aa0, haze: 1.3, exposure: 0.76, sat: 1.12, split: -1 },
@@ -43,7 +43,7 @@ const DUSK: readonly Key[] = [
 
 const DAWN: readonly Key[] = [
   DUSK[0] ?? (() => { throw new Error('colour: empty table') })(),
-  { e: -9, zenith: 0x1a2048, horizon: 0x4a4268, glow: 0x7a5a78, glowI: 0.3, key: 0xa0a8e0, keyI: 0.1, sky: 0x2c2c56, skyI: 0.34, ground: 0x2a2430, groundI: 0.14, rim: 0x9090c8, rimI: 0.16, cloudLit: 0x6a6088, cloudShade: 0x282844, haze: 1.0, exposure: 1.3, sat: 0.95, split: 0.6 },
+  { e: -9, zenith: 0x1a2048, horizon: 0x4a4268, glow: 0x7a5a78, glowI: 0.3, key: 0xa0a8e0, keyI: 0.16, sky: 0x3c3c6c, skyI: 0.42, ground: 0x2e2836, groundI: 0.16, rim: 0x9090c8, rimI: 0.18, cloudLit: 0x6a6088, cloudShade: 0x282844, haze: 1.0, exposure: 1.6, sat: 0.95, split: 0.6 },
   { e: -3.5, zenith: 0x343a74, horizon: 0xa87890, glow: 0xc87a8a, glowI: 0.6, key: 0xc08090, keyI: 0.16, sky: 0x4a4478, skyI: 0.42, ground: 0x4a3a44, groundI: 0.2, rim: 0xc08090, rimI: 0.25, cloudLit: 0xc09ab0, cloudShade: 0x5a5280, haze: 1.3, exposure: 1.1, sat: 1.0, split: 0 },
   { e: 0.5, zenith: 0x50589a, horizon: 0xf0a0a0, glow: 0xff9080, glowI: 1.2, key: 0xff9a78, keyI: 1.5, sky: 0x7068a8, skyI: 0.5, ground: 0x9a6a5a, groundI: 0.32, rim: 0xff9a80, rimI: 0.7, cloudLit: 0xf8b0b0, cloudShade: 0x8a78a8, haze: 1.5, exposure: 0.86, sat: 1.08, split: -0.7 },
   { e: 4, zenith: 0x6070b0, horizon: 0xf6c0a8, glow: 0xffa888, glowI: 1.0, key: 0xffbc90, keyI: 2.3, sky: 0x7a74b0, skyI: 0.55, ground: 0xa87458, groundI: 0.36, rim: 0xffa888, rimI: 0.65, cloudLit: 0xffc8b8, cloudShade: 0x9a88b8, haze: 1.4, exposure: 0.76, sat: 1.08, split: -0.8 },
@@ -192,7 +192,9 @@ export function applyColourScript(clock: ClockState, weather: WeatherState): Key
   LIGHT.uKeyDir.value.copy(key.dir)
   LIGHT.uKeyColor.value.copy(key.color).multiplyScalar(key.intensity)
   const ambBoost = 1 + overcast * 0.35
-  LIGHT.uSkyAmb.value.copy(M.sky).multiplyScalar(M.skyI * ambBoost)
+  // a moonlit night is blue-violet and readable; a dark-moon night only starlit
+  const moonAmb = 1 + night * (moonIllum * moonUp * 0.6 - 0.35)
+  LIGHT.uSkyAmb.value.copy(M.sky).multiplyScalar(M.skyI * ambBoost * moonAmb)
   LIGHT.uGroundAmb.value.copy(M.ground).multiplyScalar(M.groundI)
   LIGHT.uRimColor.value.copy(M.rim).multiplyScalar(M.rimI * shade)
 

@@ -350,17 +350,19 @@ const TERRAIN_ALBEDO = /* glsl */ `
 			float inCave = ( 1.0 - smoothstep( 2.0, 6.0, ca ) ) * smoothstep( - uCave2.y - 3.0, - uCave2.y, ca ) * ( 1.0 - smoothstep( uCave2.z - 1.0, uCave2.z + 2.0, abs( cb ) ) );
 			if ( inCave > 0.01 ) {
 				vec3 mid = earth * vec3( 0.82, 0.78, 0.74 );
-				float shellA = ocEdge( 0.83, ocNoise( p * 7.0 ) * 0.65 + ocNoise( p * 19.0 ) * 0.35 );
-				float shellB = ocEdge( 0.84, ocNoise( p * 13.0 + 4.0 ) * 0.6 + ocNoise( p * 31.0 ) * 0.4 );
-				mid = mix( mid, ocLin( vec3( 0.86, 0.81, 0.72 ) ), shellA * 0.6 );
-				mid = mix( mid, ocLin( vec3( 0.62, 0.6, 0.62 ) ), shellB * 0.6 );
+				// grit, not spatter: fine flecks, low contrast, thickest where people sit near the walls
+				float gritK = 0.25 + 0.2 * smoothstep( 4.0, 9.0, abs( cb ) );
+				float shellA = ocEdge( 0.8, ocNoise( p * 23.0 ) * 0.6 + ocNoise( p * 57.0 ) * 0.4 );
+				float shellB = ocEdge( 0.82, ocNoise( p * 37.0 + 4.0 ) * 0.6 + ocNoise( p * 83.0 ) * 0.4 );
+				mid = mix( mid, ocLin( vec3( 0.76, 0.71, 0.62 ) ), shellA * gritK );
+				mid = mix( mid, ocLin( vec3( 0.56, 0.54, 0.55 ) ), shellB * gritK );
 				float dh = min( length( p - uHearths.xy ), length( p - uHearths.zw ) ) + ( ocNoise( p * 1.6 ) - 0.5 ) * 0.9;
 				float ash = 1.0 - smoothstep( 0.8, 2.8, dh );
 				mid = mix( mid, ocLin( vec3( 0.42, 0.4, 0.38 ) ), ash * 0.7 );
-				float coal = ocEdge( 0.62, ocNoise( p * 6.0 + 3.0 ) * 0.7 + ocNoise( p * 17.0 ) * 0.3 ) * ( 1.0 - smoothstep( 0.6, 1.8, dh ) );
-				mid = mix( mid, ocLin( vec3( 0.06, 0.05, 0.05 ) ), coal * 0.85 );
-				float och = ocEdge( 0.78, ocNoise( p * 0.9 + 17.0 ) * 0.7 + ocNoise( p * 4.0 ) * 0.3 );
-				mid = mix( mid, ocLin( vec3( 0.58, 0.25, 0.14 ) ), och * 0.45 );
+				float coal = ocEdge( 0.66, ocNoise( p * 13.0 + 3.0 ) * 0.7 + ocNoise( p * 31.0 ) * 0.3 ) * ( 1.0 - smoothstep( 0.5, 1.4, dh ) );
+				mid = mix( mid, ocLin( vec3( 0.1, 0.08, 0.07 ) ), coal * 0.7 );
+				float och = ocEdge( 0.8, ocNoise( p * 0.9 + 17.0 ) * 0.7 + ocNoise( p * 4.0 ) * 0.3 );
+				mid = mix( mid, ocLin( vec3( 0.55, 0.27, 0.16 ) ), och * 0.26 );
 				earth = mix( earth, mid, inCave );
 			}
 		}

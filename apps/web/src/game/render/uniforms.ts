@@ -51,6 +51,9 @@ export const LIGHT = {
   uFocus: { value: new Vector3() },
   /** 0..1 how much the people's paint uses the cave's darkness (always 1; kept for tuning) */
   uCaveDark: { value: 1 },
+  /** the two fires nearest the focus as soft fill lights: xyz the flame's heart, w strength (0 = none) */
+  uFireGlow: { value: new Vector4(0, -1000, 0, 0) },
+  uFireGlow2: { value: new Vector4(0, -1000, 0, 0) },
   /** the camera's world position */
   uCamPos: { value: new Vector3() },
   /** viewport size in pixels */
