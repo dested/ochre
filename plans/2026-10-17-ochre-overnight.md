@@ -491,6 +491,21 @@ controller, cameras and verbs that make each stage of life feel different; and t
   first steps toward the player (Provider). Data-driven in `src/sim/moments.ts`, deterministic per seed, a test that
   each one can fire, and a lab button to trigger each. Applies to: sim.
 
+- (2026-10-17 02:45, lead) **sim item S5b** (after S5). Passed in 6aa3225: held opens at 18:20 by the lit hearth;
+  Ama walks small.follow at 1.55 m/s with three lines. **Still owed:**
+  (a) **A free wait in Small, Youth and Elder:** one director beat in each that releases the player for about
+  2 game hours of ordinary band life (objective "Spend the afternoon with the band", ends on its own or when the
+  player goes back to the beat's marker). Each wait guarantees one S5 moment that suits the stage: Small the seal pup,
+  Youth the rain shower, Elder the full-moon dance.
+  (b) **First steps on Provider day 1:** the first-steps moment is forced on the first free afternoon, not left to
+  chance.
+  (c) **Visitors don't survive a load:** a lagoon-band visitor present at save time is not restored; its moment counts
+  as finished.
+  (d) **The honeyguide pays off at the hearth:** the men come back carrying comb (HeldItem or a prop id play
+  already has), sit at the hearth, everyone within 6 m gets a share (the `eat` anim, fed +0.1), and there are two
+  captions: one when they return, one when the player takes the share. The player gets a share only if within 6 m.
+  Tests: each wait fires its moment on seed 1, and the held→elder playthrough still finishes true. Applies to: sim.
+
 - (2026-10-17 02:40, lead) **Frozen QA server: http://localhost:4090** is a production build of a fixed sha (see
   `/w/junk/sim-80k/qa-server/SHA`). It never reloads, so use it for playthroughs and shots that need more than a
   minute. The lead rebuilds it on request: send `rebuild qa` and say which commits you need in it. The dev server on
