@@ -47,13 +47,15 @@ function beadString(ctx: BuildCtx, pts: readonly Vector3[], br: number, skin: Sk
 export function buildAdornments(ctx: BuildCtx, ts: TorsoShape, hs: HeadShape): void {
   const { d } = ctx
   const H = d.stature
-  const br = lerp(0.0055, 0.0085, smooth(0, 16, d.age)) * (H / Math.max(0.6, H))
+  // shell size: a baby's strings are fine seed-like beads; a grown woman's shells sit small and close enough that her
+  // necklace never fills the arms-carried child's view of her face
+  const br = lerp(0.0034, 0.0068, smooth(0, 16, d.age)) * (H / Math.max(0.6, H))
   const rng = ctx.rng.fork(0xad0)
 
   if (ctx.has('beads-neck')) {
     const strings = d.age >= 12 && rng.chance(0.5) ? 2 : 1
     for (let s = 0; s < strings; s++) {
-      const drop = (d.topY - d.chestY) * (0.42 + s * 0.28) * rng.range(0.9, 1.1)
+      const drop = (d.topY - d.chestY) * (0.3 + s * 0.28) * rng.range(0.9, 1.1)
       const pts: Vector3[] = []
       const n = 48
       for (let i = 0; i <= n; i++) {
