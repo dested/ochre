@@ -377,11 +377,14 @@ const held: Chapter = {
           releaseAll(d)
           order(d, 'mother', { kind: 'goto', dest: bedEdge(d, 'shore-limpets'), speed: 2, slot: 'back', near: 1.2, face: poi(d, 'shore-limpets') })
         }),
+        // nothing to do on the walk down but this, and saying so keeps the player from waiting on a prompt
+        obj('Listen to the sea'),
         wait(1.5),
         say('The world sways. Somewhere ahead, something enormous is breathing.', null, 7),
         until((d) => d.ctx.agents.get(person(d, 'mother')?.id ?? '')?.order?.arrived === true, { max: 150 }),
         say('The sea breathes in, and out.', null, 5),
         note('coastal-life'),
+        clearObj(),
         wait(3),
       ],
     },

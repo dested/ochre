@@ -98,7 +98,9 @@ function recentNow(ctx: SimCtx, r: TalkRecent): boolean {
 }
 
 /** how well a line fits this speaker now; null when it doesn't fit at all */
-function fit(ctx: SimCtx, l: TalkLine, p: SimPerson, to: 'you' | 'band'): number | null {
+function fit(ctx: SimCtx, l: TalkLine, p: SimPerson, to: 'you' | 'band', listener: SimPerson | null = null): number | null {
+  // nobody asks an infant to do anything, and in Held every line is heard by one
+  if (l.ask && (ctx.stage === 'held' || (listener !== null && listener.look.ageYears < 2))) return null
   const cast = castOf(p)
   let score = 0
   if (l.who === cast) score += 6
@@ -135,7 +137,7 @@ function fit(ctx: SimCtx, l: TalkLine, p: SimPerson, to: 'you' | 'band'): number
 }
 
 /** the best line for this person to say now that they haven't said today; null when there is none */
-export function pickLine(ctx: SimCtx, p: SimPerson, to: 'you' | 'band'): TalkLine | null {
+export function pickLine(ctx: SimCtx, p: SimPerson, to: 'you' | 'band', listener: SimPerson | null = null): TalkLine | null {
   const today = dayKey(ctx)
   let best: TalkLine | null = null
   let bestScore = -Infinity
@@ -143,7 +145,7 @@ export function pickLine(ctx: SimCtx, p: SimPerson, to: 'you' | 'band'): TalkLin
     // keyed by the words: a band-wide line said by one role isn't said again by another the same day
     if (ctx.talk.used[l.text] === today) continue
     if (ctx.talk.realT - (ctx.talk.saidAt[l.text] ?? -1e9) < SAY_AGAIN) continue
-    const f = fit(ctx, l, p, to)
+    const f = fit(ctx, l, p, to, listener)
     if (f === null) continue
     // ties (and near ties) break by a hash of the seed and the day: the same seed says the same things
     const jitter = (mix32(ctx.state.seed, hashString(`${today}|${p.id}|${l.id}`)) >>> 0) / 4294967296
@@ -184,7 +186,7 @@ export function talkTo(ctx: SimCtx, q: SimPerson): string {
   const scripted = ctx.director?.talk(q.id) ?? null
   let text = scripted
   if (text === null) {
-    const l = pickLine(ctx, q, 'you')
+    const l = pickLine(ctx, q, 'you', s.people.find((x) => x.id === s.playerId) ?? null)
     if (l) {
       ctx.talk.used[l.text] = dayKey(ctx)
       ctx.talk.saidAt[l.text] = ctx.talk.realT
@@ -248,10 +250,10 @@ export function updateChatter(ctx: SimCtx, realDt: number): void {
     for (let j = i + 1; j < near.length; j++) {
       const b = near[j]
       if (!b || !together(a, b)) continue
-      const la = pickLine(ctx, a, 'band')
-      const lb = pickLine(ctx, b, 'band')
-      const fa = la ? (fit(ctx, la, a, 'band') ?? -Infinity) : -Infinity
-      const fb = lb ? (fit(ctx, lb, b, 'band') ?? -Infinity) : -Infinity
+      const la = pickLine(ctx, a, 'band', b)
+      const lb = pickLine(ctx, b, 'band', a)
+      const fa = la ? (fit(ctx, la, a, 'band', b) ?? -Infinity) : -Infinity
+      const fb = lb ? (fit(ctx, lb, b, 'band', a) ?? -Infinity) : -Infinity
       const pick = la && fa >= fb ? { p: a, l: la } : lb ? { p: b, l: lb } : null
       if (!pick) continue
       tk.used[pick.l.text] = dayKey(ctx)

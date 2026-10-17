@@ -445,6 +445,14 @@ describe('director', () => {
     }
     const mum = (sim: Sim) => sim.state.people.find((p) => p.id === 'ama')
 
+    // the walk down has its quiet objective
+    const sea = newSim('held')
+    steps(sea, 1)
+    director(sea).completeBeat()
+    steps(sea, 0.5)
+    expect(sea.state.chapter.beatId).toBe('held.sea')
+    expect(sea.state.chapter.objective?.text).toBe('Listen to the sea')
+
     // Begin a life at a brisk pace: the shell comes on the shore, before sunset + 0.25 h
     const quick = newSim('held')
     steps(quick, 1)

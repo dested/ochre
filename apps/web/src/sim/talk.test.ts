@@ -3,7 +3,7 @@ import type { Sim, SimEvent, SimPerson } from '../game/contracts'
 import { addAnimal } from './animals'
 import { createSandboxSim, debugCtx } from './index'
 import { TALK_CAST, TALK_LINES } from './lines'
-import { CHATTER_EVERY, quiet } from './talk'
+import { CHATTER_EVERY, pickLine, quiet } from './talk'
 import { createTestWorld } from './test-world'
 
 const world = createTestWorld(1)
@@ -109,4 +109,27 @@ describe('the band talks', () => {
     for (let i = 1; i < chat.length; i++) expect((chat[i] ?? 0) - (chat[i - 1] ?? 0)).toBeGreaterThanOrEqual(CHATTER_EVERY - 0.1)
     expect(chat.some((t) => t > 100 && t < 131)).toBe(false)
   })
+
+  test('nobody asks an infant to do anything: no ask lines to a baby, and none at all in Held', () => {
+    const asks = new Set(TALK_LINES.filter((l) => l.ask).map((l) => l.text))
+    expect(asks.has('There is a hole in my bag. Hold this for me.')).toBe(true)
+    // a baby listening: Ama runs through everything she would say and none of it is an errand
+    const sim = newSim()
+    runTo(sim, 10)
+    const ctx = ctxOf(sim)
+    const baby = sim.state.people.find((p) => p.look.ageYears < 2)
+    if (!baby) throw new Error('no baby in the band')
+    for (let i = 0; i < 40; i++) {
+      const l = pickLine(ctx, person(sim, 'ama'), 'band', baby)
+      if (!l) break
+      expect(l.ask).toBeUndefined()
+      ctx.talk.used[l.text] = 'small:0'
+    }
+    // Held: an evening and a morning of chatter around the infant, never a request
+    const held = createSandboxSim({ seed: 1, world, stage: 'held', playerName: 'Teni' })
+    const said: string[] = []
+    for (let i = 0; i < 30 * 600; i++) for (const e of held.step(1 / 30)) if (e.type === 'caption' && e.caption.kind === 'speech') said.push(e.caption.text)
+    expect(said.length).toBeGreaterThan(0)
+    expect(said.filter((t) => asks.has(t))).toEqual([])
+  }, 60_000)
 })
