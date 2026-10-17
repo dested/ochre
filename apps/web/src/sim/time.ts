@@ -7,16 +7,16 @@ import type { SimCtx } from './ctx'
 import { STAGE_AGE } from './band'
 
 /**
- * Each stage opens on a morning with a low spring tide around 09:00 (full or new moon, see core/clock):
- * Held at the end of winter, Small in spring, Coming of age in autumn, Provider in winter (the storm on day 3),
- * Elder in spring.
+ * Each stage opens on a morning with a low spring tide around 09:00 (full or new moon, see core/clock). On this
+ * coast the sun sets over the sea only from December to February, so the evening chapters sit in summer: Held,
+ * Small and Coming of age in high summer, Elder in late summer. Provider is midwinter, for the storm on day 3.
  */
 export const STAGE_EPOCH: Record<LifeStageId, ClockEpoch> = {
-  held: { dayOfYear: 236, hour: 7, moonPhase: 0.5, year: STAGE_AGE.held },
-  small: { dayOfYear: 300, hour: 6.25, moonPhase: 0.5, year: STAGE_AGE.small },
-  youth: { dayOfYear: 62, hour: 6.25, moonPhase: 0, year: STAGE_AGE.youth },
+  held: { dayOfYear: 12, hour: 7, moonPhase: 0.5, year: STAGE_AGE.held },
+  small: { dayOfYear: 24, hour: 6.25, moonPhase: 0.5, year: STAGE_AGE.small },
+  youth: { dayOfYear: 36, hour: 6.25, moonPhase: 0, year: STAGE_AGE.youth },
   provider: { dayOfYear: 196, hour: 6.5, moonPhase: 0.5, year: STAGE_AGE.provider },
-  elder: { dayOfYear: 290, hour: 6.25, moonPhase: 0.5, year: STAGE_AGE.elder },
+  elder: { dayOfYear: 52, hour: 6.25, moonPhase: 0.5, year: STAGE_AGE.elder },
 }
 
 function sunUp(dayOfYear: number, hour: number): number {

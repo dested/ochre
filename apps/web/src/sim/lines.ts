@@ -56,6 +56,10 @@ const BANK: Record<TalkSpeaker, ReadonlyArray<readonly [string, Cond?]>> = {
     ['She held you before I did. Did you know that?', { after: 'oro-died', to: 'you' }],
     ['Sit. Eat. You can tell me about it after.', { when: ['evening'], to: 'you' }],
     ['The beads are for giving. That is what they are for.', { stage: ['youth'] }],
+    ['Hungry? There are corms in the coals.', { when: ['morning', 'day'] }],
+    ['Your hair is full of salt. Come here.', { stage: YOUNG, to: 'you' }],
+    ['The gulls know where the mussels are before we do.', {}],
+    ['A good bag holds a whole tide of shells. This one holds half.', {}],
   ],
   // quiet and exact about stone and tracks
   tuk: [
@@ -75,6 +79,8 @@ const BANK: Record<TalkSpeaker, ReadonlyArray<readonly [string, Cond?]>> = {
     ['The whale came to us. We did nothing to earn it.', { after: 'whale' }],
     ['Oro showed me where the ochre sleeps. I will show you.', { after: 'oro-died', to: 'you' }],
     ['Sleep. The eland will still be there tomorrow.', { when: ['night'] }],
+    ['Stone remembers every blow. So be sure of each one.', {}],
+    ['The ridge has more silcrete than we can carry in a lifetime.', {}],
   ],
   // old and wry; tide and moon sayings
   oro: [
@@ -94,6 +100,8 @@ const BANK: Record<TalkSpeaker, ReadonlyArray<readonly [string, Cond?]>> = {
     ['Let me hold the little one. I have done this before.', { stage: ['provider'] }],
     ['Hush now. This song is older than I am.', { task: ['sing', 'tell-story'] }],
     ['The fire is low. So am I. Both of us will last the night.', { when: ['night'] }],
+    ['Do not count the days. They count themselves.', {}],
+    ['Everything I know, someone showed me. Remember that.', {}],
   ],
   // teasing
   kaya: [
@@ -109,6 +117,8 @@ const BANK: Record<TalkSpeaker, ReadonlyArray<readonly [string, Cond?]>> = {
     ['Remember when you fell in the rock pool? I do.', { stage: GROWN, to: 'you' }],
     ['Grey hair suits you. It makes you look wise.', { stage: ['elder'], to: 'you' }],
     ['Do not cry at the fire. Everyone will see.', { after: 'oro-died', to: 'you' }],
+    ['Mother likes you best. Everyone knows it.', { to: 'you' }],
+    ['Race you to the water. Loser carries the bag.', { stage: YOUNG, to: 'you' }],
   ],
   // careful, missing her partner
   nehe: [
@@ -122,6 +132,8 @@ const BANK: Record<TalkSpeaker, ReadonlyArray<readonly [string, Cond?]>> = {
     ['I am careful. Somebody has to be.', {}],
     ['Hold the wood under your arm, not in front. You will trip.', { task: ['fetch-wood'] }],
     ['Stay inside tonight. Storms change the shore.', { weather: ['storm'] }],
+    ['Ilu eats like two boys. Sabo eats like a bird.', { stage: YOUNG }],
+    ['I dreamed of him again. He was laughing.', { when: ['morning'] }],
   ],
   // playful
   ilu: [
@@ -134,6 +146,8 @@ const BANK: Record<TalkSpeaker, ReadonlyArray<readonly [string, Cond?]>> = {
     ['My boy runs faster than I ever did. It is unfair.', { stage: GROWN }],
     ['The whale is bigger than the cave. I measured it in steps.', { after: 'whale' }],
     ['Hunting is mostly walking. Nobody tells you that.', { stage: ['youth', 'provider'], task: ['track', 'hunt'] }],
+    ['I can hold my breath longer than anyone. Count.', { stage: YOUNG }],
+    ['Kaya says I am too loud. I am the right loud.', {}],
   ],
   sabo: [
     ['Look, a crab. It is waving at you.', { stage: ['small'], tide: 'low', to: 'you' }],
@@ -145,6 +159,8 @@ const BANK: Record<TalkSpeaker, ReadonlyArray<readonly [string, Cond?]>> = {
     ['My man snores worse than you. I checked.', { stage: GROWN, to: 'you' }],
     ['We were small together. Now look at us. Old.', { stage: ['elder'], to: 'you' }],
     ['Whale fat in my hair. I do not care.', { after: 'whale' }],
+    ['I know a pool with a starfish in it. It is a secret.', { stage: YOUNG, to: 'you' }],
+    ['Mother counts us every night. I count her back.', {}],
   ],
   elder: [
     ['My back says it is time to sit.', {}],
