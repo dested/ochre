@@ -471,7 +471,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   }
 
   const updateHeld = (dt: number, player: SimPerson, settings: ControlSettings) => {
-    offerShell.show(null, 0)
+    offerShell.show(null, camera.position)
     const carrier = player.carriedBy
       ? sim.state.people.find((q) => q.id === player.carriedBy)
       : undefined
@@ -550,7 +550,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     held.attract = reach ? reachAt : null
     offerer = reach ? carrier.id : null
     if (reach && carrierActor && carrier.held[hand] === 'shell')
-      offerShell.show(reachAt, carrier.heading)
+      offerShell.show(reachAt, camera.position)
     if (reach) {
       tmp2.copy(reachAt).sub(camera.position)
       const looking = fwd.angleTo(tmp2) < REACH_CONE
@@ -1092,7 +1092,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
 
       if (mode === 'held') updateHeld(dt, player, settings)
       else {
-        offerShell.show(null, 0)
+        offerShell.show(null, camera.position)
         if (focus && now < focus.until) {
           const p = focusPoint(focus.targetId)
           if (p) {
