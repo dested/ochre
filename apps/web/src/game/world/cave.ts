@@ -260,6 +260,10 @@ const ROCK_ALBEDO = /* glsl */ `
 		float facet2 = ocFacetS.w;
 		vec3 warm = mix( ocLinR( vec3( 0.62, 0.46, 0.33 ) ), ocLinR( vec3( 0.76, 0.62, 0.47 ) ), facet );
 		warm = mix( warm, ocLinR( vec3( 0.52, 0.48, 0.47 ) ), smoothstep( 0.6, 0.9, facet2 ) * 0.5 );
+		// the painting's range: some blocks dusty grey-mauve, some deep umber, so low gold light falls on more
+		// than one colour of stone
+		warm = mix( warm, ocLinR( vec3( 0.5, 0.46, 0.48 ) ), smoothstep( 0.55, 0.75, ocFacetT.w ) * smoothstep( 0.3, 0.6, ocNoise( wp.xz * 0.13 + wp.y * 0.2 ) ) * 0.6 );
+		warm = mix( warm, ocLinR( vec3( 0.38, 0.27, 0.2 ) ), ( 1.0 - smoothstep( 0.12, 0.3, ocFacetT.w ) ) * 0.55 + ( 1.0 - smoothstep( 0.05, 0.2, facet2 ) ) * 0.3 );
 		// iron-red seams
 		warm = mix( warm, ocLinR( vec3( 0.66, 0.33, 0.17 ) ), smoothstep( 0.6, 0.85, ocNoise( vec2( wp.x + wp.z, wp.y * 3.0 ) * 0.21 ) ) * 0.35 );
 		// lichen on the tops that see the sky
@@ -280,10 +284,10 @@ const ROCK_ALBEDO = /* glsl */ `
 			ocChipT = ocChip( wp, nW, 0.24, edge );
 			// only some joints open into cracks, the rest are just a change of tone
 			float crack = 1.0 - smoothstep( 0.015, 0.06, edge + ( ocNoise( wp.xy * 9.0 + wp.z * 5.0 ) - 0.5 ) * 0.04 );
-			crack *= smoothstep( 0.42, 0.62, ocNoise( vec2( wp.x - wp.z, wp.y ) * 1.9 + 7.0 ) );
+			crack *= smoothstep( 0.5, 0.7, ocNoise( vec2( wp.x - wp.z, wp.y ) * 1.9 + 7.0 ) );
 			float grit = ocNoise( vec2( wp.x + wp.z * 0.7, wp.y ) * 31.0 ) - 0.5;
 			vec3 near = warm * ( 0.93 + 0.14 * ocChipT.w + grit * 0.12 );
-			near *= 1.0 - crack * 0.45;
+			near *= 1.0 - crack * 0.32;
 			warm = mix( warm, near, ocChipNear );
 		}
 		// damp, darker toward the back
