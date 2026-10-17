@@ -1,132 +1,161 @@
-# ochre — UI / Visual Language
+# OCHRE: UI and visual language
 
-> Source of truth for how this looks and feels. Follow it for anything visual.
-> Keep it current as part of finishing a UI change — same discipline as cliffnotes.
-> This is a starter's baseline; tighten the north star once the product has one.
+> Source of truth for how OCHRE's interface looks, reads and moves. Follow it for anything on screen that isn't the
+> 3D world. Keep it current as part of finishing a UI change. The starter's auth pages (`/sign-in`, `/sign-up`,
+> `/dashboard`) keep the shadcn look described at the end.
 
 ## North star
 
-**Clean, neutral, system-native — shadcn/ui "new-york" out of the box.** Think Linear/Vercel-dashboard restraint: lots of whitespace, hairline borders, near-black-on-white, one job per screen. Failure looks like (a) too sterile → no hierarchy, walls of muted text; (b) too toy → gratuitous color, heavy shadows, rounded-everything. This template ships intentionally unopinionated so a real brand can be layered on by editing tokens in `packages/tokens/tokens.css` (web, mobile and desktop all read it).
+**Painted, quiet and handmade.** The interface should feel like marks on bone paper and scratches on ochre, laid
+over a painting: warm serif type, soft halos instead of boxes, one engraved motif, and almost nothing on screen
+while you play. Think Firewatch's restraint, Sable's clarity and the Blombos engraving.
 
-1. **Tokens over hardcoded values** — color/radius come from CSS variables; never hardcode hex.
-2. **Borders, not shadows** — separation via 1px `border` + subtle `shadow-xs/sm`, not big elevation.
-3. **Muted by default, ink for signal** — body copy is `text-muted-foreground`; headings/primary actions are full-contrast.
-4. **Contained width** — content sits in a centered `max-w-5xl` column.
+Failure looks like (a) modern chrome: bars, pills, glassy panels, icon fonts, drop-shadowed cards; (b) a "caveman"
+pastiche: stone-texture buttons, bone fonts, fake runes. Neither.
 
-## Tokens
+1. **The painting is the background.** Text sits straight on the world with a soft dark halo (`.ui-halo`), never in
+   a box. Paper slips (toasts, choices) are the only surfaces.
+2. **Nothing over the centre.** The middle of the screen belongs to the world (the aim reticle is the one exception).
+3. **Fade when idle.** The needs and the dial show when they change and fade after a few seconds; hold Tab to see
+   them. Low needs stay up and breathe.
+4. **No eyebrows, no periods in headings.** No kicker or label above a heading, ever (ages and dates go *below* the
+   title). Headings never end in a period; body copy and captions keep theirs.
 
-Defined as CSS variables in `packages/tokens/tokens.css` (`:root` + `.dark`, plus a native dark block), exposed to Tailwind via `@theme inline`. Every app imports it as `@app/tokens/tokens.css` (web and desktop from `app.css`, mobile from `global.css`). Desktop follows the OS theme (no toggle). Light + dark are both defined; dark activates when `<html>` carries `.dark`, which an inline script in `index.html` sets before first paint (stored choice → OS preference) and `ThemeToggle` flips at runtime. `color-scheme` is set per theme so native controls and scrollbars match. All colors are **oklch**. Every surface must look right in both themes — check both when adding UI.
+## Palette
 
-### Color
+Tokens live in `apps/web/src/styles/app.css` (`@theme`) and mirror in `src/ui/palette.ts` (`C`) for inline SVG.
 
-| Token          | Tailwind class                           | Use                                      |
-| -------------- | ---------------------------------------- | ---------------------------------------- |
-| Background     | `bg-background`                          | page canvas (`oklch(1 0 0)` light)       |
-| Foreground     | `text-foreground`                        | primary text (`oklch(0.145 0 0)`)        |
-| Card           | `bg-card`                                | panels/cards                             |
-| Muted fg       | `text-muted-foreground`                  | secondary text, descriptions             |
-| Primary        | `bg-primary` / `text-primary-foreground` | primary buttons (near-black)             |
-| Secondary      | `bg-secondary`                           | subtle surfaces                          |
-| Accent         | `bg-accent`                              | hover surfaces                           |
-| Destructive    | `text-destructive` / `bg-destructive`    | errors, dangerous actions                |
-| Border / Input | `border`, `border-input`                 | hairlines, field borders                 |
-| Ring           | `ring-ring`                              | focus rings (`focus-visible:ring-[3px]`) |
+| Token | Hex | Tailwind | Use |
+| --- | --- | --- | --- |
+| ochre | `#9c3d20` | `text-ochre` | engraved marks on paper, the motif on dark |
+| ochre-bright | `#c4552c` | `text-ochre-bright` | the motif over paintings, health |
+| burnt | `#c2602e` | `text-burnt` | warm accents |
+| bone | `#efe3c8` | `text-bone` | all primary text on the world; paper |
+| bone-dim | `#cdbf9f` | `text-bone-dim` | secondary text (relations, reasons, labels) |
+| charcoal | `#2a2420` | `text-charcoal` | text on paper |
+| soot | `#16110e` | `bg-soot` | screen backgrounds, washes, halos |
+| teal | `#2f6f73` | `text-teal` | the sea |
+| deep | `#173a52` | `text-deep` | deep sea, night |
+| sage | `#7d8b5a` | `text-sage` | fynbos |
+| violet | `#4a3a5c` | `text-violet` | dusk |
+| amber | `#f2a03d` | `text-amber` | the one highlight: speaker names, counts, rings, hover, skills |
 
-Accent discipline: there is **no brand accent** by default — primary is neutral near-black. Introduce a brand color by overriding `--primary` (and friends) in `tokens.css`, not by sprinkling Tailwind palette classes (`bg-blue-500`) in components.
+Amber is the only "signal" colour. Never introduce a blue or green UI accent.
 
-### Typography
+## Type
 
-| Role            | Class                                        | Use                              |
-| --------------- | -------------------------------------------- | -------------------------------- |
-| Display/title   | `text-4xl font-bold tracking-tight`          | page H1 (home)                   |
-| Page heading    | `text-3xl font-bold tracking-tight`          | section H1 (dashboard)           |
-| Section heading | `text-xl font-semibold`                      | subsections                      |
-| Card title      | `CardTitle` (`font-semibold tracking-tight`) | renders a `<div>`, not a heading |
-| Body            | default / `text-sm`                          | content                          |
-| Muted/label     | `text-sm text-muted-foreground`              | descriptions, field hints        |
+Fonts are linked from Google Fonts in `apps/web/index.html`: **Fraunces** (variable, `opsz` and `SOFT` axes) for
+headings, the wordmark, narration and names; **Figtree** for UI text and speech.
 
-Font: system stack (`ui-sans-serif, system-ui, sans-serif`) set on `body` — no web font loaded.
+| Role | Style |
+| --- | --- |
+| Wordmark | Fraunces 128 px (88 below `lg`), weight 560, tracking 0.16em, `opsz 144, SOFT 100`, over the cross-hatch band |
+| Screen title | Fraunces 64–120 px (chapter card), 40–56 px (pause, picker), weight ~480, `SOFT 100` |
+| Menu item | Fraunces 22–28 px, primary 30–40 px; hover turns amber and scratches the band in underneath |
+| Narration caption | Fraunces italic 22 px, weight 380, `opsz 36, SOFT 100` |
+| Speech caption | speaker in Fraunces semibold amber 17 px, then Figtree 19 px bone |
+| Song caption | Fraunces italic 21 px between two small voice marks |
+| Objective | Figtree 17 px medium, count in Fraunces amber tabular figures ("3/12") |
+| Prompt | key cap Figtree 14 px semibold, label Figtree 18 px medium, disabled reason Fraunces italic 15 px |
+| Name tag | Fraunces 16 px semibold (bone → amber with the bond), relation Figtree 12 px bone-dim below |
+| Toast | Fraunces 17 px semibold charcoal, body Figtree 13.5 px |
+| Small print | Figtree 12–13 px |
 
-### Spacing, shape, elevation
+Large captions (setting) scale captions by 1.28.
 
-| Token           | Value                                                               | Use                       |
-| --------------- | ------------------------------------------------------------------- | ------------------------- |
-| Page container  | `mx-auto max-w-5xl px-6 py-8`                                       | main content column       |
-| Auth card width | `mx-auto max-w-sm`                                                  | sign-in/up                |
-| Vertical rhythm | `space-y-8` (sections), `space-y-4` (forms), `space-y-2` (fields)   |                           |
-| Radius          | `--radius: 0.625rem`; `rounded-md` (controls), `rounded-xl` (cards) | scale derived in `@theme` |
-| Elevation       | `shadow-xs` (buttons/inputs), `shadow-sm` (cards)                   | keep shadows minimal      |
+## Motif: the Blombos band
+
+`CrossHatch` in `src/ui/motifs.tsx`: two framing lines, a middle line and a row of crossing diagonals, as on the
+engraved ochre from Blombos Cave, drawn as scratched strokes with deterministic jitter and the `#ui-brush` filter.
+Uses: under the wordmark, under screen titles (180–260 px), the menu hover underline, the loading bar (it engraves
+itself as the world builds). `HatchRule` is a short three-stroke separator. A numeric `width` picks the cell count
+so cells stay slightly narrower than tall.
+
+## Surfaces and filters
+
+- **Halo** (`.ui-halo`, `.ui-halo-soft`): layered dark text-shadows for text on the world.
+- **Paper** (`.ui-paper`): bone with a faint grain; the torn edge comes from `filter: url(#ui-rough)` on a separate
+  backing layer, so the filter never touches text.
+- **Soot wash**: `radial-gradient(closest-side, rgb(22 17 14 / .5), transparent)` behind HUD text that can land on
+  a bright sky (the watch ring).
+- **Grain** (`.ui-grain`): an overlay noise for full-screen paintings.
+- SVG filters (`src/ui/defs.tsx`, rendered once by `GameUI`): `#ui-rough` torn edges, `#ui-brush` dry-brush strokes,
+  `#ui-brush-soft` a gentle wobble for filled glyphs.
 
 ## Layout
 
-App shell is `src/app/layout.tsx`: a bordered `header` with a `max-w-5xl` nav (logo · Dashboard link · auth links/email+sign-out · `ThemeToggle` on the right), then `<main class="mx-auto max-w-5xl px-6 py-8"><Outlet/></main>`. Page anatomy: H1 + muted subtitle → content sections (`space-y-8`), often a grid of `Card`s (`grid gap-4 md:grid-cols-2`). Empty states are a single muted line (e.g. "No posts yet — be the first.").
+```
+ objective (top left)        watch ring (top centre)                 toasts (top right)
 
-## Components
+                              [ the world: nothing here ]
+                                  reticle when aiming
 
-Reuse these shadcn primitives — don't hand-roll. They take `className` (merged via `cn()`), no `asChild`.
-
-| Component                   | File                              | Notes                                                                                   |
-| --------------------------- | --------------------------------- | --------------------------------------------------------------------------------------- |
-| `Button` + `buttonVariants` | `src/components/ui/button.tsx`    | variants: default/destructive/outline/secondary/ghost/link; sizes: default/sm/lg/icon   |
-| `Card` family               | `src/components/ui/card.tsx`      | Card / Header / Title / Description / Content / Footer                                  |
-| `Input`                     | `src/components/ui/input.tsx`     | full-width, `aria-invalid` styling                                                      |
-| `Label`                     | `src/components/ui/label.tsx`     | pair with `htmlFor`                                                                     |
-| `ThemeToggle`               | `src/components/theme-toggle.tsx` | ghost icon `Button`; Sun/Moon swapped with `dark:hidden` / `dark:block`, never JS state |
-| `cn()`                      | `src/lib/utils.ts`                | clsx + tailwind-merge                                                                   |
-| Icons                       | `lucide-react`                    | icon library (configured in `components.json`)                                          |
-
-Add more: `bunx --bun shadcn@latest add <name>` (writes to `src/components/ui/`). If a component needs `asChild`, install `@radix-ui/react-slot` first.
-
-Signature patterns:
-
-```tsx
-// Field
-<div className="space-y-2">
-  <Label htmlFor="email">Email</Label>
-  <Input id="email" type="email" required autoComplete="email" />
-</div>
-
-// Link styled as a button (no asChild here)
-<Link to="/" className={buttonVariants()}>Back home</Link>
-
-// Inline error
-{error && <p className="text-sm text-destructive">{error}</p>}
-
-// Theme-dependent visuals: render both, hide one with the dark variant
-<Sun className="dark:hidden" />
-<Moon className="hidden dark:block" />
+ dial + needs (bottom left)     prompt, then captions (bottom centre)
 ```
 
-## States (every async surface)
+Margins: `clamp(20px, 3vw, 44px)` sides, `clamp(18px, 3.4vh, 36px)` top. Menus sit in a left column at
+`clamp(28px, 7vw, 120px)`. Everything is checked at 1280×800.
 
-- **Loading:** muted line — `<p className="text-muted-foreground text-sm">Loading…</p>` (see dashboard posts).
-- **Empty:** one muted sentence, no illustration.
-- **Pending action:** disable the button + swap its label (`disabled={isPending}` → "Posting…").
-- **Error:** inline `text-destructive` text under the form; loader/route errors fall to the root `ErrorBoundary` (`src/app/error-boundary.tsx`).
+## HUD elements
 
-## Voice / copy
+- **Needs**: four painted glyphs (mussel shell = fed, flame = warmth, crescent = energy, ochre hand = health). They
+  dim, cool and shrink as they fall; under 25% they breathe and stay visible when idle. Never bars or numbers.
+- **Dial**: a 68 px medallion. Sky follows daylight; the sun and moon ride a circle (dawn left, noon top, dusk right;
+  the moon shows its phase); the sea at the bottom rises and falls with the tide; "Spring low tide" / "Low tide" /
+  "High tide" appear under it near the extremes. The wind mark is an arrow on the rim pointing where the wind blows,
+  longer and with streaks as it strengthens.
+- **Watch ring**: an eye inside a filling amber ring, "Watching Ama · Shellfish".
+- **Prompt**: key cap ("E", "Click"), a hold ring around it, the label, and "hold"; disabled shows the reason in
+  italic.
+- **Name tags**: name, relation, a small tick down to the head; warmer with the bond; a voice mark while speaking.
 
-Terse, lowercase-leaning, developer-direct. Sentence case for UI; the brand wordmark is lowercase (`ochre`). Short imperative buttons ("Sign in", "Post"). Example good: "No posts yet — be the first." Avoid: marketing fluff, exclamation marks, ALL-CAPS, emoji in UI.
+## Motion
 
-## Mobile (apps/mobile)
+- Entrances: `animate-ui-rise` (10 px up + fade, 700 ms), `animate-ui-slip` (toasts from the right), `animate-ui-fade`.
+- Idle fades: 1.2–1.6 s opacity transitions. Low states: `animate-ui-breathe` (2.4 s).
+- Paintings: a slow push-in (chapter cards 1.02 → 1.09 over 9 s; intro cards 1.03 → 1.1). The title drifts in
+  two-layer parallax and follows the pointer gently.
+- Nothing bounces, nothing spins.
 
-Same tokens, same look, native idioms. NativeWind 5 compiles the oklch tokens to native colors; class names are the web's (`bg-background`, `text-muted-foreground`, `border-border`).
+## Copy
 
-- **Dark mode follows the OS**, no toggle. Native can't see the web's `.dark` class, so `tokens.css` repeats the dark values in `@media native and (prefers-color-scheme: dark) { :root { … } }`. Change a dark token in both places; `tokens.test.ts` fails if they drift.
-- **Primitives** in `apps/mobile/src/components/ui/` mirror web's names and cva variants: `Button` (`label` prop, `Pressable` + `Text`; variants default/destructive/outline/secondary/ghost/link, sizes default/sm/lg), `Card` family, `Input`, `Label`. Reuse them; don't style raw `Pressable`s.
-- **Placeholder text** is `#8a8a8a` (a mid grey legible in both themes); `placeholderTextColor` can't take a class.
-- **Screen anatomy:** `SafeAreaView` (`bg-background flex-1`) → `ScrollView` with `contentContainerClassName="gap-8 p-6"`. Auth screens center a single `Card`. Same states as web: muted "Loading…" line, one-sentence empty state, disabled button with a swapped label while pending, inline `text-destructive` errors, and an error `Card` with a Retry button when the server is unreachable.
-- **Splash** is white / `#0a0a0a` (light / dark), matching `--background`.
-- No web-only utilities on native (`hover:`, `shadow-xs`, `focus-visible:`); they compile to nothing.
+Second person, present tense, short. Plain warm English ("Come. The sea is sleeping."). Never invented "primitive"
+speech. Sentence case. No exclamation marks in UI chrome (characters may exclaim in speech). No emoji.
 
-## Don'ts
+## Art: the image style line
 
-- ❌ Hardcoded colors (`bg-blue-500`, hex) — use token classes; override tokens in `tokens.css` for brand.
-- ❌ Heavy shadows / `shadow-lg` cards — this is a borders-first look.
-- ❌ `tailwind.config.{js,ts}` — Tailwind v4, tokens live in `tokens.css`.
-- ❌ `asChild` on shadcn components — not supported (no Slot); use `buttonVariants()`.
-- ❌ Treating `CardTitle` as a heading element — it's a `<div>` (matters for a11y + test selectors).
-- ❌ Full-bleed layouts — content stays in the centered `max-w-5xl` column.
-- ❌ Web-font dependencies without reason — system stack is intentional.
-- ❌ `import './x.css'` from a component — the stylesheet is a `<link>` in `index.html`; `@import` new CSS from `app.css` or the dev build paints unstyled first.
-- ❌ Reading the theme in render (`useEffect` icon swaps, `matchMedia` in JSX) — SSR markup must equal client markup; use `dark:` classes.
+All painted art comes from GPT Image 2.5 Flare with the two concept paintings
+(`public/art/concept/env-cave-golden.png`, `public/art/concept/people-lineup.png`) passed as `--input` references,
+and this line at the start of every prompt:
+
+> A painting in a warm, matte oil-and-gouache style matching the reference images: visible confident brushstrokes,
+> soft edges, no outlines, golden ochre light with cool violet and teal shadows, strong atmospheric perspective, the
+> quiet dignity of a Ghibli background painting and Firewatch key art. The southern Cape coast of South Africa about
+> 80,000 years ago: limestone cliffs, fynbos with proteas, a turquoise sea, a rocky intertidal shelf. People are
+> anatomically modern Africans with dark to medium brown skin and tightly coiled hair, in hide karosses and aprons,
+> shell-bead strings and red ochre marks, natural adult proportions; never cavemen, never hunched. No text, no
+> lettering, no frame, no modern objects, no metal.
+
+Then the scene, then "Composition leaves the lower-left third calm for a title" for anything with type over it.
+Ship as `.webp` ≤ 1600 px wide and ≤ 400 KB under `public/art/{title,intro,chapters,notes,ui}/`. The title's
+foreground layer (`title/key-fg.webp`) is a transparent cut-out of the key art's bottom edge for parallax.
+
+## Code map
+
+- `src/ui/GameUI.tsx`: the root; renders by `bridge.screen`.
+- `src/ui/hud/`: `Hud` (layout and idle logic), `Needs`, `Dial`, `Lines` (objective, captions), `Marks` (prompt,
+  watch ring, reticle, name tags), `Toasts`.
+- `src/ui/screens/`: title (+ chapter picker), intro, loading, chapter card, pause, settings, notes, lineage,
+  choice, summary.
+- `src/ui/minigames/`: knapping, engraving, beads.
+- `src/ui/motifs.tsx`, `defs.tsx`, `palette.ts`, `widgets.tsx` (`MenuButton`, `TextButton`), `hooks.ts`.
+- `src/content/`: field notes, stages, skill labels.
+- `/lab/ui` (`src/app/lab/ui.tsx`): every screen and HUD state over a painting. `?preset=busy|quiet|low|disabled|
+  aiming|night|held|choice`, `?screen=<screen>`, `?stage=<stage>`, `?bg=cave|title|shore|night|bright|black`,
+  `?panel=0`, `?hold=1`. Backquote toggles the panel; `window.__ui` drives it in DEV.
+
+## The starter's pages
+
+`/sign-in`, `/sign-up` and `/dashboard` keep the shadcn "new-york" look from `@app/tokens` (`packages/tokens/tokens.css`,
+oklch, light and dark): `Button`, `Card`, `Input`, `Label` in `src/components/ui/`, a `max-w-5xl` column. They now
+use Figtree as the body font. Don't restyle them as part of game work.

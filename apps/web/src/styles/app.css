@@ -4,12 +4,112 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* OCHRE palette and type (see ui.md). The game UI uses these directly; the starter's auth pages keep the
+   shadcn tokens from @app/tokens. */
+@theme {
+  --font-serif: 'Fraunces', ui-serif, Georgia, serif;
+  --font-sans: 'Figtree', ui-sans-serif, system-ui, sans-serif;
+
+  --color-ochre: #9c3d20;
+  --color-ochre-bright: #c4552c;
+  --color-burnt: #c2602e;
+  --color-bone: #efe3c8;
+  --color-bone-dim: #cdbf9f;
+  --color-charcoal: #2a2420;
+  --color-soot: #16110e;
+  --color-teal: #2f6f73;
+  --color-deep: #173a52;
+  --color-sage: #7d8b5a;
+  --color-violet: #4a3a5c;
+  --color-amber: #f2a03d;
+
+  --ease-drift: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  --animate-ui-rise: ui-rise 700ms var(--ease-drift) both;
+  --animate-ui-fade: ui-fade 900ms ease both;
+  --animate-ui-slip: ui-slip 650ms var(--ease-drift) both;
+  --animate-ui-breathe: ui-breathe 2.4s ease-in-out infinite;
+
+  @keyframes ui-rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes ui-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes ui-slip {
+    from {
+      opacity: 0;
+      transform: translateX(24px) rotate(0.6deg);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes ui-breathe {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
-    font-family: ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-sans);
+  }
+}
+
+/* Game UI helpers. Text over the painted world gets a soft dark halo, never a box. */
+@layer components {
+  .ui-halo {
+    text-shadow:
+      0 1px 2px rgb(22 17 14 / 0.85),
+      0 0 14px rgb(22 17 14 / 0.6),
+      0 0 32px rgb(22 17 14 / 0.35);
+  }
+  .ui-halo-soft {
+    text-shadow:
+      0 1px 2px rgb(22 17 14 / 0.6),
+      0 0 12px rgb(22 17 14 / 0.4);
+  }
+  /* bone paper with a faint grain; the rough edge comes from the #ui-rough filter on a backing layer */
+  .ui-paper {
+    background-color: #efe3c8;
+    background-image:
+      radial-gradient(120% 90% at 30% 20%, rgb(255 250 235 / 0.55), transparent 60%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .25 0 0 0 0 .15 0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .ui-soot {
+    background-color: rgb(22 17 14 / 0.78);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .9 0 0 0 0 .8 0 0 0 0 .6 0 0 0 .06 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .ui-grain::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.5;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .45 0 0 0 0 .4 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
   }
 }
