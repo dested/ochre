@@ -66,7 +66,7 @@ export function ChapterCardScreen() {
         <p
           className="mt-2 animate-ui-rise font-sans text-[clamp(15px,1.2vw,18px)] leading-relaxed text-bone/85 ui-halo"
           style={{ animationDelay: '1500ms' }}>
-          {card.subtitle || stage.line}
+          {(card.subtitle || stage.line).replace(/\.\s*$/, '')}
         </p>
       </div>
       <p

@@ -92,6 +92,19 @@
       0 1px 2px rgb(22 17 14 / 0.6),
       0 0 12px rgb(22 17 14 / 0.4);
   }
+  /* a soft soot pool behind HUD text, so it reads over bright sky, sand and paper */
+  .ui-wash {
+    position: relative;
+    isolation: isolate;
+  }
+  .ui-wash::before {
+    content: '';
+    position: absolute;
+    inset: -12px -32px;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(closest-side, rgb(22 17 14 / 0.5), rgb(22 17 14 / 0.22) 65%, transparent);
+  }
   /* bone paper with a faint grain; the rough edge comes from the #ui-rough filter on a backing layer */
   .ui-paper {
     background-color: #efe3c8;

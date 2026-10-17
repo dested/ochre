@@ -76,8 +76,8 @@ so cells stay slightly narrower than tall.
 - **Halo** (`.ui-halo`, `.ui-halo-soft`): layered dark text-shadows for text on the world.
 - **Paper** (`.ui-paper`): bone with a faint grain; the torn edge comes from `filter: url(#ui-rough)` on a separate
   backing layer, so the filter never touches text.
-- **Soot wash**: `radial-gradient(closest-side, rgb(22 17 14 / .5), transparent)` behind HUD text that can land on
-  a bright sky (the watch ring).
+- **Soot wash** (`.ui-wash`): a soft radial soot pool behind HUD text that can land on a bright sky, sand or paper
+  (objective, captions, prompt, name tags; the watch ring has its own).
 - **Grain** (`.ui-grain`): an overlay noise for full-screen paintings.
 - SVG filters (`src/ui/defs.tsx`, rendered once by `GameUI`): `#ui-rough` torn edges, `#ui-brush` dry-brush strokes,
   `#ui-brush-soft` a gentle wobble for filled glyphs.

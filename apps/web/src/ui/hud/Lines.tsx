@@ -7,7 +7,7 @@ export function ObjectiveLine({ objective, dim }: { objective: Objective; dim: b
   return (
     <div
       key={objective.id + objective.text}
-      className="flex max-w-[min(44vw,520px)] animate-ui-rise items-start gap-3"
+      className="ui-wash flex max-w-[min(44vw,520px)] animate-ui-rise items-start gap-3"
       style={{ opacity: dim ? 0.6 : 1, transition: 'opacity 1.6s ease' }}>
       <svg width="16" height="22" viewBox="0 0 16 22" className="mt-[3px] shrink-0" aria-hidden>
         <g fill="none" stroke={C.ochreBright} strokeWidth="1.8" strokeLinecap="round" style={{ filter: 'url(#ui-brush)' }}>
@@ -43,7 +43,7 @@ function CaptionLine({ caption, large }: { caption: Caption; large: boolean }) {
   const scale = large ? 1.28 : 1
   if (caption.kind === 'speech') {
     return (
-      <p className="animate-ui-rise text-bone ui-halo" style={{ fontSize: 19 * scale, lineHeight: 1.4 }}>
+      <p className="ui-wash animate-ui-rise text-bone ui-halo" style={{ fontSize: 19 * scale, lineHeight: 1.4 }}>
         {caption.speaker && (
           <span
             className="mr-2.5 font-serif font-semibold text-amber"
@@ -58,7 +58,7 @@ function CaptionLine({ caption, large }: { caption: Caption; large: boolean }) {
   if (caption.kind === 'song') {
     return (
       <p
-        className="flex animate-ui-rise items-center justify-center gap-3 font-serif italic text-bone ui-halo"
+        className="ui-wash flex animate-ui-rise items-center justify-center gap-3 font-serif italic text-bone ui-halo"
         style={{ fontSize: 21 * scale, lineHeight: 1.4, fontVariationSettings: '"opsz" 36, "SOFT" 100' }}>
         <SongMark />
         <span>{caption.text}</span>
@@ -68,7 +68,7 @@ function CaptionLine({ caption, large }: { caption: Caption; large: boolean }) {
   }
   return (
     <p
-      className="animate-ui-rise font-serif italic text-bone ui-halo"
+      className="ui-wash animate-ui-rise font-serif italic text-bone ui-halo"
       style={{ fontSize: 22 * scale, lineHeight: 1.4, fontVariationSettings: '"opsz" 36, "SOFT" 100', fontWeight: 380 }}>
       {caption.text}
     </p>

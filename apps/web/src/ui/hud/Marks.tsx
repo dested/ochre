@@ -36,7 +36,7 @@ export function Prompt({ prompt }: { prompt: PromptState }) {
   return (
     <div
       key={prompt.label}
-      className="flex animate-ui-rise flex-col items-center gap-1.5"
+      className="ui-wash flex animate-ui-rise flex-col items-center gap-1.5"
       style={{ opacity: prompt.enabled ? 1 : 0.82 }}>
       <div className="flex items-center gap-3">
         <div className="relative grid place-items-center" style={{ width: wide ? 'auto' : size, height: size, minWidth: size }}>
@@ -125,7 +125,7 @@ export function NameTags({ tags }: { tags: readonly NameTag[] }) {
         return (
           <div
             key={t.id}
-            className="absolute flex flex-col items-center"
+            className="ui-wash absolute flex flex-col items-center"
             style={{
               left: t.x,
               top: t.y,
@@ -142,7 +142,7 @@ export function NameTags({ tags }: { tags: readonly NameTag[] }) {
               {t.speaking && <SpeakingMark />}
             </span>
             {t.relation && (
-              <span className="-mt-0.5 whitespace-nowrap font-sans text-[12px] text-bone-dim ui-halo">{t.relation}</span>
+              <span className="-mt-0.5 whitespace-nowrap font-sans text-[12px] font-medium text-bone-dim ui-halo">{t.relation}</span>
             )}
             {/* a short engraved tick down to the head, warmer with the bond */}
             <svg width="10" height="12" viewBox="0 0 10 12" aria-hidden className="mt-0.5">
