@@ -128,6 +128,8 @@ const OCC_STEPS = 8
 const OCC_HIDE = 0.2
 /** the held camera hides the carrier's head inside this distance, metres */
 const HEAD_HIDE = 0.3
+/** pixels between the player's head-top box and an objective mark lifted off the body */
+const MARK_LIFT = 10
 /** fade level past which tags and the prompt hide, and how far a face is made out at night */
 const FADE_HIDE = 0.3
 /** name tags anchor this far above the head top, metres */
@@ -683,6 +685,9 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   }
   const hiddenFor = new Map<string, number>()
   const reachAt = new Vector3()
+  const boxTop = new Vector3()
+  const boxRight = new Vector3()
+  const boxPt = new Vector3()
   /** the carrier holding out what she offers (cast shows her standing, the offer up where the infant sees it) */
   let offerer: string | null = null
   const selfHead = new Vector3()
@@ -863,6 +868,38 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   }
 
   /** the objective's target on screen, or clamped to the edge toward it; null in held, cinematics and fades */
+  /** the player's body on screen: feet to head top + 0.2 m, ±0.35 m wide (null when the camera is inside it) */
+  const playerBox = (player: SimPerson, width: number, height: number) => {
+    const actor = cast.person(player.id)
+    if (!actor) return null
+    actor.headPosition(boxTop)
+    const feet = world.heightAt(player.position.x, player.position.z)
+    const top = boxTop.y + 0.1 + 0.2
+    boxRight.setFromMatrixColumn(camera.matrixWorld, 0).setY(0)
+    if (boxRight.lengthSq() < 1e-6) return null
+    boxRight.normalize().multiplyScalar(0.35)
+    let left = Infinity
+    let right = -Infinity
+    let up = Infinity
+    let down = -Infinity
+    for (const y of [feet, top])
+      for (const side of [-1, 1]) {
+        boxPt
+          .set(player.position.x, y, player.position.z)
+          .addScaledVector(boxRight, side)
+          .applyMatrix4(camera.matrixWorldInverse)
+        if (boxPt.z > -0.1) return null
+        boxPt.applyMatrix4(camera.projectionMatrix)
+        const px = ((boxPt.x + 1) / 2) * width
+        const py = ((1 - boxPt.y) / 2) * height
+        left = Math.min(left, px)
+        right = Math.max(right, px)
+        up = Math.min(up, py)
+        down = Math.max(down, py)
+      }
+    return { left, right, top: up, bottom: down }
+  }
+
   const objectiveMarkNow = (player: SimPerson): ObjectiveMark | null => {
     const t = sim.state.chapter.objective?.target
     if (!t || mode !== 'third' || sim.state.stage === 'held') return null
@@ -893,7 +930,15 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       sy >= MARK_EDGE &&
       sy <= height - MARK_EDGE
     const angle = Math.atan2(dx, -dy)
-    if (onScreen) return { x: sx, y: sy, onScreen, angle, distance }
+    if (onScreen) {
+      // a target straight ahead would sit on the player's own body: lift the mark above it
+      const box = playerBox(player, width, height)
+      const y =
+        box && sx > box.left && sx < box.right && sy > box.top && sy < box.bottom
+          ? box.top - MARK_LIFT
+          : sy
+      return { x: sx, y, onScreen, angle, distance }
+    }
     // off screen: from the centre along the target's direction to the inset edge (straight behind points down)
     const ex = Math.abs(dx) < 1e-4 && Math.abs(dy) < 1e-4 ? 0 : dx
     const ey = ex === 0 && Math.abs(dy) < 1e-4 ? 1 : dy
@@ -1067,9 +1112,13 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
         camera.position.y += Math.sin(now * 47) * 0.05 * k
       }
       if (fade.t < 1) {
+        const wasBlack = fadeValue >= 1
         fade.t = Math.min(1, fade.t + dt / fade.seconds)
         fadeValue = fade.from + (fade.to - fade.from) * fade.t
         pipeline.setFade(fadeValue)
+        // full black ends what was being said; lines spoken in the black (or after) stay
+        if (!wasBlack && fadeValue >= 1 && bridge.get().captions.length > 0)
+          bridge.set({ captions: [] })
       }
       pipeline.setDream(mode === 'held' ? 0.6 : 0)
 
