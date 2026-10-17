@@ -9,7 +9,7 @@ import type { Pose, SimCtx } from '../ctx'
 import { addBond } from '../life'
 import { randomLook } from '../looks'
 import { makeName } from '../names'
-import { createAgent } from '../ai'
+import { createAgent, seatPos } from '../ai'
 import { hashString, mix32, Rng } from '../../core/rng'
 import { ageBand } from './history'
 import {
@@ -186,6 +186,19 @@ function herdNearest(d: D, from: Vec2): { id: string; d: number; calm: boolean }
   return best
 }
 
+/** small.follow: has Ama come as far as `mark` on the walk down to the mussels (or is she not walking at all)? */
+function walkedDown(d: D, mark: 'shore-path-top' | 'mid' | 'shelf', near: number): boolean {
+  const m = person(d, 'mother')
+  if (!m) return true
+  const bed = poi(d, 'shore-mussels')
+  const top = poi(d, 'shore-path-top')
+  const bottom = poi(d, 'shore-path-bottom')
+  const left = dist(m.position, bed)
+  if (mark === 'shore-path-top') return dist(m.position, top) < near || left < dist(top, bed)
+  if (mark === 'mid') return left < (dist(top, bed) + dist(bottom, bed)) / 2
+  return left < bed.radius + 16
+}
+
 // ─── Stage 1: Held ──────────────────────────────────────────────────────────────────────────────────────────
 
 const held: Chapter = {
@@ -196,6 +209,8 @@ const held: Chapter = {
   beats: [
     {
       id: 'held.faces',
+      // the evening runs slow: the sun is still on the sea when she shows you the shell
+      scale: 20,
       steps: [
         run((d) => {
           // Ama by the fire with you in her arms; the family close around her, where a baby can see them
@@ -213,10 +228,40 @@ const held: Chapter = {
             ['sister', back + 0.05, 1.2, STAND],
             ['widow', back - 1.1, 1.8, STAND],
           ]
+          const taken: Vec2[] = [m.position]
+          const family = new Set<string>([m.id])
           for (const [who, ang, r, ps] of spots) {
             const at = { x: m.position.x + Math.sin(ang) * r, z: m.position.z + Math.cos(ang) * r }
             place(d, who, at, face(at, m.position))
             order(d, who, { kind: 'hold', pose: ps, face: m.position })
+            const q = person(d, who)
+            if (q) {
+              family.add(q.id)
+              taken.push(q.position)
+            }
+          }
+          // the evening fire: everyone else in their own seat round it, firelit, the sunset in the cave mouth
+          const h = hearth(d)
+          for (const p of d.ctx.state.people) {
+            const ag = d.ctx.agents.get(p.id)
+            if (p.isPlayer || !p.alive || p.carriedBy || family.has(p.id) || !ag) continue
+            const seat = seatPos(d.ctx, ag)
+            const r = dist(seat, h)
+            let ang = Math.atan2(seat.x - h.x, seat.z - h.z)
+            let at = seat
+            // step round the ring past the family gathered behind Ama
+            for (let k = 0; k < 16 && taken.some((q) => dist(q, at) < 1.1); k++) {
+              ang += 0.3
+              at = around(d, h, r, ang)
+            }
+            place(d, p.id, at, face(at, h))
+            order(d, p.id, { kind: 'hold', pose: SIT, face: h })
+            taken.push(at)
+          }
+          const fire = d.ctx.state.fires.find((f) => f.id === 'hearth-main')
+          if (fire) {
+            fire.intensity = Math.max(fire.intensity, 0.85)
+            d.ctx.fuel[fire.id] = { fuel: 1, tender: null }
           }
         }),
         ...fadeIn(2.5),
@@ -231,9 +276,10 @@ const held: Chapter = {
     },
     {
       id: 'held.sea',
+      scale: 20,
       steps: [
         run((d) => {
-          for (const who of ['grandmother', 'father', 'sister', 'widow']) order(d, who, null)
+          releaseAll(d)
           order(d, 'mother', { kind: 'goto', dest: bedEdge(d, 'shore-limpets'), speed: 2, slot: 'back', near: 1.2, face: poi(d, 'shore-limpets') })
         }),
         wait(1.5),
@@ -246,6 +292,7 @@ const held: Chapter = {
     },
     {
       id: 'held.shell',
+      scale: 20,
       steps: [
         run((d) => order(d, 'mother', { kind: 'hold', slot: 'back', pose: OFFER_SHELL, face: poi(d, 'shore-limpets') })),
         obj('Reach for what she offers'),
@@ -278,7 +325,8 @@ const held: Chapter = {
         wait(6),
         ...fadeOut(2),
         run((d) => {
-          skipTo(d, sun(d).set + 0.5, 1)
+          // on into the dark, never round the clock if the shore ran late
+          skipTo(d, Math.max(sun(d).set + 0.5, d.ctx.state.clock.hour + 0.25))
           const s = hearthSeat(d, 0.9, 2.8)
           place(d, 'mother', s.at, s.heading)
           order(d, 'mother', { kind: 'hold', slot: 'arms', pose: SIT, face: hearth(d) })
@@ -326,12 +374,19 @@ const small: Chapter = {
           teleport(d, s.at, face(s.at, poi(d, 'cave-mouth')))
           const m = around(d, s.at, 1.6, 1.4)
           place(d, 'mother', m, face(m, poi(d, 'cave-mouth')))
-          order(d, 'mother', { kind: 'goto', dest: bedEdge(d, 'shore-mussels'), waitFor: pl.id, waitDist: 9, near: 1.5, speed: 1.25, face: poi(d, 'shore-mussels') })
+          order(d, 'mother', { kind: 'goto', dest: bedEdge(d, 'shore-mussels'), waitFor: pl.id, waitDist: 9, near: 1.5, speed: 1.55, face: poi(d, 'shore-mussels') })
         }),
         ...fadeIn(2),
         wait(0.8),
         say('Come. The moon was full. The sea is sleeping.', 'mother'),
         obj((d) => `Follow ${nameOf(d, 'mother', 'Ama')} to the rocks`),
+        // three things on the way down, each where it belongs: the sea from the top, feet on the path, the tide on the shelf
+        until((d) => walkedDown(d, 'shore-path-top', 4)),
+        say('There. All of it, as far as you can see. It goes out, and it comes back.', 'mother'),
+        until((d) => walkedDown(d, 'mid', 0)),
+        say('Feet on the dry stones. The green ones are slippery as fat.', 'mother'),
+        until((d) => walkedDown(d, 'shelf', 0)),
+        say('See the wet line on the rock? The sea comes back that far. We go before it does.', 'mother'),
         until((d) => {
           const bed = poi(d, 'shore-mussels')
           const m = person(d, 'mother')

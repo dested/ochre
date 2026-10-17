@@ -69,6 +69,8 @@ export function resetStage(ctx: SimCtx, stage: LifeStageId, people: SimPerson[])
   ctx.talk.recent = {}
   ctx.talk.talkedAt = {}
   ctx.talk.lastMeat = state.hearth.meat
+  // a new chapter opens on its own words, not on somebody's chatter
+  ctx.talk.quietUntil = ctx.talk.realT + 15
   ctx.moments.active = null
   ctx.moments.rain = null
   ctx.moments.fired = {}

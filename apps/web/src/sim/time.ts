@@ -12,7 +12,8 @@ import { STAGE_AGE } from './band'
  * Small and Coming of age in high summer, Elder in late summer. Provider is midwinter, for the storm on day 3.
  */
 export const STAGE_EPOCH: Record<LifeStageId, ClockEpoch> = {
-  held: { dayOfYear: 12, hour: 7, moonPhase: 0.5, year: STAGE_AGE.held },
+  // held opens on the evening fire, about forty minutes before the sun goes down
+  held: { dayOfYear: 12, hour: 18.33, moonPhase: 0.5, year: STAGE_AGE.held },
   small: { dayOfYear: 24, hour: 6.25, moonPhase: 0.5, year: STAGE_AGE.small },
   youth: { dayOfYear: 36, hour: 6.25, moonPhase: 0, year: STAGE_AGE.youth },
   provider: { dayOfYear: 196, hour: 6.5, moonPhase: 0.5, year: STAGE_AGE.provider },

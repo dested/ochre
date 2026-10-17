@@ -235,6 +235,8 @@ export function skipTo(d: D, hour: number, minAhead = 0): void {
   if (ahead <= 0) return
   const crossesNight = ahead > 6 || (now < 24 && now + ahead > 24) || (now < 5 && now + ahead > 5)
   d.host.advance(ahead * 3600)
+  // the scene after a skip opens on the director's words, not on chatter
+  quiet(d.ctx, 12)
   const pl = player(d)
   // the player lived through those hours with the band: they ate, and slept if it was night
   pl.needs.fed = Math.max(pl.needs.fed, 0.7)
@@ -284,7 +286,7 @@ export const say = (text: Text, who: Role | string | null = null, seconds?: numb
 export const song = (text: Text, seconds?: number): Step => run((d) => caption(d, textOf(d, text), null, 'song', seconds))
 export const note = (id: FieldNoteId): Step => run((d) => unlockNote(d, id))
 export const cam = (cue: CameraCue): Step => run((d) => emit(d, { type: 'camera', cue }))
-export const fadeOut = (s = 1.4): Step[] => [cam({ kind: 'fade', to: 'black', seconds: s }), wait(s + 0.15)]
+export const fadeOut = (s = 1.4): Step[] => [cam({ kind: 'fade', to: 'black', seconds: s }), run((d) => quiet(d.ctx, s + 2)), wait(s + 0.15)]
 export const fadeIn = (s = 1.6): Step[] => [cam({ kind: 'fade', to: 'clear', seconds: s })]
 export const minigame = (game: MinigameId, then: (d: D, quality: number) => void): Step => ({ k: 'minigame', game, then })
 export const choice = (make: (d: D) => Choice, then: (d: D, optionId: string) => void): Step => ({ k: 'choice', make, then })

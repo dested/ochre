@@ -20,7 +20,8 @@ function clamp01(x: number): number {
 // ─── fires ──────────────────────────────────────────────────────────────────────────────────────────────────
 
 export function updateFires(ctx: SimCtx, dt: number): void {
-  const night = ctx.state.clock.daylight < 0.5
+  // the fire is built up for the evening meal, before the light goes
+  const night = ctx.state.clock.daylight < 0.5 || ctx.state.clock.hour >= 17.5
   for (const f of ctx.state.fires) {
     const fu = ctx.fuel[f.id]
     if (!fu) continue
