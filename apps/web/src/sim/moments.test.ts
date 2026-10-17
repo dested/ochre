@@ -164,7 +164,7 @@ describe('days worth living', () => {
       // (an early finish first fades on to the afternoon)
       for (let i = 0; i < 30 * 10 && !sim.state.chapter.objective; i++) sim.step(1 / 30)
       expect(sim.state.clock.hour).toBeGreaterThanOrEqual(12)
-      expect(sim.state.chapter.objective?.text).toMatch(/^Spend the (afternoon|evening) with the band$/)
+      expect(sim.state.chapter.objective?.text).toMatch(/^Spend the (morning|afternoon|evening) with the band$/)
       const from = sim.state.clock.t
       for (let i = 0; i < 20_000 && sim.state.chapter.beatId === beat; i++) sim.step(10 / sim.state.timeScale)
       expect(sim.state.chapter.beatId).not.toBe(beat)
@@ -172,6 +172,20 @@ describe('days worth living', () => {
       expect(sim.state.clock.t - from).toBeGreaterThanOrEqual(2 * 3600 - 60)
     }, 60_000)
   }
+
+  test('a save inside the first-steps wait still brings the first steps after a load', () => {
+    const sim = createSim({ seed: 1, world, stage: 'provider', playerName: 'Teni' })
+    for (let i = 0; i < 30 * 120 && !ctxOf(sim).moments.window; i++) sim.step(1 / 30)
+    expect(ctxOf(sim).moments.window?.pick).toBe('first-steps')
+    expect(ctxOf(sim).moments.log.length).toBe(0)
+    expect(sim.state.chapter.objective?.text).toMatch(/^Spend the (morning|afternoon|evening) with the band$/)
+    const loaded = createSim({ seed: 1, world, stage: 'provider', playerName: 'Teni', save: sim.serialize() })
+    const ctx = ctxOf(loaded)
+    expect(ctx.moments.window?.pick).toBe('first-steps')
+    for (let i = 0; i < 30 * 300 && loaded.state.chapter.beatId !== 'provider.teach'; i++) loaded.step(1 / 30)
+    expect(loaded.state.chapter.beatId).toBe('provider.teach')
+    expect(ctx.moments.log.map((l) => l.replace(/^D\d+ \d\d:\d\d /, ''))).toEqual(["The child's first steps toward the player"])
+  }, 30_000)
 
   test('a save made mid-moment loads with no visitor and no half-played moment', () => {
     const sim = createSandboxSim({ seed: 1, world, stage: 'small', playerName: 'Teni' })

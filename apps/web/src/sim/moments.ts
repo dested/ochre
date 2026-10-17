@@ -15,8 +15,8 @@ import { makeName } from './names'
 import { fill, speak } from './talk'
 import { sunTimes } from './time'
 
-export type MomentId = 'honeyguide' | 'lion-eyes' | 'visitor' | 'seal-pup' | 'rain-dash' | 'moon-dance' | 'first-steps'
-export const MOMENT_IDS: readonly MomentId[] = ['honeyguide', 'lion-eyes', 'visitor', 'seal-pup', 'rain-dash', 'moon-dance', 'first-steps']
+export const MOMENT_IDS = ['honeyguide', 'lion-eyes', 'visitor', 'seal-pup', 'rain-dash', 'moon-dance', 'first-steps'] as const
+export type MomentId = (typeof MOMENT_IDS)[number]
 
 /** a running moment: who plays which part, where, and what it has put into the world */
 type Run = {
@@ -888,11 +888,13 @@ export function momentExtras(ctx: SimCtx): { people: ReadonlySet<string>; animal
   return { people: new Set(r?.people ?? []), animals: new Set(r?.animals ?? []) }
 }
 
-/** after a load: no visitor stays on from another band, and no moment is half played */
-export function afterLoad(ctx: SimCtx): void {
+/** after a load: no visitor stays on from another band, no moment is half played, a free wait goes on */
+export function afterLoad(ctx: SimCtx, window: FreeWindow | null): void {
   const visitors = ctx.state.people.filter((p) => p.familyId === 'lagoon-visit')
   for (const p of visitors) removePerson(ctx, p.id)
   ctx.moments = emptyMoments()
+  // a moment cut short by the save counts as had, so a wait that was waiting on it ends
+  ctx.moments.window = window ? { ...window, hurry: false } : null
   // a visit cut short by the save still counts as today's visit
   if (visitors.length > 0) ctx.moments.fired.visitor = dayKey(ctx)
 }

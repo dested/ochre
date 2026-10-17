@@ -102,7 +102,7 @@ export function createSimWith(opts: SimOptions, flags: { director: boolean }): S
   const saved = opts.save ? decodeSave(opts.save) : null
   if (saved) {
     restore(ctx, saved)
-    afterLoad(ctx)
+    afterLoad(ctx, saved.moments?.window ?? null)
   }
   for (const p of state.people) if (p.carriedBy) syncCarried(ctx, p)
 
@@ -258,6 +258,7 @@ export function createSimWith(opts: SimOptions, flags: { director: boolean }): S
       herds: ctx.herds,
       nextAnimalId: ctx.nextAnimalId,
       talk: { used: ctx.talk.used, recent: ctx.talk.recent, talkedAt: ctx.talk.talkedAt },
+      moments: { window: ctx.moments.window },
       ...(director ? { director: director.save() } : {}),
     }
     return encodeSave(payload)

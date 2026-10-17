@@ -36,6 +36,8 @@ export function placeBand(ctx: SimCtx): void {
     p.position = { x: spot.x + Math.sin(ang) * r, z: spot.z + Math.cos(ang) * r }
     p.heading = ctx.rng.range(0, Math.PI * 2)
     p.speed = 0
+    // awake and standing: an heir taking over must not start the chapter in last night's sleep pose
+    if (!p.carriedBy) p.anim = 'idle'
     p.task = { kind: 'idle', targetId: null, target: null, until: null, skill: null }
     p.speech = null
   }

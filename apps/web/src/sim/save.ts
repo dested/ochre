@@ -3,6 +3,7 @@
  * a clear error on any mismatch. Plans and paths are not saved: people re-decide on the first step after a load.
  */
 import { z } from 'zod'
+import { MOMENT_IDS } from './moments'
 import type {
   AnimalAnim,
   AnimalKind,
@@ -196,6 +197,14 @@ export const payloadSchema = z.object({
   nextAnimalId: z.number(),
   /** the director's place in the life; absent in a sandbox sim */
   director: directorSchema.optional(),
+  /** a director's free wait still open (S5c): its moment still comes after a load */
+  moments: z
+    .object({
+      window: z
+        .object({ from: z.number(), until: z.number(), pick: z.enum(MOMENT_IDS).nullable(), got: z.boolean(), short: z.boolean(), hurry: z.boolean() })
+        .nullable(),
+    })
+    .optional(),
   /** lines said today and what the band is talking about */
   talk: z
     .object({

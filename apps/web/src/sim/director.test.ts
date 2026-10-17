@@ -159,6 +159,8 @@ describe('director', () => {
     expect(Math.round(player(sim).look.ageYears)).toBe(6)
     expect(sim.state.people.find((p) => p.id === 'player')?.alive).toBe(false)
     expect(sim.state.chapter.objective?.text.startsWith('Follow ')).toBe(true)
+    // awake and standing, not in the sleep pose the grandchild had at the end of the last life
+    expect(player(sim).anim).toBe('idle')
     // the heir's life plays on
     for (let i = 0; i < 40 && sim.state.stage === 'small'; i++) {
       director(sim).completeBeat()
