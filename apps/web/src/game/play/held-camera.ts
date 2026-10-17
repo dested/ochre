@@ -86,14 +86,10 @@ export function createHeldCamera(): HeldCamera {
         // on the back: peek over the shoulder; in the arms: looking up into the carrier's face
         cam.yaw = slot === 'back' ? FORWARD_YAW : 0
         cam.pitch = 0.08
-        if (slot === 'arms' && face) {
-          const dx = face.x - eye.x
-          const dy = face.y - eye.y
-          const dz = face.z - eye.z
-          let yaw = Math.atan2(dx, dz) - facing
-          yaw = Math.atan2(Math.sin(yaw), Math.cos(yaw))
-          cam.yaw = MathUtils.clamp(yaw, -cam.cone, cam.cone)
-          cam.pitch = MathUtils.clamp(-Math.atan2(dy, Math.hypot(dx, dz)), pitchMin, pitchMax)
+        // cradled, the view sits out along her heading and faces back up at her face
+        if (slot === 'arms') {
+          cam.yaw = 0
+          cam.pitch = -Math.atan2(CRADLE_DROP, CRADLE_OUT)
         }
         lastSlot = slot
       }
