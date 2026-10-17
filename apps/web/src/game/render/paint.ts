@@ -62,6 +62,10 @@ varying vec3 vOcWorld;
 varying vec3 vOcNormalW;
 uniform vec4 uPaint;
 ${PAINT_UNIFORMS_GLSL}
+// set by a material's albedo GLSL: how much of the direct light gets past small relief the shadow map can't see
+// (a ledge's shadow on the bed below), and how wet and glossy the surface is (a tight glint of each light)
+float ocKeyOcc = 1.0;
+float ocSheen = 0.0;
 ${NOISE_GLSL}
 ${PAINT_GLSL}
 // the brush: a world-space variation of value and temperature, in strokes a hand might lay
@@ -97,12 +101,15 @@ void RE_Direct_Painted( const in IncidentLight directLight, const in vec3 geomet
 	} else {
 		r = ocRamp( ndl );
 	}
-	vec3 irradiance = directLight.color * r * tint;
+	vec3 irradiance = directLight.color * r * tint * ocKeyOcc;
 	reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseColor );
 	// a soft, broad sheen instead of a sharp highlight
 	vec3 h = normalize( directLight.direction + geometryViewDir );
-	float sh = pow( max( dot( geometryNormal, h ), 0.0 ), 24.0 ) * ( 1.0 - material.roughness ) * 0.6;
-	reflectedLight.directSpecular += directLight.color * sh * r * 0.25;
+	float nh = max( dot( geometryNormal, h ), 0.0 );
+	float sh = pow( nh, 24.0 ) * ( 1.0 - material.roughness ) * 0.6;
+	reflectedLight.directSpecular += directLight.color * sh * r * 0.25 * ocKeyOcc;
+	// wet rock: the light's own glint
+	reflectedLight.directSpecular += directLight.color * pow( nh, 90.0 ) * ocSheen * ocKeyOcc * step( 0.0, ndl );
 }
 #undef RE_Direct
 #define RE_Direct RE_Direct_Painted

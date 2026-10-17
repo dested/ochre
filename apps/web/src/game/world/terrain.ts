@@ -185,7 +185,13 @@ varying vec4 vSplatB;
 uniform vec3 uKeyDirT;
 uniform vec4 uOchre;
 uniform vec4 uHearths;
+uniform vec3 uZenith;
+uniform vec3 uHorizon;
+uniform vec3 uSunGlow;
+uniform vec3 uSunDir;
 vec4 ocFacetT = vec4( 0.0 );
+// small relief drawn rather than modelled (the shelf's ledges, mussels): the normal's lean, world space
+vec3 ocBumpT = vec3( 0.0 );
 vec3 ocLin( vec3 c ) { return pow( c, vec3( 2.2 ) ); }
 // a hard painted edge at threshold t of a field n, antialiased to a pixel however close the camera is
 float ocEdge( float t, float n ) {
@@ -220,21 +226,123 @@ vec4 ocBushLayer( vec2 p, float cs, float seed ) {
 	float side = clamp( dot( - rel / max( dist, 1e-3 ), sd ) * ( dist / size ), - 1.0, 1.0 );
 	return vec4( bush, side, ocHash( id + 3.7 + seed ), ocHash( id + 21.0 + seed ) );
 }
-// the shelf's bedding: rows across the strike, blocks along it (joints warped a little so they aren't ruled);
-// x = distance to the nearest joint in metres, yzw = the block's hashes
-vec4 ocBlocks( vec2 p ) {
-	vec2 q = vec2( dot( p, vec2( 0.91, 0.42 ) ), dot( p, vec2( - 0.42, 0.91 ) ) );
+// the shelf's bedding, in ledges. q is the strike frame (x along the beds, y across them, toward the sea), warped a
+// little so nothing is ruled. Rows of beds 1.7 m wide step up or down 10-40 cm from one to the next (most step down
+// toward the sea, a few are flush); along a row, joints cut it into blocks a few metres long, each a few cm proud
+// or sunk. The heightfield can't hold relief this small, so it is drawn: the slope of each ledge's face, the rounded
+// lip on top, the shadow the ledge throws over the bed below (from the key light's height), the damp at its foot
+struct OcBed {
+	vec2 tilt; // the surface normal's lean, world xz
+	float lit; // 1 in the light, 0 in a ledge's shadow
+	float foot; // near the foot of a ledge
+	float lip; // on a ledge's rounded top edge
+	float gapD; // metres to the nearest joint's crack
+	float dj; // metres to the block's nearest edge
+	float hollow; // 1 when the bed is lower than the rows either side
+	vec3 id; // the block's hashes
+};
+const float OC_ROW = 1.7;
+float ocRise( float r ) {
+	float s = ocHash( vec2( r, 1.9 ) ) < 0.7 ? - 1.0 : 1.0;
+	return s * ( 0.1 + 0.3 * ocHash( vec2( r, 2.7 ) ) ) * step( 0.15, ocHash( vec2( r, 5.5 ) ) );
+}
+float ocLift( float row, float qx ) {
+	float len = 1.8 + 3.4 * ocHash( vec2( row, 3.1 ) );
+	float col = floor( qx / len + ocHash( vec2( row, 7.7 ) ) );
+	return ( ocHash( vec2( col, row ) + 6.1 ) - 0.5 ) * 0.12;
+}
+// one edge of the block: d metres away, dh the neighbour's height over this block's, n the way out, s the key
+// light's way and v the way to the eye (strike frame, unit), cotE the light's elevation as a cotangent
+void ocLedge( inout OcBed b, inout vec2 g, float d, float dh, vec2 n, vec2 s, vec2 v, float cotE ) {
+	b.dj = min( b.dj, d );
+	if ( dh > 0.0 ) {
+		// under a ledge: its face is a steep band (only where it faces the eye: from above the ledge it is hidden
+		// behind the lip), then the bed in its shadow, damp at the foot
+		float w = dh * 0.5 * smoothstep( - 0.1, 0.25, dot( - n, v ) );
+		float face = 1.0 - ocEdge( w, d );
+		g += n * face * 1.9;
+		b.lit = min( b.lit, ocEdge( clamp( dh * cotE * dot( s, n ), 0.0, 2.5 ), d ) );
+		b.foot = max( b.foot, ( 1.0 - smoothstep( w, w + 0.5, d ) ) * smoothstep( 0.04, 0.2, dh ) );
+		b.gapD = min( b.gapD, abs( d - w ) );
+	} else {
+		// on top of a ledge: the rounded lip falls away to the edge
+		float lip = ( 1.0 - smoothstep( 0.0, 0.08, d ) ) * smoothstep( 0.03, 0.14, - dh );
+		g -= n * lip * 1.3;
+		b.lip = max( b.lip, lip );
+		b.gapD = min( b.gapD, d - dh * 0.5 );
+	}
+}
+OcBed ocBed( vec2 p, vec3 key, vec3 eye ) {
+	OcBed b;
+	b.lit = 1.0;
+	b.foot = 0.0;
+	b.lip = 0.0;
+	b.gapD = 9.0;
+	b.dj = 9.0;
+	vec2 g = vec2( 0.0 );
+	const vec2 AX = vec2( 0.91, 0.42 );
+	const vec2 AY = vec2( - 0.42, 0.91 );
+	vec2 q = vec2( dot( p, AX ), dot( p, AY ) );
 	q += vec2( ocNoise( p * 0.11 ), ocNoise( p * 0.11 + 5.0 ) ) * 2.2 + vec2( ocNoise( p * 0.5 + 2.0 ), ocNoise( p * 0.5 + 9.0 ) ) * 0.35;
-	float rowW = 1.7;
-	float row = floor( q.y / rowW );
-	float fy = fract( q.y / rowW );
+	float row = floor( q.y / OC_ROW );
+	float fy = fract( q.y / OC_ROW );
 	float len = 1.8 + 3.4 * ocHash( vec2( row, 3.1 ) );
 	float qx = q.x / len + ocHash( vec2( row, 7.7 ) );
-	float col = floor( qx );
+	vec2 id = vec2( floor( qx ), row );
 	float fx = fract( qx );
-	float dj = min( min( fy, 1.0 - fy ) * rowW, min( fx, 1.0 - fx ) * len );
-	vec2 id = vec2( col, row );
-	return vec4( dj, ocHash( id + 1.3 ), ocHash( id + 8.9 ), ocHash( id + 4.2 ) );
+	float me = ( ocHash( id + 6.1 ) - 0.5 ) * 0.12;
+	vec2 kq = vec2( dot( key.xz, AX ), dot( key.xz, AY ) );
+	float kl = length( kq );
+	vec2 s = kq / max( kl, 1e-4 );
+	float cotE = kl / max( key.y, 0.06 );
+	vec2 v = vec2( dot( eye.xz, AX ), dot( eye.xz, AY ) );
+	v /= max( length( v ), 1e-4 );
+	float up = ocRise( row ) + ocLift( row + 1.0, q.x ) - me;
+	float dn = - ocRise( row - 1.0 ) + ocLift( row - 1.0, q.x ) - me;
+	ocLedge( b, g, ( 1.0 - fy ) * OC_ROW, up, vec2( 0.0, 1.0 ), s, v, cotE );
+	ocLedge( b, g, fy * OC_ROW, dn, vec2( 0.0, - 1.0 ), s, v, cotE );
+	ocLedge( b, g, fx * len, ( ocHash( id + vec2( - 1.0, 0.0 ) + 6.1 ) - 0.5 ) * 0.12 - me, vec2( - 1.0, 0.0 ), s, v, cotE );
+	ocLedge( b, g, ( 1.0 - fx ) * len, ( ocHash( id + vec2( 1.0, 0.0 ) + 6.1 ) - 0.5 ) * 0.12 - me, vec2( 1.0, 0.0 ), s, v, cotE );
+	b.hollow = step( 0.06, up ) * step( 0.06, dn );
+	b.id = vec3( ocHash( id + 1.3 ), ocHash( id + 8.9 ), ocHash( id + 4.2 ) );
+	// each block lies a little off level
+	g += ( b.id.zy - 0.5 ) * 0.14;
+	// the normal leans away from the uphill way
+	b.tilt = - ( g.x * AX + g.y * AY );
+	return b;
+}
+// a mussel bed: shells crowded every which way, each a small dome. xy the normal's lean (world xz), z cover
+// (0 in the black gaps between shells), w the shell's tone
+vec4 ocMussels( vec2 p ) {
+	vec2 gp = p / 0.07;
+	vec2 i = floor( gp );
+	vec2 f = fract( gp );
+	float best = 1.0;
+	vec4 o = vec4( 0.0 );
+	for ( int y = - 1; y <= 1; y ++ ) {
+		for ( int x = - 1; x <= 1; x ++ ) {
+			vec2 c = vec2( float( x ), float( y ) );
+			vec2 r = f - ( c + 0.15 + 0.7 * ocHash2( i + c ) );
+			float a = ocHash( i + c + 3.3 ) * 6.2832;
+			vec2 ax = vec2( cos( a ), sin( a ) );
+			vec2 l = vec2( dot( r, ax ), dot( r, vec2( - ax.y, ax.x ) ) ) / vec2( 0.66, 0.38 );
+			float rr = dot( l, l );
+			if ( rr < best ) {
+				best = rr;
+				vec2 lean = ( l.x / 0.66 ) * ax + ( l.y / 0.38 ) * vec2( - ax.y, ax.x );
+				o = vec4( lean * 0.55, 1.0, ocHash( i + c + 9.7 ) );
+			}
+		}
+	}
+	o.z = 1.0 - smoothstep( 0.72, 1.0, best );
+	return o;
+}
+// the sky as still water mirrors it: the dome's gradient and the glow round the sun
+vec3 ocSkyMirror( vec3 d ) {
+	float up = clamp( d.y, 0.0, 1.0 );
+	vec3 c = mix( uHorizon, uZenith, pow( up, 0.5 ) );
+	float m = max( dot( d, uSunDir ), 0.0 );
+	return c + uSunGlow * ( pow( m, 6.0 ) * 0.3 + pow( m, 40.0 ) * 0.8 ) * smoothstep( - 0.2, 0.05, uSunDir.y );
 }
 vec3 ocBushTone( float h ) {
 	if ( h < 0.3 ) return ocLin( vec3( 0.44, 0.5, 0.31 ) );
@@ -316,29 +424,66 @@ const TERRAIN_ALBEDO = /* glsl */ `
 		float seaRock = smoothstep( 14.0, 1.5, y ) * 0.8 + smoothstep( 4.0, 1.2, y ) * 0.2;
 		rock = mix( rock, rock * vec3( 0.55, 0.52, 0.5 ), seaRock );
 		cliff = mix( cliff, cliff * vec3( 0.55, 0.52, 0.5 ), seaRock );
-		// the intertidal shelf: bedded blocks split by joints, each block its own tone and tilt; mussels crowd the
-		// joints low down, olive weed and pink coralline cover the lower blocks, and some blocks hold pools
-		vec4 bk = ocBlocks( p );
-		vec4 sf = ocFacet( vOcWorld + 13.0, nW, 0.7 );
+		// the intertidal shelf: pale, dry calcarenite on the high beds, damp and darker low down, stepping to the sea in
+		// ledges; weed and sea lettuce at the ledges' feet and on the low beds, mussels crowded in blue-black beds
+		// lowest, pink coralline at the bottom, pools in the hollow beds holding the sky
+		vec3 shelf = vec3( 0.0 );
+		float weed = 0.0;
+		float mus = 0.0;
+		float pool = 0.0;
 		float near = smoothstep( 0.2, 0.05, px );
-		vec3 shelf = mix( ocLin( vec3( 0.26, 0.23, 0.2 ) ), ocLin( vec3( 0.46, 0.41, 0.34 ) ), bk.y * 0.7 + sf.w * 0.3 );
-		shelf = mix( shelf, ocLin( vec3( 0.42, 0.42, 0.4 ) ), step( 0.86, bk.y ) * 0.25 );
-		float joint = 1.0 - ocEdge( 0.07 + 0.05 * bk.z, bk.x + ( ocNoise( p * 3.0 ) - 0.5 ) * 0.05 );
-		float lowY = smoothstep( 1.0, -0.6, y );
-		// mussels along the joints and on the seaward blocks
-		float mus = ocEdge( 0.66, ocNoise( p * 2.6 + 1.0 ) * 0.75 + ( 1.0 - smoothstep( 0.0, 0.1, bk.x ) ) * 0.3 ) * lowY;
-		shelf = mix( shelf, ocLin( vec3( 0.1, 0.11, 0.13 ) ), mus * 0.75 );
-		// weed and coralline on whole blocks, ragged inside
-		float wcov = smoothstep( 1.0, -0.8, y ) * 0.6;
-		float weed = step( bk.w, wcov ) * ocEdge( 0.5, ocNoise( p * 1.9 + bk.zw * 9.0 ) * 0.7 + smoothstep( 0.0, 0.6, bk.x ) * 0.3 );
-		shelf = mix( shelf, mix( ocLin( vec3( 0.27, 0.27, 0.15 ) ), ocLin( vec3( 0.36, 0.3, 0.17 ) ), bk.z ), weed * 0.8 );
-		shelf = mix( shelf, ocLin( vec3( 0.66, 0.46, 0.48 ) ), smoothstep( -0.7, -1.4, y ) * step( 0.5, bk.z ) * 0.55 );
-		shelf *= 1.0 - 0.3 * joint * near;
-		// pools: whole blocks of water (only out of the sea), with ragged rims
-		float poolEdge = bk.x + ( ocNoise( p * 2.2 ) - 0.5 ) * 0.35;
-		float pool = ocEdge( 0.28, poolEdge ) * step( bk.z, 0.13 ) * step( uSeaLevel + 0.12, y ) * smoothstep( 1.9, 1.0, y ) * wb.z;
-		// each block tilts a little, for the knife
-		ocFacetT.xz += ( vec2( bk.w, bk.z ) - 0.5 ) * 0.7 * wb.z * ( 1.0 - pool );
+		if ( wb.z > 0.01 ) {
+			OcBed bd = ocBed( p, uKeyDirT, uCamPos - vOcWorld );
+			float hi = smoothstep( - 0.3, 1.8, y );
+			vec3 dry = mix( ocLin( vec3( 0.6, 0.55, 0.46 ) ), ocLin( vec3( 0.69, 0.63, 0.52 ) ), bd.id.x );
+			vec3 damp = mix( ocLin( vec3( 0.35, 0.33, 0.29 ) ), ocLin( vec3( 0.43, 0.4, 0.34 ) ), bd.id.x );
+			shelf = mix( damp, dry, hi );
+			// broken colour within each bed, and the grain of the bedding along it
+			shelf *= 0.88 + 0.2 * ocNoise( p * 1.4 + bd.id.yz * 7.0 ) + 0.06 * ocNoise( vec2( dot( p, vec2( 0.91, 0.42 ) ) * 0.6, dot( p, vec2( - 0.42, 0.91 ) ) * 6.0 ) );
+			// the lips dry and pale, the feet damp and dark
+			shelf = mix( shelf, shelf * 1.2 + ocLin( vec3( 0.05, 0.045, 0.04 ) ), bd.lip * 0.8 );
+			shelf *= 1.0 - 0.22 * bd.foot;
+			// pits weathered into the high beds, a grey crust of barnacles in the middle zone
+			float pit = ocEdge( 0.78, ocNoise( p * 15.0 + 3.0 ) * 0.7 + ocNoise( p * 37.0 ) * 0.3 ) * hi * near;
+			shelf *= 1.0 - 0.22 * pit;
+			float barn = ocEdge( 0.62, ocNoise( p * 17.0 + 1.0 ) * 0.6 + ocNoise( p * 0.8 + 4.0 ) * 0.4 ) * smoothstep( - 0.4, 0.4, y ) * smoothstep( 1.6, 0.8, y );
+			shelf = mix( shelf, ocLin( vec3( 0.62, 0.61, 0.57 ) ), barn * 0.45 );
+			// weed: brown and olive wrack in a broken fringe along each ledge's foot, spreading over the beds lowest down;
+			// a little sea lettuce at the water
+			float low = smoothstep( 0.4, - 1.0, y );
+			weed = ocEdge( 0.66, ocNoise( p * 3.0 + bd.id.yz * 5.0 ) * 0.4 + ocNoise( p * 9.0 ) * 0.15 + bd.foot * 0.55 * smoothstep( 1.6, 0.2, y ) + low * 0.4 );
+			vec3 wrack = mix( ocLin( vec3( 0.29, 0.26, 0.14 ) ), ocLin( vec3( 0.36, 0.28, 0.16 ) ), bd.id.y );
+			shelf = mix( shelf, wrack * ( 0.85 + 0.3 * ocNoise( p * 13.0 ) ), weed * 0.85 );
+			float ulva = ocEdge( 0.8, ocNoise( p * 3.1 + 7.0 ) * 0.7 + ocNoise( p * 11.0 ) * 0.3 ) * smoothstep( - 0.4, - 1.2, y );
+			shelf = mix( shelf, ocLin( vec3( 0.27, 0.37, 0.15 ) ), ulva * 0.6 );
+			shelf = mix( shelf, ocLin( vec3( 0.66, 0.46, 0.48 ) ), smoothstep( - 0.7, - 1.4, y ) * step( 0.5, bd.id.y ) * 0.5 * ( 1.0 - weed ) );
+			// the joints: thin cracks in shadow
+			float gapW = 0.011 + 0.012 * bd.id.z;
+			float gap = 1.0 - ocEdge( gapW, bd.gapD + ( ocNoise( p * 3.0 ) - 0.5 ) * 0.03 );
+			vec2 lean = bd.tilt;
+			// mussels in clustered beds, low down, thickest along the joints and at the ledges' feet
+			float mz = smoothstep( 0.55, - 0.25, y );
+			if ( mz > 0.01 ) {
+				mus = ocEdge( 0.62, ocNoise( p * 1.2 + 5.0 ) * 0.55 + ocNoise( p * 4.1 ) * 0.2 + bd.foot * 0.3 + ( 1.0 - smoothstep( 0.0, 0.35, bd.gapD ) ) * 0.25 ) * mz;
+				if ( mus > 0.01 ) {
+					float crisp = smoothstep( 0.035, 0.012, px );
+					vec4 ms = ocMussels( p );
+					vec3 shell = mix( ocLin( vec3( 0.07, 0.08, 0.11 ) ), ocLin( vec3( 0.15, 0.17, 0.22 ) ), ms.w );
+					vec3 bed = mix( ocLin( vec3( 0.03, 0.03, 0.035 ) ), shell, mix( 0.8, ms.z, crisp ) );
+					shelf = mix( shelf, bed, mus );
+					lean = mix( lean, ms.xy * ms.z, mus * crisp );
+				}
+			}
+			shelf *= 1.0 - 0.6 * gap * ( 1.0 - mus );
+			// pools: the hollow beds and a few others hold water, out of the sea, with ragged rims
+			float poolEdge = bd.dj + ( ocNoise( p * 2.2 ) - 0.5 ) * 0.35;
+			pool = ocEdge( 0.3, poolEdge ) * max( bd.hollow * step( bd.id.z, 0.55 ), step( bd.id.z, 0.08 ) ) * step( uSeaLevel + 0.12, y ) * smoothstep( 1.9, 1.0, y );
+			lean *= 1.0 - pool;
+			ocBumpT = vec3( lean.x, 0.0, lean.y ) * wb.z;
+			// light bounced off the sunlit rock round it keeps a ledge's shadow from going black
+			ocKeyOcc = mix( 1.0, 0.35 + 0.65 * bd.lit, wb.z * ( 1.0 - pool ) );
+			pool *= wb.z;
+		}
 		// earth, trodden floors and the cave: dust over rubble, each stone its own tone, darker in the cracks
 		vec3 earth = mix( ocLin( vec3( 0.54, 0.43, 0.31 ) ), ocLin( vec3( 0.44, 0.34, 0.25 ) ), drift );
 		if ( wb.w > 0.02 ) {
@@ -383,23 +528,33 @@ const TERRAIN_ALBEDO = /* glsl */ `
 			float seam = smoothstep( 0.55, 0.85, sin( y * 2.4 + ocNoise( p * 0.5 ) * 2.0 ) * 0.5 + 0.5 ) * ( 1.0 - smoothstep( uOchre.z * 0.5, uOchre.z, od ) );
 			col = mix( col, ocLin( vec3( 0.61, 0.24, 0.13 ) ), seam * smoothstep( 0.2, 0.5, 1.0 - nW.y ) );
 		}
-		// wet: the swash zone and everything the sea covers, with a sheen of sky; the shelf below the high-water
-		// line never dries between tides, and its weed and mussels glisten
+		// wet: the swash zone and everything the sea covers; the shelf dark and glossy for 2 m above the water, and
+		// below the high-water line it never quite dries, its weed and mussels glistening
 		float wet = smoothstep( uSeaLevel + 1.1, uSeaLevel + 0.15, y );
-		wet = max( wet, wb.z * smoothstep( 1.4, -0.6, y ) * ( 0.45 + 0.35 * weed + 0.2 * mus ) );
-		col = mix( col, col * vec3( 0.58, 0.6, 0.62 ), wet * ( 0.85 - 0.3 * wb.z ) );
+		wet = max( wet, wb.z * smoothstep( uSeaLevel + 2.0, uSeaLevel + 1.0, y ) );
+		wet = max( wet, wb.z * smoothstep( 1.4, - 0.6, y ) * ( 0.4 + 0.35 * weed + 0.25 * mus ) );
+		col = mix( col, col * vec3( 0.5, 0.52, 0.55 ), wet * 0.85 );
 		vec3 vv = normalize( uCamPos - vOcWorld );
-		float grazing = pow( 1.0 - clamp( vv.y, 0.0, 1.0 ), 4.0 );
-		totalEmissiveRadiance += uSkyAmb * grazing * wet * 0.35;
+		// wet ground mirrors the sky, blurred, most at a grazing look; wet rock glints in each light
+		vec3 nB = normalize( nW + ocBumpT );
+		float fr = pow( 1.0 - clamp( dot( vv, nB ), 0.0, 1.0 ), 5.0 );
+		totalEmissiveRadiance += mix( uSkyAmb, ocSkyMirror( reflect( - vv, nB ) ), 0.6 ) * wet * ( 0.03 + 0.28 * fr ) * ocCaveSky( vOcWorld );
+		ocSheen = wet * wb.z * ( 0.5 + 0.5 * mus ) * 0.6;
 		// rain: puddles in the flat, trodden places, holding the sky
 		if ( uWeather.y > 0.01 ) {
 			float flatK = smoothstep( 0.94, 0.99, nW.y ) * ( wb.w + wa.x * 0.4 + wa.w * 0.3 ) * smoothstep( 0.6, 0.95, ocCaveSky( vOcWorld ) );
 			float pud = smoothstep( 0.6, 0.7, ocNoise( p * 0.28 ) * 0.75 + ocNoise( p * 1.3 ) * 0.25 ) * flatK * smoothstep( 0.15, 0.6, uWeather.y );
 			pool = max( pool, pud * 0.85 );
 		}
-		// the pools: clear water over the dark, weedy floor of the block, holding the sky only at a grazing look
-		col = mix( col, col * vec3( 0.42, 0.52, 0.55 ) + ocLin( vec3( 0.03, 0.07, 0.08 ) ), pool );
-		totalEmissiveRadiance += ( uSkyAmb * 0.75 + uKeyColor * 0.04 ) * pool * ( 0.05 + 0.3 * grazing * grazing );
+		// pools: clear water over the dark floor of the bed, mirroring the sky, more of it the flatter the look
+		if ( pool > 0.001 ) {
+			vec2 rip = ( vec2( ocNoise( p * 3.0 + uTime * 0.35 ), ocNoise( p * 3.0 - uTime * 0.3 + 3.0 ) ) - 0.5 ) * 0.05;
+			vec3 pn = normalize( vec3( rip.x, 1.0, rip.y ) );
+			float pf = 0.02 + 0.98 * pow( 1.0 - clamp( dot( vv, pn ), 0.0, 1.0 ), 5.0 );
+			col = mix( col, ( col * vec3( 0.42, 0.52, 0.55 ) + ocLin( vec3( 0.03, 0.07, 0.08 ) ) ) * ( 1.0 - pf ), pool );
+			totalEmissiveRadiance += ocSkyMirror( reflect( - vv, pn ) ) * pf * pool * ocCaveSky( vOcWorld );
+			ocSheen = max( ocSheen, pool );
+		}
 		diffuseColor.rgb = col;
 	}
 `
@@ -408,11 +563,13 @@ const TERRAIN_NORMAL = /* glsl */ `
 	{
 		// bend the normal on rock so cliffs read as faceted stone
 		vec4 wbn = vSplatB;
-		float rk = clamp( wbn.x + wbn.y + wbn.z * 0.6, 0.0, 1.0 );
+		float rk = clamp( wbn.x + wbn.y + wbn.z * 0.15, 0.0, 1.0 );
 		if ( rk > 0.05 ) {
 			vec3 gv = ( viewMatrix * vec4( ocFacetT.xyz, 0.0 ) ).xyz;
 			normal = normalize( normal + gv * 0.5 * rk );
 		}
+		// the drawn relief
+		normal = normalize( normal + ( viewMatrix * vec4( ocBumpT, 0.0 ) ).xyz );
 	}
 `
 
@@ -467,7 +624,15 @@ export function createTerrainView(world: WorldData, grid: TerrainGrid | null): T
     fragmentHead: TERRAIN_FRAG_HEAD,
     albedo: TERRAIN_ALBEDO,
     normal: TERRAIN_NORMAL,
-    uniforms: { uKeyDirT: LIGHT.uKeyDir, uOchre: ochreU, uHearths: hearthU },
+    uniforms: {
+      uKeyDirT: LIGHT.uKeyDir,
+      uOchre: ochreU,
+      uHearths: hearthU,
+      uZenith: LIGHT.uZenith,
+      uHorizon: LIGHT.uHorizon,
+      uSunGlow: LIGHT.uSunGlow,
+      uSunDir: LIGHT.uSunDir,
+    },
   })
 
   // detail tiles
