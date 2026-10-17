@@ -446,6 +446,31 @@ function poseHeld(c: AnimCtx, s: PoseSpec): void {
 
 /* ─── held items ───────────────────────────────────────────────────────────────────────────────────────── */
 
+const SMALL = new Set<HeldItem>(['shell', 'corm', 'stone', 'ochre', 'beads'])
+
+/**
+ * crouched with a small thing in the hand: held out on the open palm, up in front of her chest about a quarter metre,
+ * where a child at her shoulder or before her can see it. The target rides the chest, turned back by how far the
+ * crouch tips it, so the hand stays up at chest height however deep she bends.
+ */
+function offerHand(c: AnimCtx, s: PoseSpec, a: ArmSpec, side: number): void {
+  const { d, rig } = c
+  const k = rig.stature / 1.55
+  const th = s.hipRot.x + s.spine.x + s.chest.x
+  // from the shoulder joint: down 0.16 m and forward 0.38 m (the hand 0.25 m clear of the breast), a little inward
+  const oy = -0.16 * k
+  const oz = 0.38 * k
+  a.ik = true
+  a.space = B.chest
+  a.wrist.set(side * d.shoulderX * 0.6, d.shoulderJointY + oy * Math.cos(th) + oz * Math.sin(th), oz * Math.cos(th) - oy * Math.sin(th))
+  a.pole.set(side * 0.7, -0.6, -0.3)
+  a.aim = true
+  a.aimAxis.set(-side * 0.25, 0.15, 1)
+  a.aimPalm.set(-side * 0.15, 1, 0)
+  a.curl = 0.3
+  a.thumb = 0.3
+}
+
 function holdItems(c: AnimCtx, s: PoseSpec, anim: PersonAnim, moving: boolean): void {
   const { d, rig } = c
   const H = rig.stature
@@ -454,6 +479,11 @@ function holdItems(c: AnimCtx, s: PoseSpec, anim: PersonAnim, moving: boolean): 
     const a: ArmSpec | undefined = s.arms[i]
     if (!item || item === 'none' || !a) continue
     const side = i === 0 ? 1 : -1
+    // the offering hand is the right one, or the left when only it holds something (play reads it the same way)
+    if (anim === 'crouch' && !moving && SMALL.has(item) && (i === 1 || c.held[1] === 'none')) {
+      offerHand(c, s, a, side)
+      continue
+    }
     a.curl = 0.88
     a.thumb = 0.7
     const standing = anim === 'idle' || anim === 'talk' || anim === 'walk' || anim === 'run' || anim === 'carry' || anim === 'point' || anim === 'wave'
@@ -619,5 +649,14 @@ export function poseAnim(anim: PersonAnim, c: AnimCtx, s: PoseSpec): void {
     s.neck.x += 0.12 * e
     s.head.x -= 0.22 * e
     s.hip.y -= 0.012 * c.rig.stature * e
+  }
+  // a child on the back rides the chest with its head by hers: however she bends, her head doesn't tip back into its
+  // face (crouched, at the fire, dancing she looks down instead of ahead)
+  if (c.carrying === 'back' && !lying) {
+    const ext = -0.05 - (s.neck.x + s.head.x)
+    if (ext > 0) {
+      s.neck.x += ext * 0.6
+      s.head.x += ext * 0.4
+    }
   }
 }

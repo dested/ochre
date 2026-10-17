@@ -450,6 +450,53 @@ export function mount(el: HTMLElement): () => void {
       const a = ama.headPosition(new Vector3())
       return a.distanceTo(infant.headPosition(new Vector3()))
     },
+    /**
+     * the carried child's head against the carrier's: the gap between the eye points, and the clearance between the
+     * two skulls taken as spheres (centre distance less both radii), in metres
+     */
+    carryHeads: () => {
+      if (!ama) return null
+      // the carrier's own body mesh and the child's (which rides under the carrier's carry-attach), at full detail
+      ama.object.updateMatrixWorld(true)
+      const bodies: { mesh: SkinnedMesh; child: boolean }[] = []
+      ama.object.traverse((o) => {
+        if (!(o instanceof LOD)) return
+        let child = false
+        for (let q = o.parent; q; q = q.parent) if (q.name === 'carry-attach') child = true
+        const first = o.levels[0]?.object.getObjectsByProperty('isSkinnedMesh', true)[0]
+        if (first instanceof SkinnedMesh) bodies.push({ mesh: first, child })
+      })
+      const skull = (child: boolean): Vector3[] => {
+        const out: Vector3[] = []
+        for (const { mesh: m } of bodies.filter((x) => x.child === child)) {
+          const si = m.geometry.getAttribute('skinIndex')
+          const sw = m.geometry.getAttribute('skinWeight')
+          const n = m.geometry.getAttribute('position').count
+          for (let k = 0; k < n; k++) {
+            let best = -1
+            let bw = 0
+            for (let j = 0; j < 4; j++) {
+              const w = sw.getComponent(k, j)
+              if (w > bw) {
+                bw = w
+                best = si.getComponent(k, j)
+              }
+            }
+            if (best === B.head || best === B.jaw) out.push(m.getVertexPosition(k, new Vector3()).applyMatrix4(m.matrixWorld))
+          }
+        }
+        return out
+      }
+      const a = skull(false)
+      const b = skull(true)
+      let gap = Infinity
+      for (const u of a) for (const w of b) gap = Math.min(gap, u.distanceToSquared(w))
+      return {
+        eyes: Number(ama.headPosition(new Vector3()).distanceTo(infant.headPosition(new Vector3())).toFixed(3)),
+        skull: Number(Math.sqrt(gap).toFixed(3)),
+        n: [a.length, b.length],
+      }
+    },
     /** both eye midpoints in the carrier's body frame (+X its left, +Z forward), in cm */
     carryEyes: () => {
       if (!ama) return null

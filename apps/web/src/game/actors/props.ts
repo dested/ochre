@@ -237,7 +237,7 @@ export function buildSling(mb: MeshBuilder, d: BodyDims, child: BodyDims, seed: 
 
 /** where the child's root (feet) sits for a back carry, in the carrier's bind space */
 export function backSeat(d: BodyDims, child: BodyDims): Vector3 {
-  const hips = new Vector3(d.shoulderW * 0.1, d.chestY - (d.chestY - d.waistY) * 0.35, -(d.chestDepth + child.hipDepth * 1.05 + 0.02))
+  const hips = new Vector3(d.shoulderW * 0.22, d.chestY - (d.chestY - d.waistY) * 0.85, -(d.chestDepth + child.hipDepth * 1.05 + 0.02))
   return hips.sub(new Vector3(0, child.hipY, 0))
 }
 
