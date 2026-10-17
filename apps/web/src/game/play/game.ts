@@ -125,6 +125,8 @@ const OCC_HIDE = 0.2
 const HEAD_HIDE = 0.3
 /** fade level past which tags and the prompt hide, and how far a face is made out at night */
 const FADE_HIDE = 0.3
+/** an interaction this close to the objective's point is the beat's work, metres */
+const GOAL_NEAR = 6
 const DARK_RANGE = 10
 /** held.faces opens the look cone this far past the farthest face */
 const FACES_MARGIN = (15 * Math.PI) / 180
@@ -482,9 +484,23 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
 
   const updateInteract = (dt: number, player: SimPerson) => {
     const list = sim.interactionsNear(player.position, INTERACT_RADIUS)
-    // the beat's own verb (dir:*) wins over eating or talking beside it; then the nearest that works
+    // the beat wins: its own verb (dir:*), its objective's person, the work at its objective's place.
+    // Talking to whoever walks beside you comes after work; Eat only when hungry or nothing else works
+    const target = sim.state.chapter.objective?.target
+    const goal = target?.kind === 'person' ? target.id : null
+    const place = target?.kind === 'point' ? target.at : null
+    const atPlace = (i: Interaction) =>
+      place !== null &&
+      i.verb !== 'talk' &&
+      Math.hypot(i.position.x - place.x, i.position.z - place.z) < GOAL_NEAR
+    const hungry = player.needs.fed < 0.5
     const it =
       list.find((i) => i.enabled && i.id.startsWith('dir:')) ??
+      list.find((i) => i.enabled && i.targetKind === 'person' && i.targetId === goal) ??
+      list.find((i) => i.enabled && atPlace(i)) ??
+      (hungry ? list.find((i) => i.enabled && i.verb === 'eat') : undefined) ??
+      list.find((i) => i.enabled && i.verb !== 'eat' && i.verb !== 'talk') ??
+      list.find((i) => i.enabled && i.verb !== 'eat') ??
       list.find((i) => i.enabled) ??
       list[0] ??
       null
