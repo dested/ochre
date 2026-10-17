@@ -406,7 +406,7 @@ controller, cameras and verbs that make each stage of life feel different; and t
 
 ## Ledger (lead, updated 2026-10-17 01:05)
 
-Board: down · Last pushed: 60add27 (main) · Gate: typecheck green at 60add27 · Deploy: c61a551 live at https://ochre.dested.com (CI green)
+Board: down · Last pushed: 2078087 (main, 01:15) · Gate: install 0, typecheck 0, test 0 at 2078087 · Deploy: CI run pending
 
 | Agent | Model | Owns | Item now | Last sha / artifact | Status |
 | --- | --- | --- | --- | --- | --- |
