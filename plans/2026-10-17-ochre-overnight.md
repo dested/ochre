@@ -615,6 +615,15 @@ controller, cameras and verbs that make each stage of life feel different; and t
   **sim:** the whale was still at night in ui's run at 478ad65 (`06-whale-a.png`). Check daylight holds on every path
   into provider.whale (normal flow, the Chapters menu, the QA jump).
 
+- (2026-10-17 04:30, lead) **People P4** (after necklace 126c800 and wrinkles cca08b3 passed). The sky spike is
+  world's now; drop it. In order: (1) grazing eland tuck the head down between the forelegs (the P3 note), and the
+  thumb note if still open. (2) An animation pass on the beats Sal sees in the demo: `dance` (moon-dance), `mourn` and
+  `lie-dead` (the death), `crawl` (small), `tend-fire`, `engrave`, `sing`. Per anim, a 4-frame contact sheet from the
+  people lab, side and front. Done when: feet stay planted (no slide, no float above the ground plane, no sink), hands
+  reach their props (fire stick to the hearth, engraving stone in the off hand and point on the stone), no limb passes
+  through the body or the hides, and `lie-dead` lies flat on the ground with no limb clipping into it. Fix what fails;
+  list what you changed per anim in the ready line, with the sheet paths.
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: cca08b3 (main, 04:24) · Gate: install 0, typecheck 0, test 0 (68), build 0 at cca08b3 · Deploy: CI pending (previous 272d4c7 live)
@@ -622,7 +631,7 @@ Board: down · Last pushed: cca08b3 (main, 04:24) · Gate: install 0, typecheck 
 | Agent | Model | Owns | Item now | Last sha / artifact | Status |
 | --- | --- | --- | --- | --- | --- |
 | world | opus-xhigh | world-gen, game/world, game/render | sky spike (f1-walk) first, then F1 b, a, c–e; notes: softer ledges, flame cards, cave dressing visibility | W3 4–5 passed 04:20 (421b1a6 tris: cave 126/805k high, 97/484k medium; e988dd0 gold); W3 1–3 passed 04:10 (aeb266c, 500a203, 25aa317); tris 12f7386/3812240; W2 86a96f0 passed 03:20; W1 82b261e passed | working |
-| people | opus-xhigh | game/actors | eland graze head, cradle necklace, wrinkles/thumb | P3 6798b36 passed 04:40; P1b 3f8b1a9 passed 04:35 (L0 ≤70k); P2 afe56e2 passed | working |
+| people | opus-xhigh | game/actors | P4: eland graze, then anim pass (dance, mourn, lie-dead, crawl, tend-fire, engrave, sing) | wrinkles cca08b3 + necklace 126c800 passed 04:30; P3 6798b36 passed 04:40; P1b 3f8b1a9 passed 04:35 (L0 ≤70k); P2 afe56e2 passed | working |
 | sim | opus-high | sim | F2 whale daylight on every path | F1 adc88d1 passed (50 tests); pacing 972f17c passed (47 tests, waits 29–91 s real); aside 74bce0a passed; S5c 95e8327 passed; S5b rest 69428c6 passed (41 tests; covers S5c 1–2); f683e42 superseded; S5b part 6aa3225 passed (held 18:20, follow walk); S5 209a09c passed (7 moments); S4 d0549fd passed; S2 071949a passed | working |
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | recheck #9, #11 on 421b1a6; then held.* after F2 | F1 mark 23acc39 passed; U7 passed (bdc3b86); chatter 830a7ab; U6 ce615bc passed; U5, U3 passed | working |
 | play | opus-high | game/play, game/audio, app/play.tsx | F2 held opening (acked 04:21) | F1 play 7e42a4a passed (all 9; dd47469 summary hang fixed); PL3 runs 1–2 reached the summary, no errors; 8c75080 aim, 8f774e0 tags, 7a6f0e5 spoor passed; 9a7684d passed (E verb, seated camera); PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
