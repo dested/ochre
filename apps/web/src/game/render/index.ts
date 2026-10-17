@@ -28,6 +28,7 @@ import {
 import type { CreateRenderPipeline, Quality, RenderPipeline } from '../contracts'
 import { ATMOS_FRAG, FINISH_FRAG, FS_VERT, GRADE_FRAG, RAYS_FRAG, TBLUR_FRAG, TENSOR_FRAG, UP_FRAG, downFrag, paintFrag } from './post'
 import { LIGHT, POST } from './uniforms'
+import { createGpuTimer, type GpuTimer } from './gpuTimer'
 
 export { paint, patchPaint } from './paint'
 export { LIGHT, POST } from './uniforms'
@@ -48,6 +49,10 @@ export type PaintedPipeline = RenderPipeline & {
   readonly dream: number
   /** lab only: 0 the finished frame; 1 scene, 2 after the air, 3 bloom, 4 graded, 5 distance */
   debugStage(stage: number): void
+  /** lab only: time each stage on the GPU (where the timer extension exists) */
+  profile(on: boolean): void
+  /** smoothed GPU milliseconds per stage while profiling */
+  gpuTimes(): { label: string; ms: number }[]
 }
 
 const DEBUG_FRAG = /* glsl */ `
@@ -237,6 +242,9 @@ export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRender
   })
 
   let debugStage = 0
+  let timer: GpuTimer | null = null
+  const t0 = (label: string) => timer?.begin(label)
+  const t1 = () => timer?.end()
   const debugMat = mat(DEBUG_FRAG, { tSrc: { value: null }, tDepth: { value: depthTex }, uMode: { value: 0 }, uNear: near, uFar: far, uScale: { value: 1 } })
 
   const pass = (m: ShaderMaterial, target: WebGLRenderTarget | null) => {
@@ -312,17 +320,22 @@ export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRender
       camWorld.copy(camera.matrixWorld)
       LIGHT.uCamPos.value.setFromMatrixPosition(camera.matrixWorld)
 
-      // 1. the scene
+      // 1. the scene (the shadow map with it)
+      t0('scene')
       renderer.setRenderTarget(sceneRT)
       renderer.setClearColor(LIGHT.uHorizon.value, 1)
       renderer.clear(true, true, true)
       renderer.render(scene, camera)
+      t1()
 
       // 2. the air
+      t0('air')
       setTex(atmos, 'tScene', sceneRT)
       pass(atmos, hdrRT)
+      t1()
 
       // 3. the blur pyramid
+      t0('bloom')
       const levels = spec.levels
       let src: WebGLRenderTarget = hdrRT
       for (let i = 0; i < levels; i++) {
@@ -349,8 +362,10 @@ export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRender
       if (bloomTex) setTex(grade, 'tBloom', bloomTex)
       const gn = grade.uniforms.uBloomNorm
       if (gn) gn.value = 1 / levels
+      t1()
 
       // 4. god rays (quarter resolution)
+      t0('rays')
       if (POST.rays.value.x > 0.001 && POST.rays.value.w > 0.001) {
         setTex(rays, 'tSrc', hdrRT)
         pass(rays, raysRT)
@@ -359,21 +374,27 @@ export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRender
         renderer.setClearColor(0x000000, 1)
         renderer.clear(true, false, false)
       }
+      t1()
 
       // 5. grade into display space
+      t0('grade')
       dreamU.value = dream
       pass(grade, spec.taps > 0 ? ldrRT : paintRT)
+      t1()
 
       // 6. paint
       if (spec.taps > 0) {
+        t0('paint')
         const r = paintUniforms.uRadius.value
         if (r instanceof Vector3) r.set(spec.radius[0], spec.radius[1] * (h / 1080), 180)
         pass(paintMat, paintRT)
+        t1()
       }
 
       // 7. the flow: which way the strokes run
       strokeU.value.x = spec.stroke
       strokeU.value.w = spec.stroke > 0 && dream < 0.99 ? 1 : 0
+      t0('flow')
       if (strokeU.value.w > 0) {
         pass(tensor, flowA)
         const st: unknown = tblur.uniforms.uStep?.value
@@ -385,8 +406,10 @@ export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRender
         pass(tblur, flowA)
         setTex(finish, 'tFlow', flowA)
       }
+      t1()
 
       // 8. finish to the canvas
+      t0('finish')
       fadeU.value = fade
       if (debugStage > 0) {
         const src = [sceneRT, sceneRT, hdrRT, up[0] ?? hdrRT, spec.taps > 0 ? ldrRT : paintRT, sceneRT][debugStage] ?? sceneRT
@@ -396,6 +419,7 @@ export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRender
         if (u.uScale) u.uScale.value = debugStage === 3 ? 1 / levels : 1
         pass(debugMat, null)
       } else pass(finish, null)
+      t1()
     },
     setSize(width: number, height: number, dpr: number) {
       cssW = width
@@ -418,6 +442,18 @@ export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRender
       }
       applySize()
     },
+    profile(on: boolean) {
+      if (!on) {
+        timer?.dispose()
+        timer = null
+        return
+      }
+      const gl = renderer.getContext()
+      if (!timer && gl instanceof WebGL2RenderingContext) timer = createGpuTimer(gl)
+    },
+    gpuTimes() {
+      return timer?.report() ?? []
+    },
     debugStage(stage: number) {
       debugStage = stage
     },
@@ -428,6 +464,7 @@ export const createRenderPipeline: CreateRenderPipeline = (renderer: WebGLRender
       fade = Math.min(1, Math.max(0, amount))
     },
     dispose() {
+      timer?.dispose()
       sceneRT.dispose()
       depthTex.dispose()
       for (const t of [hdrRT, ldrRT, paintRT, raysRT, flowA, flowB, ...down, ...up]) t.dispose()

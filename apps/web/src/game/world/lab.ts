@@ -33,6 +33,13 @@ type ViewDef = { x: number; y: number; z: number; yaw: number; pitch: number; fo
 
 const VIEW_NAMES = ['cave', 'shore', 'cove', 'plateau', 'aerial'] as const
 
+/** the GPU stage times as two short lines: total, then each stage */
+function gpuLine(times: { label: string; ms: number }[]): string {
+  if (times.length === 0) return '\ngpu: no timer'
+  const total = times.reduce((a, t) => a + t.ms, 0)
+  return `\ngpu ${total.toFixed(2)} ms\n` + times.map((t) => `${t.label} ${t.ms.toFixed(2)}`).join('  ')
+}
+
 function isQuality(s: string | null): s is Quality {
   return s === 'low' || s === 'medium' || s === 'high'
 }
@@ -65,6 +72,9 @@ export function mount(el: HTMLElement): () => void {
   }
   const qp = q.get('quality')
   if (isQuality(qp)) pipeline.setQuality(qp)
+  // ?gpu=1: GPU milliseconds per post stage in the info panel (where the timer extension exists)
+  const gpu = q.get('gpu') === '1'
+  if (gpu && isPaintedPipeline(pipeline)) pipeline.profile(true)
 
   // the preset views
   const ground = (x: number, z: number) => world.heightAt(x, z)
@@ -367,7 +377,8 @@ export function mount(el: HTMLElement): () => void {
         `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}  day ${clock.dayOfYear}  ${clock.season}\n` +
         `sun ${sunEl.toFixed(1)}°  moon ${clock.moonPhase.toFixed(2)}\n` +
         `sea ${clock.seaLevel.toFixed(2)} m  tide ${clock.tide.toFixed(2)}\n` +
-        `cam ${pos.x.toFixed(0)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(0)}  gen ${genMs.toFixed(0)} ms`
+        `cam ${pos.x.toFixed(0)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(0)}  gen ${genMs.toFixed(0)} ms` +
+        (gpu && isPaintedPipeline(pipeline) ? gpuLine(pipeline.gpuTimes()) : '')
     }
   })
 
