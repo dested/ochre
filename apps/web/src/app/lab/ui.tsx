@@ -5,7 +5,7 @@
  */
 import { useEffect, useState, type ReactNode } from 'react'
 import { bridge, useBridge, type BridgeState, type Screen, type Toast } from '~/game/bridge'
-import { LIFE_STAGES, type Caption, type LifeStageId, type MinigameId } from '~/game/contracts'
+import { FIELD_NOTE_IDS, LIFE_STAGES, type Caption, type LifeStageId, type MinigameId } from '~/game/contracts'
 import { clockAt } from '~/core/clock'
 import { STAGES } from '~/content/stages'
 import { GameUI } from '~/ui/GameUI'
@@ -179,6 +179,10 @@ function goScreen(screen: Screen) {
   const extra: Partial<BridgeState> = {}
   if (screen === 'loading') extra.loadingProgress = 0.62
   if (screen === 'chapter-card' && !bridge.get().chapter) extra.chapter = cardFor('small')
+  if (screen === 'notes' && bridge.get().notesUnlocked.length === 0) {
+    extra.notesUnlocked = FIELD_NOTE_IDS.slice(0, 15)
+    extra.notesNew = ['spring-tides', 'shellfish', 'heat-treatment']
+  }
   if (screen === 'summary' && !bridge.get().summary) {
     extra.summary = {
       name: 'Teni',
