@@ -4,10 +4,23 @@
  */
 import { Vector3 } from 'three'
 import { SFX_NAMES } from '../audio'
-import { LIFE_STAGES, type AudioFrame, type GameAudio, type LifeStageId, type MusicCue } from '../contracts'
+import {
+  LIFE_STAGES,
+  type AudioFrame,
+  type GameAudio,
+  type LifeStageId,
+  type MusicCue,
+} from '../contracts'
 import { createRuntime } from './runtime'
 
-const TELEPORTS = ['hearth-main', 'shore-path-top', 'shore-mussels', 'corm-slope', 'cove-beach', 'lookout-point']
+const TELEPORTS = [
+  'hearth-main',
+  'shore-path-top',
+  'shore-mussels',
+  'corm-slope',
+  'cove-beach',
+  'lookout-point',
+]
 
 export type PlayLabHandles = {
   stage(s: LifeStageId): void
@@ -29,7 +42,10 @@ function isStage(s: string | null): s is LifeStageId {
   return s !== null && (LIFE_STAGES as readonly string[]).includes(s)
 }
 
-type Scrub = Pick<AudioFrame, 'seaDistance' | 'surf' | 'fireDistance' | 'daylight' | 'wind' | 'rain' | 'muffle'>
+type Scrub = Pick<
+  AudioFrame,
+  'seaDistance' | 'surf' | 'fireDistance' | 'daylight' | 'wind' | 'rain' | 'muffle'
+>
 const SCRUBS: { key: keyof Scrub; max: number; step: number }[] = [
   { key: 'seaDistance', max: 200, step: 1 },
   { key: 'surf', max: 1, step: 0.01 },
@@ -43,7 +59,15 @@ const MUSIC_CUES: MusicCue[] = ['title', ...LIFE_STAGES, 'summary', null]
 
 /** the ambience scrubber: while on, the panel's values replace the game's in every AudioFrame */
 function createScrubber() {
-  const values: Scrub = { seaDistance: 20, surf: 0.5, fireDistance: 40, daylight: 0.8, wind: 0.3, rain: 0, muffle: 0 }
+  const values: Scrub = {
+    seaDistance: 20,
+    surf: 0.5,
+    fireDistance: 40,
+    daylight: 0.8,
+    wind: 0.3,
+    rain: 0,
+    muffle: 0,
+  }
   const s = { on: false, inCave: false, values }
   const wrap = (a: GameAudio): GameAudio => ({
     ...a,
@@ -57,10 +81,13 @@ function createScrubber() {
   return { state: s, wrap }
 }
 
-function audioPanel(audio: GameAudio, scrub: ReturnType<typeof createScrubber>['state']): HTMLElement {
+function audioPanel(
+  audio: GameAudio,
+  scrub: ReturnType<typeof createScrubber>['state']
+): HTMLElement {
   const panel = document.createElement('div')
   panel.style.cssText =
-    'position:absolute;right:8px;top:8px;z-index:20;width:240px;box-sizing:border-box;max-height:calc(100% - 16px);overflow:hidden auto;display:flex;flex-direction:column;gap:3px;' +
+    'position:fixed;right:8px;top:8px;z-index:100;width:240px;box-sizing:border-box;max-height:calc(100% - 16px);overflow:hidden auto;display:flex;flex-direction:column;gap:3px;' +
     'font:11px system-ui;color:#efe3c8;background:rgba(42,36,32,.82);padding:8px;border-radius:6px'
   panel.addEventListener('pointerdown', (e) => e.stopPropagation())
   const head = (text: string) => {
@@ -78,7 +105,8 @@ function audioPanel(audio: GameAudio, scrub: ReturnType<typeof createScrubber>['
   const btn = (parent: HTMLElement, label: string, onClick: () => void) => {
     const b = document.createElement('button')
     b.textContent = label
-    b.style.cssText = 'padding:2px 6px;border-radius:3px;border:0;color:#efe3c8;background:rgba(156,61,32,.55);cursor:pointer;font:inherit'
+    b.style.cssText =
+      'padding:2px 6px;border-radius:3px;border:0;color:#efe3c8;background:rgba(156,61,32,.55);cursor:pointer;font:inherit'
     b.addEventListener('click', (e) => {
       e.stopPropagation()
       void audio.resume().then(onClick)
@@ -105,11 +133,20 @@ function audioPanel(audio: GameAudio, scrub: ReturnType<typeof createScrubber>['
     l.append(i, label)
     panel.appendChild(l)
   }
-  check('override the game', () => scrub.on, (v) => (scrub.on = v))
-  check('in cave', () => scrub.inCave, (v) => (scrub.inCave = v))
+  check(
+    'override the game',
+    () => scrub.on,
+    (v) => (scrub.on = v)
+  )
+  check(
+    'in cave',
+    () => scrub.inCave,
+    (v) => (scrub.inCave = v)
+  )
   for (const sc of SCRUBS) {
     const l = document.createElement('label')
-    l.style.cssText = 'display:grid;grid-template-columns:72px minmax(0,1fr) 30px;gap:4px;align-items:center'
+    l.style.cssText =
+      'display:grid;grid-template-columns:72px minmax(0,1fr) 30px;gap:4px;align-items:center'
     const name = document.createElement('span')
     name.textContent = sc.key
     const i = document.createElement('input')
@@ -142,7 +179,8 @@ export function mount(el: HTMLElement): () => void {
     stage = s
     rt.startLife({ seed: 80_000, stage: s, playerName: 'Teni' })
     bridge.set({ screen: 'playing', hasLife: true })
-    for (const b of stageButtons) b.style.background = b.dataset.stage === s ? '#9c3d20' : 'rgba(42,36,32,.8)'
+    for (const b of stageButtons)
+      b.style.background = b.dataset.stage === s ? '#9c3d20' : 'rgba(42,36,32,.8)'
   }
   // chapter cards from the sim just dismiss themselves in the lab
   const offCard = bridge.subscribe(() => {
@@ -151,11 +189,12 @@ export function mount(el: HTMLElement): () => void {
 
   const panel = document.createElement('div')
   panel.style.cssText =
-    'position:absolute;left:8px;top:50%;transform:translateY(-50%);z-index:20;display:flex;flex-direction:column;gap:4px;font:12px system-ui;'
+    'position:fixed;left:8px;top:50%;transform:translateY(-50%);z-index:100;display:flex;flex-direction:column;gap:4px;font:12px system-ui;'
   const mkBtn = (label: string, onClick: () => void) => {
     const b = document.createElement('button')
     b.textContent = label
-    b.style.cssText = 'padding:4px 8px;border-radius:4px;border:0;color:#efe3c8;background:rgba(42,36,32,.8);cursor:pointer;text-align:left'
+    b.style.cssText =
+      'padding:4px 8px;border-radius:4px;border:0;color:#efe3c8;background:rgba(42,36,32,.8);cursor:pointer;text-align:left'
     b.addEventListener('click', (e) => {
       e.stopPropagation()
       onClick()
@@ -170,9 +209,11 @@ export function mount(el: HTMLElement): () => void {
   })
   for (const id of TELEPORTS) mkBtn(`→ ${id}`, () => handles.teleport(id))
   for (const scale of [72, 720, 7200]) mkBtn(`time ×${scale}`, () => handles.timeScale(scale))
-  el.appendChild(panel)
+  // on the body, not the mount: the mount is a fixed stacking context under GameUI, and the panels must sit above
+  // the HUD and name tags
+  document.body.appendChild(panel)
   const sound = audioPanel(rt.audio, scrubber.state)
-  el.appendChild(sound)
+  document.body.appendChild(sound)
   const wake = () => void rt.audio.resume().catch(() => {})
   window.addEventListener('pointerdown', wake, true)
 
@@ -205,7 +246,13 @@ export function mount(el: HTMLElement): () => void {
       const p = g.player()
       return {
         stage,
-        player: { x: p.position.x, z: p.position.z, heading: p.heading, carriedBy: p.carriedBy, skills: p.skills },
+        player: {
+          x: p.position.x,
+          z: p.position.z,
+          heading: p.heading,
+          carriedBy: p.carriedBy,
+          skills: p.skills,
+        },
         hour: g.sim.state.clock.hour,
         seaLevel: g.sim.state.clock.seaLevel,
         prompt: bridge.get().prompt,
@@ -216,7 +263,15 @@ export function mount(el: HTMLElement): () => void {
         fwd: rt.camera.getWorldDirection(new Vector3()).toArray(),
         heads: g.sim.state.people.map((q) => {
           const a = g.cast.person(q.id)
-          return a ? [q.id, a.headPosition(new Vector3()).toArray().map((v) => Number(v.toFixed(2)))] : [q.id, null]
+          return a
+            ? [
+                q.id,
+                a
+                  .headPosition(new Vector3())
+                  .toArray()
+                  .map((v) => Number(v.toFixed(2))),
+              ]
+            : [q.id, null]
         }),
       }
     },

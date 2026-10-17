@@ -71,7 +71,7 @@ function buildLineage(sim: Sim): LineageEntry[] {
   return st.people.map((p) => ({
     id: p.id,
     name: p.name,
-    relation: p.isPlayer ? 'You' : sim.relationOf(p.id) ?? 'Of the band',
+    relation: p.isPlayer ? 'You' : (sim.relationOf(p.id) ?? 'Of the band'),
     ageYears: Math.floor(p.look.ageYears),
     alive: p.alive,
     bond: p.bond,
@@ -80,7 +80,8 @@ function buildLineage(sim: Sim): LineageEntry[] {
     fatherId: inBand(p.fatherId),
     partnerId: inBand(p.partnerId),
     // outside the family, guess the generation from the age gap
-    generation: gen.get(p.id) ?? Math.max(-2, Math.min(2, Math.round((p.look.ageYears - playerAge) / -25))),
+    generation:
+      gen.get(p.id) ?? Math.max(-2, Math.min(2, Math.round((p.look.ageYears - playerAge) / -25))),
     isPlayer: p.isPlayer,
   }))
 }
@@ -113,7 +114,13 @@ export function mount(el: HTMLElement): () => void {
   const save = () => {
     const g = rt.game
     if (!g) return
-    writeSave({ v: 1, name: playerName, stage: g.sim.state.stage, seed: SEED, save: g.sim.serialize() })
+    writeSave({
+      v: 1,
+      name: playerName,
+      stage: g.sim.state.stage,
+      seed: SEED,
+      save: g.sim.serialize(),
+    })
   }
 
   // every entry into a life comes from a click: the gesture that lets WebAudio start
@@ -273,7 +280,8 @@ export function mount(el: HTMLElement): () => void {
       const next = { ...bridge.get().settings, ...patch }
       bridge.set({ settings: next })
       if (patch.quality) rt.pipeline.setQuality(patch.quality)
-      if (patch.master !== undefined || patch.music !== undefined) rt.audio.setVolume(next.master, next.music)
+      if (patch.master !== undefined || patch.music !== undefined)
+        rt.audio.setVolume(next.master, next.music)
     },
   })
 
@@ -306,8 +314,18 @@ export function mount(el: HTMLElement): () => void {
           stage: st.stage,
           beat: st.chapter.beatId,
           objective: st.chapter.objective,
-          clock: { day: st.clock.day, hour: Number(st.clock.hour.toFixed(2)), seaLevel: Number(st.clock.seaLevel.toFixed(2)) },
-          player: { x: Number(p.position.x.toFixed(1)), z: Number(p.position.z.toFixed(1)), carriedBy: p.carriedBy, skills: p.skills, needs: p.needs },
+          clock: {
+            day: st.clock.day,
+            hour: Number(st.clock.hour.toFixed(2)),
+            seaLevel: Number(st.clock.seaLevel.toFixed(2)),
+          },
+          player: {
+            x: Number(p.position.x.toFixed(1)),
+            z: Number(p.position.z.toFixed(1)),
+            carriedBy: p.carriedBy,
+            skills: p.skills,
+            needs: p.needs,
+          },
           watching: st.watching,
           inventory: st.inventory,
           prompt: bridge.get().prompt,

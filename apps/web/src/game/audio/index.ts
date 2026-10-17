@@ -36,11 +36,20 @@ const STALE_MS = 400
 const MUSIC_LEVEL = 0.35
 
 /** per-tick graph update from a frame; shared by the live scheduler and offline renders */
-export function driveEngine(e: Engine, f: AudioFrame | null, presence: number, horizon: number): void {
+export function driveEngine(
+  e: Engine,
+  f: AudioFrame | null,
+  presence: number,
+  horizon: number
+): void {
   e.ambience.apply(f, presence)
   const m = f?.muffle ?? 0
   // 18 kHz open, ~1 kHz at the stage-1 muffle of 0.7
-  e.muffle.frequency.setTargetAtTime(Math.min(e.ctx.sampleRate * 0.45, 18000) * Math.pow(300 / 18000, m), e.ctx.currentTime, 0.3)
+  e.muffle.frequency.setTargetAtTime(
+    Math.min(e.ctx.sampleRate * 0.45, 18000) * Math.pow(300 / 18000, m),
+    e.ctx.currentTime,
+    0.3
+  )
   e.reverbSend.gain.setTargetAtTime(f?.inCave ? 0.5 : 0.06, e.ctx.currentTime, 0.5)
   e.ambience.schedule(horizon)
   e.music.schedule(horizon)
@@ -150,7 +159,8 @@ export const createAudio: CreateAudio = (): GameAudio => {
     if (d > 90) return null
     const h = frame.heading
     // right of the facing direction is (−cos h, sin h) (contracts)
-    const pan = d < 0.5 ? 0 : (dx * -Math.cos(h) + dz * Math.sin(h)) / Math.max(0.5, Math.hypot(dx, dz))
+    const pan =
+      d < 0.5 ? 0 : (dx * -Math.cos(h) + dz * Math.sin(h)) / Math.max(0.5, Math.hypot(dx, dz))
     const p = e.ctx.createStereoPanner()
     p.pan.value = Math.max(-1, Math.min(1, pan * 0.85))
     const g = e.ctx.createGain()

@@ -27,11 +27,18 @@ export function createTracks(sim: Sim, spoor: Spoor): Tracks {
         const prev = last.get(a.id)
         if (!prev || Math.hypot(a.position.x - prev.x, a.position.z - prev.z) >= STRIDE) {
           last.set(a.id, { x: a.position.x, z: a.position.z })
-          prints.push({ x: a.position.x, z: a.position.z, heading: a.heading, t: st.clock.t, shown: false })
+          prints.push({
+            x: a.position.x,
+            z: a.position.z,
+            heading: a.heading,
+            t: st.clock.t,
+            shown: false,
+          })
           if (prints.length > MAX_PRINTS) prints.shift()
         }
       }
-      const reads = st.stage !== 'held' && st.people.some((p) => p.isPlayer && p.skills.includes('tracking'))
+      const reads =
+        st.stage !== 'held' && st.people.some((p) => p.isPlayer && p.skills.includes('tracking'))
       if (!reads) {
         if (showing) {
           spoor.clear()

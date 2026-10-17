@@ -16,7 +16,14 @@ export type Ambience = {
 }
 
 /** looped noise through a filter into a gain; returns both so levels and filters can move */
-function bed(k: SfxKit, buffer: AudioBuffer, type: BiquadFilterType, freq: number, q: number, out: AudioNode) {
+function bed(
+  k: SfxKit,
+  buffer: AudioBuffer,
+  type: BiquadFilterType,
+  freq: number,
+  q: number,
+  out: AudioNode
+) {
   const src = k.ctx.createBufferSource()
   src.buffer = buffer
   src.loop = true
@@ -76,7 +83,9 @@ export function createAmbience(k: SfxKit, world: AudioNode, heart: AudioNode): A
       const cave = frame.inCave ? 1 : 0
       seaProx = clamp01(1 / (1 + Math.max(0, frame.seaDistance) / 28)) * (cave ? 0.45 : 1)
       const surf = seaProx * (0.4 + 0.6 * clamp01(frame.surf))
-      fireProx = Number.isFinite(frame.fireDistance) ? 1 / (1 + Math.pow(frame.fireDistance / 3.5, 2)) : 0
+      fireProx = Number.isFinite(frame.fireDistance)
+        ? 1 / (1 + Math.pow(frame.fireDistance / 3.5, 2))
+        : 0
       day = clamp01((frame.daylight - 0.2) / 0.5)
       night = clamp01((0.35 - frame.daylight) / 0.25)
       const windAmt = clamp01(frame.wind) * (cave ? 0.25 : 1)
@@ -90,7 +99,15 @@ export function createAmbience(k: SfxKit, world: AudioNode, heart: AudioNode): A
     schedule(horizon) {
       const now = ctx.currentTime
       if (!f || presence < 0.01) {
-        nextWave = nextBird = nextGull = nextCricket = nextFrog = nextCrackle = nextBeat = nextGust = now
+        nextWave =
+          nextBird =
+          nextGull =
+          nextCricket =
+          nextFrog =
+          nextCrackle =
+          nextBeat =
+          nextGust =
+            now
         return
       }
       const fr = f
@@ -132,7 +149,14 @@ export function createAmbience(k: SfxKit, world: AudioNode, heart: AudioNode): A
           for (let i = 0; i < n; i++) {
             const s = t + i * rand(0.07, 0.14)
             const up = Math.random() < 0.5
-            tone(ctx, pan, s, { type: 'sine', freq: up ? base : base * 1.3, freqTo: up ? base * 1.35 : base * 0.9, dur: rand(0.05, 0.1), gain: 0.035 * amt, attack: 0.008 })
+            tone(ctx, pan, s, {
+              type: 'sine',
+              freq: up ? base : base * 1.3,
+              freqTo: up ? base * 1.35 : base * 0.9,
+              dur: rand(0.05, 0.1),
+              gain: 0.035 * amt,
+              attack: 0.008,
+            })
           }
           setTimeout(() => pan.disconnect(), (t - now + 2) * 1000)
         }
@@ -160,7 +184,14 @@ export function createAmbience(k: SfxKit, world: AudioNode, heart: AudioNode): A
           pan.connect(world)
           const fq = rand(4200, 4900)
           const pulses = 3 + Math.floor(Math.random() * 2)
-          for (let i = 0; i < pulses; i++) tone(ctx, pan, t + i * 0.042, { type: 'sine', freq: fq, dur: 0.022, gain: 0.018 * amt, attack: 0.003 })
+          for (let i = 0; i < pulses; i++)
+            tone(ctx, pan, t + i * 0.042, {
+              type: 'sine',
+              freq: fq,
+              dur: 0.022,
+              gain: 0.018 * amt,
+              attack: 0.003,
+            })
           setTimeout(() => pan.disconnect(), (t - now + 1) * 1000)
         }
         nextCricket = t + rand(0.25, 0.7)
@@ -174,7 +205,16 @@ export function createAmbience(k: SfxKit, world: AudioNode, heart: AudioNode): A
           pan.connect(world)
           const fq = rand(150, 230)
           const n = 3 + Math.floor(Math.random() * 4)
-          for (let i = 0; i < n; i++) tone(ctx, pan, t + i * 0.055, { type: 'sawtooth', freq: fq, freqTo: fq * 0.9, dur: 0.04, gain: 0.025 * amt, attack: 0.006, lowpass: 700 })
+          for (let i = 0; i < n; i++)
+            tone(ctx, pan, t + i * 0.055, {
+              type: 'sawtooth',
+              freq: fq,
+              freqTo: fq * 0.9,
+              dur: 0.04,
+              gain: 0.025 * amt,
+              attack: 0.006,
+              lowpass: 700,
+            })
           setTimeout(() => pan.disconnect(), (t - now + 1.5) * 1000)
         }
         nextFrog = t + rand(2.5, 8)
@@ -183,7 +223,13 @@ export function createAmbience(k: SfxKit, world: AudioNode, heart: AudioNode): A
       while (nextCrackle < horizon) {
         const t = Math.max(nextCrackle, now)
         if (fireProx > 0.02) {
-          burst(ctx, world, t, { buffer: noise.white, dur: rand(0.004, 0.02), gain: presence * fireProx * rand(0.05, 0.22), filter: 'highpass', freq: rand(1800, 5000) })
+          burst(ctx, world, t, {
+            buffer: noise.white,
+            dur: rand(0.004, 0.02),
+            gain: presence * fireProx * rand(0.05, 0.22),
+            filter: 'highpass',
+            freq: rand(1800, 5000),
+          })
           nextCrackle = t + rand(0.03, 0.35) / (0.3 + fireProx)
         } else nextCrackle = t + 0.5
       }

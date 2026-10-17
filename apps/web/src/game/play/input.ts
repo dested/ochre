@@ -27,13 +27,25 @@ export type Input = {
 }
 
 function isTyping(t: EventTarget | null): boolean {
-  return t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement
+  return (
+    t instanceof HTMLInputElement ||
+    t instanceof HTMLTextAreaElement ||
+    t instanceof HTMLSelectElement
+  )
 }
 
 export function createInput(canvas: HTMLCanvasElement): Input {
   const held = new Set<string>()
   const edges = new Set<string>()
-  const mouse = { dx: 0, dy: 0, wheel: 0, lmb: false, rmb: false, lmbPressed: false, rmbPressed: false }
+  const mouse = {
+    dx: 0,
+    dy: 0,
+    wheel: 0,
+    lmb: false,
+    rmb: false,
+    lmbPressed: false,
+    rmbPressed: false,
+  }
   const lockLost = new Set<() => void>()
   let releasing = false
   let dragging = false

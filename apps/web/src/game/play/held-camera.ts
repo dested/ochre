@@ -24,7 +24,7 @@ export type HeldCamera = {
     settings: ControlSettings,
     slot: CarrySlot,
     /** the carrier's face: in the arms the view starts on it */
-    face: Vector3 | null,
+    face: Vector3 | null
   ): void
 }
 
@@ -63,7 +63,11 @@ export function createHeldCamera(): HeldCamera {
       }
       const k = 0.0019 * settings.sensitivity
       cam.yaw = MathUtils.clamp(cam.yaw - input.mouse.dx * k, -CONE, CONE)
-      cam.pitch = MathUtils.clamp(cam.pitch + input.mouse.dy * k * (settings.invertY ? -1 : 1), -0.9, 1.0)
+      cam.pitch = MathUtils.clamp(
+        cam.pitch + input.mouse.dy * k * (settings.invertY ? -1 : 1),
+        -0.9,
+        1.0
+      )
       if (first) {
         smoothHeading = facing
         eyeSmooth.copy(eye)
@@ -85,7 +89,9 @@ export function createHeldCamera(): HeldCamera {
       const yaw = smoothHeading + cam.yaw
       const p = cam.pitch
       camera.position.set(eyeSmooth.x, eyeSmooth.y + bob + breath, eyeSmooth.z)
-      look.set(Math.sin(yaw) * Math.cos(p), -Math.sin(p), Math.cos(yaw) * Math.cos(p)).add(camera.position)
+      look
+        .set(Math.sin(yaw) * Math.cos(p), -Math.sin(p), Math.cos(yaw) * Math.cos(p))
+        .add(camera.position)
       camera.up.set(0, 1, 0)
       camera.lookAt(look)
       camera.rotateZ(sway)

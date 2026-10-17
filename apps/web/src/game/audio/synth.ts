@@ -14,7 +14,14 @@ export function makeNoise(ctx: BaseAudioContext, seconds = 3): Noise {
   const p = pink.getChannelData(0)
   const b = brown.getChannelData(0)
   // Paul Kellet's pink filter; brown is leaky integrated white
-  let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, last = 0
+  let b0 = 0,
+    b1 = 0,
+    b2 = 0,
+    b3 = 0,
+    b4 = 0,
+    b5 = 0,
+    b6 = 0,
+    last = 0
   for (let i = 0; i < n; i++) {
     const x = Math.random() * 2 - 1
     w[i] = x
@@ -33,7 +40,12 @@ export function makeNoise(ctx: BaseAudioContext, seconds = 3): Noise {
 }
 
 /** a plucked string at `freq`, normalised, `seconds` long */
-export function makePluck(ctx: BaseAudioContext, freq: number, seconds = 3, brightness = 0.45): AudioBuffer {
+export function makePluck(
+  ctx: BaseAudioContext,
+  freq: number,
+  seconds = 3,
+  brightness = 0.45
+): AudioBuffer {
   const sr = ctx.sampleRate
   const n = Math.floor(sr * seconds)
   const buf = ctx.createBuffer(1, n, sr)
@@ -111,7 +123,8 @@ export function burst(ctx: BaseAudioContext, dest: AudioNode, t: number, o: Burs
   const f = ctx.createBiquadFilter()
   f.type = o.filter ?? 'lowpass'
   f.frequency.setValueAtTime(o.freq ?? 1000, t)
-  if (o.freqTo !== undefined) f.frequency.exponentialRampToValueAtTime(Math.max(20, o.freqTo), t + o.dur)
+  if (o.freqTo !== undefined)
+    f.frequency.exponentialRampToValueAtTime(Math.max(20, o.freqTo), t + o.dur)
   f.Q.value = o.q ?? 0.7
   const g = ctx.createGain()
   envelope(g, t, o.gain, o.attack ?? 0.004, o.dur)
@@ -139,7 +152,8 @@ export function tone(ctx: BaseAudioContext, dest: AudioNode, t: number, o: ToneO
   const osc = ctx.createOscillator()
   osc.type = o.type
   osc.frequency.setValueAtTime(o.freq, t)
-  if (o.freqTo !== undefined) osc.frequency.exponentialRampToValueAtTime(Math.max(10, o.freqTo), t + (o.glide ?? o.dur))
+  if (o.freqTo !== undefined)
+    osc.frequency.exponentialRampToValueAtTime(Math.max(10, o.freqTo), t + (o.glide ?? o.dur))
   const g = ctx.createGain()
   envelope(g, t, o.gain, o.attack ?? 0.005, o.dur)
   if (o.lowpass !== undefined) {
@@ -155,7 +169,14 @@ export function tone(ctx: BaseAudioContext, dest: AudioNode, t: number, o: ToneO
 }
 
 /** play a prepared buffer (a pluck) once */
-export function play(ctx: BaseAudioContext, dest: AudioNode, t: number, buffer: AudioBuffer, gain: number, rate = 1): void {
+export function play(
+  ctx: BaseAudioContext,
+  dest: AudioNode,
+  t: number,
+  buffer: AudioBuffer,
+  gain: number,
+  rate = 1
+): void {
   const src = ctx.createBufferSource()
   src.buffer = buffer
   src.playbackRate.value = rate

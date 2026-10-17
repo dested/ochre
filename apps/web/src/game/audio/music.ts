@@ -23,13 +23,61 @@ const MINOR = [0, 3, 5, 7, 10]
 const MAJOR = [0, 2, 4, 7, 9]
 
 const STYLES: Record<Exclude<MusicCue, null>, Style> = {
-  title: { root: 293.66, scale: MINOR, step: 0.55, phrase: [4, 7], rest: [6, 11], span: 7, drone: 1 },
-  held: { root: 349.23, scale: MAJOR, step: 0.85, phrase: [3, 5], rest: [10, 18], span: 6, drone: 0.55 },
-  small: { root: 392, scale: MAJOR, step: 0.42, phrase: [5, 8], rest: [9, 16], span: 8, drone: 0.7 },
+  title: {
+    root: 293.66,
+    scale: MINOR,
+    step: 0.55,
+    phrase: [4, 7],
+    rest: [6, 11],
+    span: 7,
+    drone: 1,
+  },
+  held: {
+    root: 349.23,
+    scale: MAJOR,
+    step: 0.85,
+    phrase: [3, 5],
+    rest: [10, 18],
+    span: 6,
+    drone: 0.55,
+  },
+  small: {
+    root: 392,
+    scale: MAJOR,
+    step: 0.42,
+    phrase: [5, 8],
+    rest: [9, 16],
+    span: 8,
+    drone: 0.7,
+  },
   youth: { root: 220, scale: MINOR, step: 0.4, phrase: [5, 9], rest: [9, 15], span: 8, drone: 0.8 },
-  provider: { root: 261.63, scale: MAJOR, step: 0.48, phrase: [4, 8], rest: [10, 17], span: 7, drone: 0.8 },
-  elder: { root: 329.63, scale: MINOR, step: 0.8, phrase: [3, 5], rest: [12, 20], span: 5, drone: 0.9 },
-  summary: { root: 293.66, scale: MAJOR, step: 0.6, phrase: [6, 10], rest: [4, 8], span: 9, drone: 1 },
+  provider: {
+    root: 261.63,
+    scale: MAJOR,
+    step: 0.48,
+    phrase: [4, 8],
+    rest: [10, 17],
+    span: 7,
+    drone: 0.8,
+  },
+  elder: {
+    root: 329.63,
+    scale: MINOR,
+    step: 0.8,
+    phrase: [3, 5],
+    rest: [12, 20],
+    span: 5,
+    drone: 0.9,
+  },
+  summary: {
+    root: 293.66,
+    scale: MAJOR,
+    step: 0.6,
+    phrase: [6, 10],
+    rest: [4, 8],
+    span: 9,
+    drone: 1,
+  },
 }
 
 export type Music = {
@@ -39,7 +87,11 @@ export type Music = {
   dispose(): void
 }
 
-export function createMusic(ctx: BaseAudioContext, out: AudioNode, pluck: (f: number) => AudioBuffer): Music {
+export function createMusic(
+  ctx: BaseAudioContext,
+  out: AudioNode,
+  pluck: (f: number) => AudioBuffer
+): Music {
   const droneGain = ctx.createGain()
   droneGain.gain.value = 0
   const droneLp = ctx.createBiquadFilter()
@@ -99,7 +151,8 @@ export function createMusic(ctx: BaseAudioContext, out: AudioNode, pluck: (f: nu
       // small steps, an occasional leap, end on the root or the fifth
       if (last) degree = Math.random() < 0.6 ? 0 : 3
       else {
-        const leap = Math.random() < 0.18 ? (Math.random() < 0.5 ? -3 : 3) : Math.random() < 0.5 ? -1 : 1
+        const leap =
+          Math.random() < 0.18 ? (Math.random() < 0.5 ? -3 : 3) : Math.random() < 0.5 ? -1 : 1
         degree = Math.max(-2, Math.min(s.span, degree + leap))
       }
       const gain = (last ? 0.32 : 0.26) * rand(0.75, 1)

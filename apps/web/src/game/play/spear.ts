@@ -155,13 +155,20 @@ export function createSpear(world: WorldData, paint: PaintMaterial): Spear {
         const fz = Math.cos(a.heading)
         for (const k of [-1, 0, 1]) {
           if (half === 0 && k !== 0) continue
-          tmp.set(a.position.x + fx * half * k, ground + a.altitude + h, a.position.z + fz * half * k)
+          tmp.set(
+            a.position.x + fx * half * k,
+            ground + a.altitude + h,
+            a.position.z + fz * half * k
+          )
           const c = tmp.clone()
           if (segDist(prev, pos, c) < r) {
             state = 'held'
             root.visible = false
             const dist = start.distanceTo(c)
-            const quality = Math.min(1, Math.max(0.1, spear.pointQuality * Math.min(1, Math.max(0.2, 1.25 - dist / 35))))
+            const quality = Math.min(
+              1,
+              Math.max(0.1, spear.pointQuality * Math.min(1, Math.max(0.2, 1.25 - dist / 35)))
+            )
             return { kind: 'hit', animalId: a.id, quality }
           }
         }
@@ -178,7 +185,11 @@ export function createSpear(world: WorldData, paint: PaintMaterial): Spear {
       return null
     },
     canPickUp(p) {
-      return state === 'stuck' && stuckAt !== null && Math.hypot(stuckAt.x - p.x, stuckAt.z - p.z) < PICKUP_RADIUS
+      return (
+        state === 'stuck' &&
+        stuckAt !== null &&
+        Math.hypot(stuckAt.x - p.x, stuckAt.z - p.z) < PICKUP_RADIUS
+      )
     },
     pickUp() {
       state = 'held'

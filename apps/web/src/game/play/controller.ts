@@ -7,6 +7,13 @@ import type { PersonAnim, Vec2, WorldData } from '../contracts'
 import type { Input } from './input'
 import type { StageFeel } from './stages'
 
+/** collision samples along the camera boom */
+const CAM_STEPS = 14
+/** the camera's line to the player stays this far (m) from a lit fire */
+const FIRE_CLEAR = 1.2
+/** orbit offsets tried, nearest first, when a flame sits between the camera and the player */
+const SWING = [0.45, -0.45, 0.9, -0.9, 1.5, -1.5]
+
 export type ControllerOutput = { position: Vec2; heading: number; speed: number; anim: PersonAnim }
 
 export type ControlSettings = { sensitivity: number; invertY: boolean }
@@ -32,10 +39,19 @@ export type Controller = {
     seaLevel: number,
     settings: ControlSettings,
     frozen: boolean,
-    aim: number,
+    aim: number
   ): ControllerOutput
-  /** place the camera behind the player; aim tightens it over the shoulder */
-  updateCamera(dt: number, camera: PerspectiveCamera, feel: StageFeel, aim: number): void
+  /**
+   * place the camera behind the player; aim tightens it over the shoulder; the line to the player keeps clear
+   * of lit fires (pull in, or swing the orbit aside)
+   */
+  updateCamera(
+    dt: number,
+    camera: PerspectiveCamera,
+    feel: StageFeel,
+    aim: number,
+    fires?: readonly Vec2[]
+  ): void
 }
 
 function angleDiff(a: number, b: number): number {
@@ -91,8 +107,16 @@ export function createController(world: WorldData): Controller {
       if (input.mouse.dx !== 0 || input.mouse.dy !== 0) idleMouse = 0
       else idleMouse += dt
       ctl.yaw -= input.mouse.dx * k
-      ctl.pitch = MathUtils.clamp(ctl.pitch + input.mouse.dy * k * (settings.invertY ? -1 : 1), -0.45, 1.15)
-      zoom = MathUtils.clamp(zoom + input.mouse.wheel * 0.12, feel.camMin / feel.camDistance, feel.camMax / feel.camDistance)
+      ctl.pitch = MathUtils.clamp(
+        ctl.pitch + input.mouse.dy * k * (settings.invertY ? -1 : 1),
+        -0.45,
+        1.15
+      )
+      zoom = MathUtils.clamp(
+        zoom + input.mouse.wheel * 0.12,
+        feel.camMin / feel.camDistance,
+        feel.camMax / feel.camDistance
+      )
 
       let f = 0
       let r = 0
@@ -109,7 +133,8 @@ export function createController(world: WorldData): Controller {
       let dz = fz * f + fx * r
       const len = Math.hypot(dx, dz)
       moving = len > 0.01
-      const running = feel.run > 0 && aim < 0.3 && (input.down('ShiftLeft') || input.down('ShiftRight'))
+      const running =
+        feel.run > 0 && aim < 0.3 && (input.down('ShiftLeft') || input.down('ShiftRight'))
       let target = moving ? (running ? feel.run : feel.walk) * (1 - aim * 0.55) : 0
       if (moving) {
         dx /= len
@@ -156,7 +181,7 @@ export function createController(world: WorldData): Controller {
       else if (!frozen && input.down('KeyC')) anim = 'crouch'
       return { position: { x: position.x, z: position.z }, heading, speed, anim }
     },
-    updateCamera(dt, camera, feel, aim) {
+    updateCamera(dt, camera, feel, aim, fires = []) {
       const ground = world.heightAt(position.x, position.z)
       const ty = ground + feel.camTarget * (1 - aim * 0.05)
       const follow = 1 - Math.exp(-dt * feel.follow)
@@ -173,8 +198,35 @@ export function createController(world: WorldData): Controller {
       const inCave = world.inCave(position.x, position.z)
       let want = feel.camDistance * zoom * (1 - aim * 0.55)
       if (inCave) want = Math.min(want, 2.6)
-      const yaw = ctl.yaw
       const pitch = inCave ? Math.min(ctl.pitch, 0.35) : ctl.pitch
+      // how far out along a yaw the camera can sit before its line to the player enters a fire's radius
+      const fireClear = (y: number): number => {
+        if (fires.length === 0) return want
+        const fx = Math.sin(y)
+        const fz = Math.cos(y)
+        for (let i = 1; i <= CAM_STEPS; i++) {
+          const d = (want * i) / CAM_STEPS
+          const x = camTarget.x - fx * d
+          const z = camTarget.z - fz * d
+          for (const f of fires) {
+            // only a line heading into the flame counts: beside a fire the camera can still back away
+            const fd = Math.hypot(x - f.x, z - f.z)
+            if (fd < FIRE_CLEAR && fd < Math.hypot(camTarget.x - f.x, camTarget.z - f.z) - 0.05)
+              return Math.max(0.6, d - want / CAM_STEPS)
+          }
+        }
+        return want
+      }
+      // a flame behind the player: swing the orbit toward the nearest clear side (not while aiming)
+      if (aim < 0.3 && fireClear(ctl.yaw) < want * 0.7) {
+        for (const off of SWING) {
+          if (fireClear(ctl.yaw + off) >= want * 0.9) {
+            ctl.yaw += Math.sign(off) * Math.min(Math.abs(off), dt * 1.6)
+            break
+          }
+        }
+      }
+      const yaw = ctl.yaw
       const fx = Math.sin(yaw)
       const fz = Math.cos(yaw)
       const cp = Math.cos(pitch)
@@ -187,8 +239,8 @@ export function createController(world: WorldData): Controller {
       const py = camTarget.y + aim * 0.15
 
       // terrain collision: march out from the pivot and stop short of the ground
-      let allowed = want
-      const steps = 14
+      let allowed = Math.min(want, fireClear(yaw))
+      const steps = CAM_STEPS
       for (let i = 1; i <= steps; i++) {
         const d = (want * i) / steps
         const x = px - fx * d * cp

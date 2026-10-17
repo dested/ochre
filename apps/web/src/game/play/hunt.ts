@@ -68,7 +68,12 @@ export function createHunt(deps: {
       if (canAim && aim > 0.6 && input.mouse.lmbPressed) {
         const actor = cast.person(player.id)
         if (actor) actor.handPosition('right', hand)
-        else hand.set(player.position.x, world.heightAt(player.position.x, player.position.z) + 1.5, player.position.z)
+        else
+          hand.set(
+            player.position.x,
+            world.heightAt(player.position.x, player.position.z) + 1.5,
+            player.position.z
+          )
         if (spear.throw(hand, camera, sim.state.animals)) {
           throwT = THROW_SECONDS
           audio.sfx('throw', hand)
@@ -79,7 +84,11 @@ export function createHunt(deps: {
       if (hit?.kind === 'hit') {
         sim.command({ type: 'spear-hit', animalId: hit.animalId, quality: hit.quality })
         const a = sim.state.animals.find((x) => x.id === hit.animalId)
-        if (a) audio.sfx('hit', new Vector3(a.position.x, world.heightAt(a.position.x, a.position.z) + 1, a.position.z))
+        if (a)
+          audio.sfx(
+            'hit',
+            new Vector3(a.position.x, world.heightAt(a.position.x, a.position.z) + 1, a.position.z)
+          )
       } else if (hit?.kind === 'miss') sim.command({ type: 'spear-miss' })
 
       const showAim = aim > 0.35
@@ -93,7 +102,14 @@ export function createHunt(deps: {
           spear.pickUp()
           return null
         }
-        return { label: 'Pick up the spear', key: 'E', holdSeconds: 0, holdProgress: 0, enabled: true, reason: null }
+        return {
+          label: 'Pick up the spear',
+          key: 'E',
+          holdSeconds: 0,
+          holdProgress: 0,
+          enabled: true,
+          reason: null,
+        }
       }
       return null
     },

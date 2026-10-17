@@ -10,7 +10,12 @@ export const createStubSpoor: CreateSpoor = (world: WorldData) => {
   root.name = 'stub-spoor'
   const geo = new CircleGeometry(0.06, 8)
   geo.rotateX(-Math.PI / 2)
-  const mat = new MeshBasicMaterial({ color: '#3a2a1c', transparent: true, opacity: 0.7, depthWrite: false })
+  const mat = new MeshBasicMaterial({
+    color: '#3a2a1c',
+    transparent: true,
+    opacity: 0.7,
+    depthWrite: false,
+  })
   const prints: Mesh[] = []
   return {
     root,

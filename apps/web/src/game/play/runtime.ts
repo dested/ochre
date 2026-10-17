@@ -5,7 +5,15 @@
 import { PerspectiveCamera, Scene } from 'three'
 import { FIELD_NOTES } from '~/content/field-notes'
 import { bridge as pageBridge, type Bridge } from '../bridge'
-import { FIELD_NOTE_IDS, type GameAudio, type LifeStageId, type SaveData, type WorldData, type WorldView, type RenderPipeline } from '../contracts'
+import {
+  FIELD_NOTE_IDS,
+  type GameAudio,
+  type LifeStageId,
+  type SaveData,
+  type WorldData,
+  type WorldView,
+  type RenderPipeline,
+} from '../contracts'
 import { createHost, type GameHost } from '../engine/host'
 import { createGame, type Game } from './game'
 import { createInput, type Input } from './input'
@@ -31,7 +39,10 @@ export type Runtime = {
   dispose(): void
 }
 
-export function createRuntime(el: HTMLElement, opts: { bridge?: Bridge; wrapAudio?: (a: GameAudio) => GameAudio } = {}): Runtime {
+export function createRuntime(
+  el: HTMLElement,
+  opts: { bridge?: Bridge; wrapAudio?: (a: GameAudio) => GameAudio } = {}
+): Runtime {
   const bridge = opts.bridge ?? pageBridge
   const host = createHost(el)
   const pipeline = modules.createRenderPipeline(host.renderer)
@@ -106,7 +117,7 @@ export function createRuntime(el: HTMLElement, opts: { bridge?: Bridge; wrapAudi
           noteTitle: (id) => rt.noteTitle(id),
           onChapterEnd: (next) => rt.onChapterEnd(next),
         },
-        o,
+        o
       )
       rt.game = game
       return game

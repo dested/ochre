@@ -47,7 +47,10 @@ export type Cast = {
   dispose(): void
 }
 
-export function createCast(world: WorldData, modules: Pick<Modules, 'createPerson' | 'createAnimal'>): Cast {
+export function createCast(
+  world: WorldData,
+  modules: Pick<Modules, 'createPerson' | 'createAnimal'>
+): Cast {
   const root = new Group()
   root.name = 'cast'
   const people = new Map<string, PersonEntry>()
@@ -66,7 +69,16 @@ export function createCast(world: WorldData, modules: Pick<Modules, 'createPerso
         if (!e) {
           const actor = modules.createPerson(p.look)
           root.add(actor.object)
-          e = { actor, anim: null, age: p.look.ageYears, left: 'none', right: 'none', carrying: null, slot: null, talking: false }
+          e = {
+            actor,
+            anim: null,
+            age: p.look.ageYears,
+            left: 'none',
+            right: 'none',
+            carrying: null,
+            slot: null,
+            talking: false,
+          }
           people.set(p.id, e)
         }
         const a = e.actor
@@ -112,7 +124,7 @@ export function createCast(world: WorldData, modules: Pick<Modules, 'createPerso
         const cid = p.carrying?.id ?? null
         const slot = p.carrying?.slot ?? null
         if (cid !== e.carrying || slot !== e.slot) {
-          const child = cid ? people.get(cid)?.actor ?? null : null
+          const child = cid ? (people.get(cid)?.actor ?? null) : null
           if (e.carrying && e.carrying !== cid) {
             const prev = people.get(e.carrying)
             e.actor.carry(null)
@@ -149,7 +161,10 @@ export function createCast(world: WorldData, modules: Pick<Modules, 'createPerso
           e.anim = an.anim
         }
         a.setSpeed(an.speed)
-        const ground = an.kind === 'whale' || an.kind === 'seal' ? Math.max(world.heightAt(an.position.x, an.position.z), state.clock.seaLevel - 0.3) : world.heightAt(an.position.x, an.position.z)
+        const ground =
+          an.kind === 'whale' || an.kind === 'seal'
+            ? Math.max(world.heightAt(an.position.x, an.position.z), state.clock.seaLevel - 0.3)
+            : world.heightAt(an.position.x, an.position.z)
         a.object.position.set(an.position.x, ground + an.altitude, an.position.z)
         a.object.rotation.set(0, an.heading, 0)
         a.update(dt)

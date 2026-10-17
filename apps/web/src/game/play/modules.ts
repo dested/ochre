@@ -24,7 +24,11 @@ import { createWorldData } from '../../world-gen'
 import { createWorldView } from '../world'
 
 /** world's tracking-marks helper (game/world/spoor.ts), per the run plan */
-export type Spoor = { readonly root: Object3D; add(x: number, z: number, heading: number, age: number): void; clear(): void }
+export type Spoor = {
+  readonly root: Object3D
+  add(x: number, z: number, heading: number, age: number): void
+  clear(): void
+}
 export type CreateSpoor = (world: WorldData) => Spoor
 
 export type Modules = {

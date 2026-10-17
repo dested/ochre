@@ -48,7 +48,10 @@ export function createFeed(bridge: Bridge, hooks: FeedHooks): Feed {
       const id = `${c.id}#${serial++}`
       captionExpiry.set(id, now + Math.max(1.5, c.seconds))
       // one caption per speaker at a time; narration replaces narration
-      const keep = bridge.get().captions.filter((x) => !(x.speaker === c.speaker && x.kind === c.kind)).slice(-2)
+      const keep = bridge
+        .get()
+        .captions.filter((x) => !(x.speaker === c.speaker && x.kind === c.kind))
+        .slice(-2)
       bridge.set({ captions: [...keep, { ...c, id }] })
     },
     toast(t) {
@@ -67,22 +70,45 @@ export function createFeed(bridge: Bridge, hooks: FeedHooks): Feed {
           break
         case 'learned':
           if (e.personId === state.playerId) {
-            feed.toast({ kind: 'learned', title: `You learned ${skillName(e.skill)}`, body: e.fromId ? `From watching ${nameOf(e.fromId)}` : null, noteId: null })
+            feed.toast({
+              kind: 'learned',
+              title: `You learned ${skillName(e.skill)}`,
+              body: e.fromId ? `From watching ${nameOf(e.fromId)}` : null,
+              noteId: null,
+            })
           } else if (e.fromId === state.playerId) {
-            feed.toast({ kind: 'learned', title: `${nameOf(e.personId)} learned ${skillName(e.skill)}`, body: 'From watching you', noteId: null })
+            feed.toast({
+              kind: 'learned',
+              title: `${nameOf(e.personId)} learned ${skillName(e.skill)}`,
+              body: 'From watching you',
+              noteId: null,
+            })
           }
           break
         case 'face-learned': {
           const rel = relationOf(e.personId)
           const name = nameOf(e.personId)
-          feed.toast({ kind: 'face', title: rel ? `${rel} · ${name}` : name, body: null, noteId: null })
+          feed.toast({
+            kind: 'face',
+            title: rel ? `${rel} · ${name}` : name,
+            body: null,
+            noteId: null,
+          })
           break
         }
         case 'note': {
           const s = bridge.get()
           if (s.notesUnlocked.includes(e.noteId)) break
-          bridge.set({ notesUnlocked: [...s.notesUnlocked, e.noteId], notesNew: [...s.notesNew, e.noteId] })
-          feed.toast({ kind: 'note', title: 'New Field Note', body: hooks.noteTitle(e.noteId) ?? fallbackTitle(e.noteId), noteId: e.noteId })
+          bridge.set({
+            notesUnlocked: [...s.notesUnlocked, e.noteId],
+            notesNew: [...s.notesNew, e.noteId],
+          })
+          feed.toast({
+            kind: 'note',
+            title: 'New Field Note',
+            body: hooks.noteTitle(e.noteId) ?? fallbackTitle(e.noteId),
+            noteId: e.noteId,
+          })
           break
         }
         case 'chapter-start':
@@ -100,7 +126,13 @@ export function createFeed(bridge: Bridge, hooks: FeedHooks): Feed {
           hooks.modal()
           break
         case 'choice':
-          bridge.set({ choice: { id: e.choice.id, prompt: e.choice.prompt, options: e.choice.options.map((o) => ({ ...o })) } })
+          bridge.set({
+            choice: {
+              id: e.choice.id,
+              prompt: e.choice.prompt,
+              options: e.choice.options.map((o) => ({ ...o })),
+            },
+          })
           hooks.modal()
           break
         case 'camera':
@@ -109,7 +141,12 @@ export function createFeed(bridge: Bridge, hooks: FeedHooks): Feed {
         case 'death': {
           if (e.personId === state.playerId) break
           const rel = relationOf(e.personId)
-          feed.toast({ kind: 'event', title: `${rel ?? nameOf(e.personId)} has died`, body: null, noteId: null })
+          feed.toast({
+            kind: 'event',
+            title: `${rel ?? nameOf(e.personId)} has died`,
+            body: null,
+            noteId: null,
+          })
           break
         }
         case 'life-summary':
@@ -138,7 +175,15 @@ export function createFeed(bridge: Bridge, hooks: FeedHooks): Feed {
     reset() {
       captionExpiry.clear()
       toastExpiry.clear()
-      bridge.set({ captions: [], toasts: [], objective: null, prompt: null, nameTags: [], choice: null, minigame: null })
+      bridge.set({
+        captions: [],
+        toasts: [],
+        objective: null,
+        prompt: null,
+        nameTags: [],
+        choice: null,
+        minigame: null,
+      })
     },
   }
   return feed

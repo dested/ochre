@@ -16,6 +16,7 @@ import type {
   Sim,
   SimEvent,
   SimPerson,
+  Vec2,
   WorldData,
   WorldView,
 } from '../contracts'
@@ -74,6 +75,9 @@ const TAG_BOX_W = 120
 const TAG_BOX_H = 40
 /** the tag draws above its anchor (name, relation, tick): keep the anchor this far below the top margin */
 const TAG_TALL = 52
+/** samples along the eye→head line for tag occlusion, and how long a person stays hidden before the tag fades */
+const OCC_STEPS = 8
+const OCC_HIDE = 0.2
 const MAX_TAGS = 6
 const HELD_FACE_RANGE = 1.2
 
@@ -148,7 +152,13 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   })
 
   function cameraCue(cue: CameraCue): void {
-    if (cue.kind === 'fade') fade = { from: fadeValue, to: cue.to === 'black' ? 1 : 0, t: 0, seconds: Math.max(0.01, cue.seconds) }
+    if (cue.kind === 'fade')
+      fade = {
+        from: fadeValue,
+        to: cue.to === 'black' ? 1 : 0,
+        t: 0,
+        seconds: Math.max(0.01, cue.seconds),
+      }
     else if (cue.kind === 'shake') shake = { strength: cue.strength, t: 0, seconds: cue.seconds }
     else if (cue.kind === 'focus') focus = { targetId: cue.targetId, until: now + cue.seconds }
     else focus = null
@@ -158,7 +168,13 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     const l = lastPrompt
     if (
       p === l ||
-      (p && l && p.label === l.label && p.enabled === l.enabled && p.reason === l.reason && Math.abs(p.holdProgress - l.holdProgress) < 0.01 && p.key === l.key)
+      (p &&
+        l &&
+        p.label === l.label &&
+        p.enabled === l.enabled &&
+        p.reason === l.reason &&
+        Math.abs(p.holdProgress - l.holdProgress) < 0.01 &&
+        p.key === l.key)
     )
       return
     lastPrompt = p
@@ -168,8 +184,14 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   const route = (events: SimEvent[]) => {
     for (const e of events) {
       // UI moments the sim has no position for
-      if ((e.type === 'learned' && (e.personId === sim.state.playerId || e.fromId === sim.state.playerId)) || e.type === 'face-learned') audio.sfx('learn')
-      else if (e.type === 'note' && !bridge.get().notesUnlocked.includes(e.noteId)) audio.sfx('note')
+      if (
+        (e.type === 'learned' &&
+          (e.personId === sim.state.playerId || e.fromId === sim.state.playerId)) ||
+        e.type === 'face-learned'
+      )
+        audio.sfx('learn')
+      else if (e.type === 'note' && !bridge.get().notesUnlocked.includes(e.noteId))
+        audio.sfx('note')
       else if (e.type === 'chapter-start') audio.sfx('chapter')
       else if (e.type === 'life-summary') audio.music('summary')
       else if (e.type === 'teleport') controller.teleport(e.position.x, e.position.z, e.heading)
@@ -185,7 +207,11 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     const sea = sim.state.clock.seaLevel
     // surf or anything deeper: a six-year-old doesn't wade out past the breakers
     const surface = world.surfaceAt(x, z, sea)
-    if ((surface !== 'surf' && surface !== 'shallows' && surface !== 'deep-sea') || world.waterDepth(x, z, sea) <= 0.3) return
+    if (
+      (surface !== 'surf' && surface !== 'shallows' && surface !== 'deep-sea') ||
+      world.waterDepth(x, z, sea) <= 0.3
+    )
+      return
     // uphill is against the ground normal's horizontal part
     const n = world.normalAt(x, z)
     let ux = -n.x
@@ -202,9 +228,17 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     cameraCue({ kind: 'shake', strength: 0.7, seconds: 0.45 })
     audio.sfx('wave-crash', sfxAt.set(x, sea, z))
     surfCooldown = 2.5
-    const mother = player.motherId ? sim.state.people.find((p) => p.id === player.motherId) : undefined
+    const mother = player.motherId
+      ? sim.state.people.find((p) => p.id === player.motherId)
+      : undefined
     const caller = mother?.alive ? mother.name : 'Ama'
-    feed.caption({ id: 'surf-call', text: 'Not so far!', speaker: caller, kind: 'speech', seconds: 2.5 })
+    feed.caption({
+      id: 'surf-call',
+      text: 'Not so far!',
+      speaker: caller,
+      kind: 'speech',
+      seconds: 2.5,
+    })
   }
 
   const updateAudio = (player: SimPerson) => {
@@ -239,7 +273,9 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   }
 
   const updateHeld = (dt: number, player: SimPerson, settings: ControlSettings) => {
-    const carrier = player.carriedBy ? sim.state.people.find((q) => q.id === player.carriedBy) : undefined
+    const carrier = player.carriedBy
+      ? sim.state.people.find((q) => q.id === player.carriedBy)
+      : undefined
     const actor = cast.person(player.id)
     if (!actor || !carrier) return
     actor.headPosition(tmp)
@@ -247,7 +283,17 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     actor.object.visible = false
     const carrierActor = cast.person(carrier.id)
     const face = carrierActor ? carrierActor.headPosition(tmp2) : null
-    held.update(dt, input, camera, tmp, carrier.heading, carrier.speed, settings, carrier.carrying?.slot ?? 'back', face)
+    held.update(
+      dt,
+      input,
+      camera,
+      tmp,
+      carrier.heading,
+      carrier.speed,
+      settings,
+      carrier.carrying?.slot ?? 'back',
+      face
+    )
     camera.updateMatrixWorld()
 
     // gaze: the face nearest the screen centre within 6°
@@ -272,8 +318,16 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       const y = world.heightAt(reach.position.x, reach.position.z) + 0.8
       tmp2.set(reach.position.x, y, reach.position.z).sub(camera.position)
       const looking = fwd.angleTo(tmp2) < 0.45
-      setPrompt({ label: looking ? 'Reach' : 'Look at what she offers', key: 'LMB', holdSeconds: 0, holdProgress: 0, enabled: looking, reason: null })
-      if (looking && input.mouse.lmbPressed) sim.command({ type: 'interact', interactionId: reach.id })
+      setPrompt({
+        label: looking ? 'Reach' : 'Look at what she offers',
+        key: 'LMB',
+        holdSeconds: 0,
+        holdProgress: 0,
+        enabled: looking,
+        reason: null,
+      })
+      if (looking && input.mouse.lmbPressed)
+        sim.command({ type: 'interact', interactionId: reach.id })
     } else setPrompt(null)
   }
 
@@ -317,9 +371,59 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     })
   }
 
+  const caveMouth = world.pois.find((p) => p.id === 'cave-mouth') ?? null
+  const head = new Vector3()
+  /** terrain, the cave's rock (crossing its footprint anywhere but the mouth) and lit flames block the line */
+  const occluded = (from: Vector3, to: Vector3, body: Vector3 | null): boolean => {
+    // the player's own body (a vertical post up to the head), seen from behind
+    if (body) {
+      const dx = to.x - from.x
+      const dz = to.z - from.z
+      const len2 = dx * dx + dz * dz
+      const t = len2 > 1e-6 ? ((body.x - from.x) * dx + (body.z - from.z) * dz) / len2 : -1
+      if (t > 0 && t < 1) {
+        const off = Math.hypot(from.x + dx * t - body.x, from.z + dz * t - body.z)
+        if (off < 0.22 && from.y + (to.y - from.y) * t < body.y + 0.1) return true
+      }
+    }
+    let wasIn = world.inCave(from.x, from.z)
+    for (let i = 1; i < OCC_STEPS; i++) {
+      const t = i / OCC_STEPS
+      const x = from.x + (to.x - from.x) * t
+      const y = from.y + (to.y - from.y) * t
+      const z = from.z + (to.z - from.z) * t
+      const ground = world.heightAt(x, z)
+      if (ground > y) return true
+      const isIn = world.inCave(x, z)
+      if (isIn !== wasIn) {
+        if (!caveMouth || Math.hypot(x - caveMouth.x, z - caveMouth.z) > caveMouth.radius * 1.2 + 4)
+          return true
+        wasIn = isIn
+      }
+      for (const f of sim.state.fires) {
+        if (
+          f.intensity > 0.3 &&
+          Math.hypot(x - f.x, z - f.z) < 0.45 &&
+          y < ground + 1.3 * f.intensity
+        )
+          return true
+      }
+    }
+    return false
+  }
+  const hiddenFor = new Map<string, number>()
+  const selfHead = new Vector3()
+  const litFires: Vec2[] = []
+  let lastTagsAt = 0
+
   const updateTags = (player: SimPerson) => {
     const { width, height } = deps.viewport()
+    const tagDt = Math.min(0.25, now - lastTagsAt)
+    lastTagsAt = now
+    const fading: NameTag[] = []
     const heldStage = player.carriedBy !== null
+    const self = heldStage ? undefined : cast.person(player.id)
+    const playerHead = self ? self.headPosition(selfHead) : null
     type Candidate = { tag: NameTag; d: number }
     const cands: Candidate[] = []
     for (const q of sim.state.people) {
@@ -331,23 +435,33 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       const d = tmp.distanceTo(camera.position)
       // the face filling an infant's view gets no tag: the face toast carries that moment
       if (d > TAG_RANGE || (heldStage && d < HELD_FACE_RANGE)) continue
+      head.copy(tmp)
+      head.y += 0.1
       tmp.y += heldStage ? 0.22 : 0.32
       tmp.project(camera)
       if (tmp.z > 1 || tmp.z < -1 || Math.abs(tmp.x) > 1.1 || Math.abs(tmp.y) > 1.1) continue
+      // a person out of sight loses their tag after OCC_HIDE (faded by the UI, then dropped)
+      const hidden = occluded(camera.position, head, playerHead)
+        ? (hiddenFor.get(q.id) ?? 0) + tagDt
+        : 0
+      hiddenFor.set(q.id, hidden)
+      if (hidden > OCC_HIDE + 0.6) continue
       const speaking = q.speech && q.speech.until > sim.state.clock.t ? q.speech.text : null
-      cands.push({
-        d,
-        tag: {
-          id: q.id,
-          name: q.name,
-          relation: relationOf(q.id),
-          x: Math.min(width - TAG_MARGIN, Math.max(TAG_MARGIN, ((tmp.x + 1) / 2) * width)),
-          y: Math.min(height - TAG_MARGIN, Math.max(TAG_MARGIN + TAG_TALL, ((1 - tmp.y) / 2) * height)),
-          bond: q.bond,
-          opacity: 1 - smooth(heldStage ? 3 : 12, heldStage ? 7 : TAG_RANGE, d),
-          speaking,
-        },
-      })
+      const tag: NameTag = {
+        id: q.id,
+        name: q.name,
+        relation: relationOf(q.id),
+        x: Math.min(width - TAG_MARGIN, Math.max(TAG_MARGIN, ((tmp.x + 1) / 2) * width)),
+        y: Math.min(
+          height - TAG_MARGIN,
+          Math.max(TAG_MARGIN + TAG_TALL, ((1 - tmp.y) / 2) * height)
+        ),
+        bond: q.bond,
+        opacity: 1 - smooth(heldStage ? 3 : 12, heldStage ? 7 : TAG_RANGE, d),
+        speaking,
+      }
+      if (hidden > OCC_HIDE) fading.push({ ...tag, opacity: 0 })
+      else cands.push({ d, tag })
     }
     // declutter: nearest first, at most MAX_TAGS plus anyone speaking; an overlapping farther tag nudges up a
     // line when both are close, otherwise it drops out
@@ -368,6 +482,9 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       if (!c.tag.speaking) quiet++
     }
     const tags = placed.map((c) => c.tag)
+    // keep fading tags only if they were showing, so the UI can ease them out
+    const prevIds = new Set(bridge.get().nameTags.map((t) => t.id))
+    for (const f of fading) if (prevIds.has(f.id)) tags.push(f)
     const prev = bridge.get().nameTags
     if (tags.length === 0 && prev.length === 0) return
     bridge.set({ nameTags: tags })
@@ -382,7 +499,10 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       visible: s.chapter.beatId !== 'elder.walk',
       name: player.name,
       // whole years from one, tenths for an infant
-      ageYears: player.look.ageYears >= 1 ? Math.floor(player.look.ageYears) : Math.round(player.look.ageYears * 10) / 10,
+      ageYears:
+        player.look.ageYears >= 1
+          ? Math.floor(player.look.ageYears)
+          : Math.round(player.look.ageYears * 10) / 10,
       stage: s.stage,
       needs: s.stage === 'held' ? null : { ...player.needs },
       clock,
@@ -398,7 +518,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     const key = w ? `${w.personId}:${w.skill}:${w.progress.toFixed(2)}` : ''
     if (key === watchKey) return
     watchKey = key
-    const name = w ? sim.state.people.find((p) => p.id === w.personId)?.name ?? w.personId : ''
+    const name = w ? (sim.state.people.find((p) => p.id === w.personId)?.name ?? w.personId) : ''
     bridge.setHud({ watching: w ? { name, skill: w.skill, progress: w.progress } : null })
   }
 
@@ -423,23 +543,57 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
         mode = nextMode
         const self = cast.person(player.id)
         if (self) self.object.visible = true
-        if (mode === 'third') controller.teleport(player.position.x, player.position.z, player.heading)
+        if (mode === 'third')
+          controller.teleport(player.position.x, player.position.z, player.heading)
         else held.reset()
       }
 
       const feel = STAGE_FEEL[sim.state.stage]
       let pose: PlayerPose | null = null
       if (mode === 'third') {
-        const out = controller.update(dt, input, feel, sim.state.clock.seaLevel, settings, !live, hunt.aim)
+        const out = controller.update(
+          dt,
+          input,
+          feel,
+          sim.state.clock.seaLevel,
+          settings,
+          !live,
+          hunt.aim
+        )
         const anim = hunt.throwing ? 'throw' : out.anim
-        pose = { x: out.position.x, z: out.position.z, heading: out.heading, speed: out.speed, anim, right: hunt.rightHand() }
+        pose = {
+          x: out.position.x,
+          z: out.position.z,
+          heading: out.heading,
+          speed: out.speed,
+          anim,
+          right: hunt.rightHand(),
+        }
         if (live) {
-          sim.command({ type: 'move', position: out.position, heading: out.heading, speed: out.speed, anim })
+          sim.command({
+            type: 'move',
+            position: out.position,
+            heading: out.heading,
+            speed: out.speed,
+            anim,
+          })
           surfPush(dt, player)
           const moved = Math.hypot(out.position.x - lastPos.x, out.position.z - lastPos.z)
           const stride = 0.55 + player.look.ageYears * 0.012
-          const step = steps.advance(Math.min(moved, 1), Math.min(0.85, stride), world.surfaceAt(out.position.x, out.position.z, sim.state.clock.seaLevel))
-          if (step) audio.sfx(step, sfxAt.set(out.position.x, world.heightAt(out.position.x, out.position.z), out.position.z))
+          const step = steps.advance(
+            Math.min(moved, 1),
+            Math.min(0.85, stride),
+            world.surfaceAt(out.position.x, out.position.z, sim.state.clock.seaLevel)
+          )
+          if (step)
+            audio.sfx(
+              step,
+              sfxAt.set(
+                out.position.x,
+                world.heightAt(out.position.x, out.position.z),
+                out.position.z
+              )
+            )
         }
         lastPos.x = out.position.x
         lastPos.z = out.position.z
@@ -464,7 +618,9 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
             controller.yaw += d * Math.min(1, dt * 2.5)
           }
         } else focus = null
-        controller.updateCamera(dt, camera, feel, hunt.aim)
+        litFires.length = 0
+        for (const f of sim.state.fires) if (f.intensity > 0.1) litFires.push(f)
+        controller.updateCamera(dt, camera, feel, hunt.aim, litFires)
         const huntPrompt = hunt.update(dt, input, player, live)
         if (huntPrompt) setPrompt(huntPrompt)
         else if (live) updateInteract(dt, player)
@@ -499,7 +655,14 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       feed.frame(now)
       updateAudio(player)
 
-      const focusPos = mode === 'held' ? camera.position : tmp.set(controller.position.x, world.heightAt(controller.position.x, controller.position.z), controller.position.z)
+      const focusPos =
+        mode === 'held'
+          ? camera.position
+          : tmp.set(
+              controller.position.x,
+              world.heightAt(controller.position.x, controller.position.z),
+              controller.position.z
+            )
       view.update({
         dt,
         clock: sim.state.clock,
@@ -513,7 +676,13 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     },
     teleport(x, z, heading) {
       controller.teleport(x, z, heading ?? controller.heading)
-      sim.command({ type: 'move', position: { x, z }, heading: heading ?? controller.heading, speed: 0, anim: 'idle' })
+      sim.command({
+        type: 'move',
+        position: { x, z },
+        heading: heading ?? controller.heading,
+        speed: 0,
+        anim: 'idle',
+      })
     },
     player: findPlayer,
     dispose() {
