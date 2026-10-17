@@ -307,6 +307,8 @@ export type PersonActor = {
   setAge(ageYears: number): void
   /** a quiet "speaking" mouth/gesture layer on top of the current anim */
   setTalking(on: boolean): void
+  /** a song instead of speech (the sim's '♪'): open vowels, a slow sway, hands keeping time; wins over talking */
+  setSinging?(on: boolean): void
   update(dt: number): void
   /** world-space point between the eyes (infant camera, name tags) */
   headPosition(out: Vector3): Vector3
