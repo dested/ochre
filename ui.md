@@ -109,6 +109,25 @@ Margins: `clamp(20px, 3vw, 44px)` sides, `clamp(18px, 3.4vh, 36px)` top. Menus s
   italic.
 - **Name tags**: name, relation, a small tick down to the head; warmer with the bond; a voice mark while speaking.
 
+## Minigames
+
+Full-screen over their own painting (`public/art/minigames/`), title and hint top left on a soot wash, actions
+bottom right, one spoken line at a time (the family member by relation from `lineage`, else Tuk / Ama), and a
+result card bottom left: a verdict heading ("A good point", "Sixteen lines", "Eight beads on the string"), one
+italic line, Continue (Enter).
+
+- **Knapping**: press on the edge of the silcrete, pull the hammerstone back, release. Angle off square decides the
+  blow: under 20° bites the outline, 25–58° travels across the face and thins it, past 72° glances. Too square and
+  hard breaks a chunk away; too deep where it is narrow snaps it across. Space turns the stone over (each face has
+  its own scars and thickness). Quality = symmetry and fit to the leaf (60%) and thinness (40%), scaled down if
+  small. Finish unlocks after 6 strikes.
+- **Engraving**: drag inside the ochre (mask: reddish pixels flood-filled from the middle of the painting). A line
+  counts at 60 image px. Quality = lines / 10.
+- **Beads**: the awl sways; press over the glint, hold, release in the pale band. Aim narrows the band. 8 from 12.
+  Quality = 65% strung / 8 + 35% precision.
+- DEV hooks for automation: `window.__knap` (world), `window.__beads` (phase, setup), `__ui.minigame(name)`, and
+  `/lab/ui?minigame=knapping|engraving|beads`.
+
 ## Motion
 
 - Entrances: `animate-ui-rise` (10 px up + fade, 700 ms), `animate-ui-slip` (toasts from the right), `animate-ui-fade`.
@@ -147,12 +166,15 @@ foreground layer (`title/key-fg.webp`) is a transparent cut-out of the key art's
   watch ring, reticle, name tags), `Toasts`.
 - `src/ui/screens/`: title (+ chapter picker), intro, loading, chapter card, pause, settings, notes, lineage,
   choice, summary.
-- `src/ui/minigames/`: knapping, engraving, beads.
+- `src/ui/minigames/`: `MinigameHost` (dispatch, clamps quality, calls `minigameDone`), `kit.tsx` (frame over a
+  painting, spoken line, result card, canvas loop), `Knapping` + `knap-geom.ts` (pure outline geometry and
+  `assess`), `Engraving` (keeps the lines in localStorage `ochre:engraving`, shown on the summary as "The mark you
+  left"), `Beads`, `sound.ts` (plays through `game/audio/shared.ts`).
 - `src/ui/motifs.tsx`, `defs.tsx`, `palette.ts`, `widgets.tsx` (`MenuButton`, `TextButton`), `hooks.ts`.
 - `src/content/`: field notes, stages, skill labels.
 - `/lab/ui` (`src/app/lab/ui.tsx`): every screen and HUD state over a painting. `?preset=busy|quiet|low|disabled|
   aiming|night|held|choice`, `?screen=<screen>`, `?stage=<stage>`, `?bg=cave|title|shore|night|bright|black`,
-  `?panel=0`, `?hold=1`. Backquote toggles the panel; `window.__ui` drives it in DEV.
+  `?panel=0`, `?hold=1`, `?minigame=<game>`. Backquote toggles the panel; `window.__ui` drives it in DEV.
 
 ## The starter's pages
 

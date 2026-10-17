@@ -2,12 +2,60 @@
  * The life summary: the years, the children, what you taught and to whom, the bead you gave, the story you told.
  * Then "Continue as <heir>" (the band goes on) or "Return to the title".
  */
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { bridge, useBridge } from '~/game/bridge'
 import { FIELD_NOTE_IDS } from '~/game/contracts'
 import { SKILL_LABELS } from '~/content/skills'
 import { CrossHatch, HatchRule } from '../motifs'
+import { ENGRAVING_KEY, type SavedEngraving } from '../minigames/Engraving'
 import { MenuButton } from '../widgets'
+
+function isEngraving(v: unknown): v is SavedEngraving {
+  if (typeof v !== 'object' || v === null || !('name' in v) || !('aspect' in v) || !('strokes' in v)) return false
+  return typeof v.name === 'string' && typeof v.aspect === 'number' && Array.isArray(v.strokes) && v.strokes.every((st: unknown) => Array.isArray(st) && st.every((n: unknown) => typeof n === 'number'))
+}
+
+/** the lines from the engraving minigame, if this browser kept them */
+function useEngraving(): SavedEngraving | null {
+  const [mark, setMark] = useState<SavedEngraving | null>(null)
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(ENGRAVING_KEY)
+      const parsed: unknown = raw ? JSON.parse(raw) : null
+      if (isEngraving(parsed)) setMark(parsed)
+    } catch {
+      // no storage, no mark
+    }
+  }, [])
+  return mark
+}
+
+/** the engraved lines redrawn small, pale scratches on red */
+function Mark({ mark }: { mark: SavedEngraving }) {
+  const all = mark.strokes.flat()
+  const xs = all.filter((_, i) => i % 2 === 0)
+  const ys = all.filter((_, i) => i % 2 === 1)
+  const pad = 0.02
+  const x0 = Math.min(...xs) - pad
+  const y0 = Math.min(...ys) - pad
+  const w = Math.max(...xs) + pad - x0
+  const h = Math.max(...ys) + pad - y0
+  return (
+    <svg viewBox={`${x0 * mark.aspect} ${y0} ${w * mark.aspect} ${h}`} className="mt-2 h-[64px] w-auto max-w-full rounded-[3px] bg-ochre/70 px-2 py-1.5" aria-label="the engraving you made">
+      {mark.strokes.map((st, i) => (
+        <polyline
+          key={i}
+          points={st.map((n, j) => (j % 2 === 0 ? n * mark.aspect : n)).join(' ')}
+          fill="none"
+          stroke="#f0c2a4"
+          strokeOpacity="0.85"
+          strokeWidth={h / 60}
+          strokeLinecap="round"
+        />
+      ))}
+    </svg>
+  )
+}
 
 function Section({ title, children, delay }: { title: string; children: ReactNode; delay: number }) {
   return (
@@ -22,6 +70,7 @@ function Section({ title, children, delay }: { title: string; children: ReactNod
 
 export function SummaryScreen() {
   const s = useBridge((st) => st.summary)
+  const mark = useEngraving()
   if (!s) return null
   return (
     <div className="fixed inset-0 animate-ui-fade overflow-hidden bg-soot ui-grain" style={{ animationDuration: '2400ms' }}>
@@ -75,6 +124,11 @@ export function SummaryScreen() {
           <Section title="Field Notes" delay={1200}>
             {s.notesFound} of {FIELD_NOTE_IDS.length} found
           </Section>
+          {mark && mark.name === s.name && mark.strokes.length > 0 && (
+            <Section title="The mark you left" delay={1350}>
+              <Mark mark={mark} />
+            </Section>
+          )}
         </div>
 
         <div className="mt-9 flex animate-ui-rise items-center gap-4" style={{ animationDelay: '1500ms' }}>

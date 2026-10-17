@@ -289,6 +289,9 @@ export function UiLab() {
     const st = params.get('stage')
     if (st && isStage(st)) bridge.set({ chapter: cardFor(st) })
     if (sc && isScreen(sc)) goScreen(sc)
+    const mg = params.get('minigame')
+    const game = GAMES.find((g) => g === mg)
+    if (game) bridge.set({ screen: 'playing', minigame: game })
 
     const key = (e: KeyboardEvent) => {
       if (e.key === '`') setPanel((p) => !p)
@@ -301,6 +304,10 @@ export function UiLab() {
           screen: (n: string) => isScreen(n) && goScreen(n),
           bg: (n: string) => isBg(n) && setBg(n),
           state: () => bridge.get(),
+          minigame: (n: string) => {
+            const game = GAMES.find((g) => g === n)
+            if (game) bridge.set({ screen: 'playing', minigame: game })
+          },
         },
       })
     }
