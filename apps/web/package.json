@@ -52,6 +52,7 @@
     "rimraf": "^6.0.1",
     "superjson": "catalog:",
     "tailwind-merge": "^2.5.5",
+    "three": "0.185.0",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -64,6 +65,7 @@
     "@types/pg": "^8.20.0",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@types/three": "0.185.0",
     "@vitejs/plugin-react": "^4.3.4",
     "prisma": "catalog:",
     "tailwindcss": "catalog:",
