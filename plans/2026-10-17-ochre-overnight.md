@@ -404,6 +404,9 @@ controller, cameras and verbs that make each stage of life feel different; and t
   hides the HUD while `state.chapter.beatId === 'elder.walk'`. NPCs and animals within ~60 m of the player move at
   real-time speed; distant ones at game-time speed (sim). Applies to: sim, play.
 
+- (2026-10-17 01:18, lead) **No more image generation tonight**: the OpenAI credit is exhausted (01:05). Use
+  the art already in `public/art/`, or procedural/shader art. Don't retry the API. Applies to: all.
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: 2078087 (main, 01:15) · Gate: install 0, typecheck 0, test 0 at 2078087 · Deploy: CI run pending
@@ -418,7 +421,7 @@ Board: down · Last pushed: 2078087 (main, 01:15) · Gate: install 0, typecheck 
 
 Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); Drydock portal :4400 (Windows bun, log in
 scratchpad drydock-portal.log)
-Images used: 40 / 200 (lead 2, ui 38)
+Images used: 47 / 200 (lead 2, ui 45). OpenAI credit exhausted 01:05; generation stopped (needs-sal Check 2)
 Waiting on Sal: none (needs-sal file: plans/2026-10-17-needs-sal.md)
 Escalations: none
 Next: review W1 and P1; push once ui's lineage fix makes HEAD green; updates.md.
