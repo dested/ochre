@@ -46,7 +46,7 @@ function createEngine(): Engine {
 
   const muffle = ctx.createBiquadFilter()
   muffle.type = 'lowpass'
-  muffle.frequency.value = 18000
+  muffle.frequency.value = Math.min(ctx.sampleRate * 0.45, 18000)
   muffle.Q.value = 0.5
   muffle.connect(master)
   const world = ctx.createGain()
@@ -104,7 +104,7 @@ export const createAudio: CreateAudio = (): GameAudio => {
     e.ambience.apply(f, presence)
     const m = f?.muffle ?? 0
     // 18 kHz open, ~1 kHz at the stage-1 muffle of 0.7
-    e.muffle.frequency.setTargetAtTime(18000 * Math.pow(300 / 18000, m), e.ctx.currentTime, 0.3)
+    e.muffle.frequency.setTargetAtTime(Math.min(e.ctx.sampleRate * 0.45, 18000) * Math.pow(300 / 18000, m), e.ctx.currentTime, 0.3)
     e.reverbSend.gain.setTargetAtTime(f?.inCave ? 0.5 : 0.06, e.ctx.currentTime, 0.5)
     const horizon = e.ctx.currentTime + LOOKAHEAD
     e.ambience.schedule(horizon)

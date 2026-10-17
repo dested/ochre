@@ -18,10 +18,10 @@ import { paint } from '../render/paint'
 import { createAudio } from '../audio'
 import { createStubSpoor } from './stubs/spoor'
 import { createStubAnimal, createStubPerson } from './stubs/actors'
-import { createStubPipeline } from './stubs/pipeline'
+import { createRenderPipeline } from '../render'
 import { createSim } from '../../sim'
-import { createStubWorldData } from './stubs/world-data'
-import { createStubWorldView } from './stubs/world-view'
+import { createWorldData } from '../../world-gen'
+import { createWorldView } from '../world'
 
 /** world's tracking-marks helper (game/world/spoor.ts), per the run plan */
 export type Spoor = { readonly root: Object3D; add(x: number, z: number, heading: number, age: number): void; clear(): void }
@@ -40,9 +40,9 @@ export type Modules = {
 }
 
 export const modules: Modules = {
-  createWorldData: createStubWorldData,
-  createWorldView: createStubWorldView,
-  createRenderPipeline: createStubPipeline,
+  createWorldData,
+  createWorldView,
+  createRenderPipeline,
   createSim,
   createPerson: createStubPerson,
   createAnimal: createStubAnimal,

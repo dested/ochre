@@ -378,7 +378,8 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     const w = s.weather
     const clock: ClockState = { ...s.clock }
     bridge.setHud({
-      visible: true,
+      // the last walk to the sea has no HUD
+      visible: s.chapter.beatId !== 'elder.walk',
       name: player.name,
       // whole years from one, tenths for an infant
       ageYears: player.look.ageYears >= 1 ? Math.floor(player.look.ageYears) : Math.round(player.look.ageYears * 10) / 10,
