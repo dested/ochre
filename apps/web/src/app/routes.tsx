@@ -1,4 +1,4 @@
-import { redirect, type RouteObject, type LoaderFunctionArgs } from 'react-router-dom'
+import { Outlet, redirect, type RouteObject, type LoaderFunctionArgs } from 'react-router-dom'
 import type { QueryClient } from '@tanstack/react-query'
 import type { TRPCOptionsProxy } from '@trpc/tanstack-react-query'
 import { authClient } from '~/lib/auth-client'
@@ -7,8 +7,13 @@ import type { Session } from '../../server/auth'
 import type { AppRouter } from '../../server/router'
 import { DashboardPage } from './dashboard'
 import { RouteErrorBoundary } from './error-boundary'
-import { HomePage } from './home'
 import { Layout } from './layout'
+import { PeopleLab } from './lab/people'
+import { PlayLab } from './lab/play'
+import { SimLab } from './lab/sim'
+import { UiLab } from './lab/ui'
+import { WorldLab } from './lab/world'
+import { PlayPage } from './play'
 import { SignInPage } from './sign-in'
 import { SignUpPage } from './sign-up'
 
@@ -79,18 +84,33 @@ async function redirectIfSignedIn({ context }: LoaderFunctionArgs) {
   return null
 }
 
+/** the game and the labs render full-bleed; the starter's auth pages keep their nav layout */
+function Shell() {
+  return <Outlet />
+}
+
 export const routes: RouteObject[] = [
   {
     id: 'root',
     path: '/',
-    Component: Layout,
+    Component: Shell,
     loader: rootLoader,
     ErrorBoundary: RouteErrorBoundary,
     children: [
-      { index: true, Component: HomePage },
-      { path: 'sign-in', Component: SignInPage, loader: redirectIfSignedIn },
-      { path: 'sign-up', Component: SignUpPage, loader: redirectIfSignedIn },
-      { path: 'dashboard', Component: DashboardPage, loader: dashboardLoader },
+      { index: true, Component: PlayPage },
+      { path: 'lab/world', Component: WorldLab },
+      { path: 'lab/people', Component: PeopleLab },
+      { path: 'lab/sim', Component: SimLab },
+      { path: 'lab/ui', Component: UiLab },
+      { path: 'lab/play', Component: PlayLab },
+      {
+        Component: Layout,
+        children: [
+          { path: 'sign-in', Component: SignInPage, loader: redirectIfSignedIn },
+          { path: 'sign-up', Component: SignUpPage, loader: redirectIfSignedIn },
+          { path: 'dashboard', Component: DashboardPage, loader: dashboardLoader },
+        ],
+      },
     ],
   },
 ]
