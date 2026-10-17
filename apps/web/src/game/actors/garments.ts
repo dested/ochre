@@ -109,13 +109,18 @@ function ragged(u: number, seed: number, amp: number): number {
   return amp * (n * 1.2 + tabs * 0.8)
 }
 
-/** skirt skinning: torso above the hips, then hips blended into the thighs by side */
+/**
+ * skirt skinning: torso above the hips, then hips blended into the thighs by side. The front goes almost wholly
+ * with the thighs, so a kneeling or seated thigh lifts the skirt over the lap instead of passing through it; the
+ * back keeps some of the hips, so it hangs behind a seat rather than swinging under it
+ */
 function skirtSkin(ctx: BuildCtx, ts: TorsoShape, hemY: number, k = 0.8): SkinFn {
   const { d } = ctx
   return (x, y, z): SkinW => {
     if (y > d.hipY) return ts.skin(x, y, z)
-    const g = smooth(d.hipY, Math.min(hemY, d.hipY - d.thigh * 0.4), y) * k
     const th = Math.atan2(x, z)
+    // the blend is done a third of the way down the thigh (or at a hem above that): below, the hide is the thigh's
+    const g = smooth(d.hipY, Math.max(hemY, d.hipY - d.thigh * 0.35), y) * k * (1 - 0.4 * smooth(1.3, 2.7, Math.abs(th)))
     const wl = clamp(0.5 + 0.5 * Math.sin(th), 0, 1)
     return { b: [B.hips, B.thighL, B.thighR], w: [1 - g, g * wl, g * (1 - wl)] }
   }
@@ -165,7 +170,7 @@ function buildSkirt(ctx: BuildCtx, ts: TorsoShape, kind: 'full' | 'side'): void 
   const centre = kind === 'side' ? side * Math.PI * 0.55 : 0
   const half = kind === 'side' ? Math.PI * rng.range(0.55, 0.68) : Math.PI * 1.06
   const P = new Vector3()
-  ctx.gear.at(new Matrix4(), skirtSkin(ctx, ts, hemLo, 0.85)).grid(kind === 'full' ? 60 : 40, 18, (u, v, out) => {
+  ctx.gear.at(new Matrix4(), skirtSkin(ctx, ts, hemLo, 0.98)).grid(kind === 'full' ? 60 : 40, 18, (u, v, out) => {
     const th = centre + (u * 2 - 1) * half
     // the long diagonal: low on one side, high on the other, plus ragged tabs
     const k = 0.5 + 0.5 * Math.sin(th * side - 0.4)
@@ -261,7 +266,7 @@ function buildWrap(ctx: BuildCtx, ts: TorsoShape): void {
     return lerp(topFront, topBack, 0.5 - 0.5 * Math.cos(th)) + span * diagK + ragged(th / (Math.PI * 2) + 3.1, seed, 0.006 * H)
   }
   const vHip = 0.42
-  ctx.gear.at(new Matrix4(), skirtSkin(ctx, ts, hemBase, 0.85)).grid(
+  ctx.gear.at(new Matrix4(), skirtSkin(ctx, ts, hemBase, 0.98)).grid(
     56,
     22,
     (u, v, out: GridPoint) => {
@@ -344,9 +349,17 @@ function buildApron(ctx: BuildCtx, ts: TorsoShape): void {
   ]
   for (const f of flaps) {
     const hem = d.hipY - f.len
-    const skin: SkinFn = (_x, y) => {
-      const g = smooth(d.hipY, hem, y) * 0.7
-      return { b: [B.hips, B.thighL, B.thighR], w: [1 - g, g * 0.5, g * 0.5] }
+    // below the hips each side of a flap goes with its own thigh, so a kneeling or seated thigh lifts the flap
+    // instead of passing through it: all of the front flap (it drapes over the lap), only the sides of the back
+    // flap (its middle hangs from the hips behind)
+    const rim = Math.sin(f.half0)
+    const skin: SkinFn = (x, y, z) => {
+      const th = Math.atan2(x, z)
+      const s = Math.sin(th)
+      const k = f.k === 0 ? 0.95 : 0.92 * smooth(0.2, 0.85, Math.abs(s))
+      const g = smooth(d.hipY, Math.max(hem, d.hipY - d.thigh * 0.35), y) * k
+      const wl = clamp(0.5 + (0.5 * s) / rim, 0, 1)
+      return { b: [B.hips, B.thighL, B.thighR], w: [1 - g, g * wl, g * (1 - wl)] }
     }
     ctx.gear.at(new Matrix4(), skin).grid(18, 14, (u, v, out) => {
       const half = lerp(f.half0, f.half1, v)
@@ -453,7 +466,8 @@ function buildDiagonal(ctx: BuildCtx, ts: TorsoShape, sd: 1 | -1): void {
   }
   const skin: SkinFn = (x, y, z): SkinW => {
     const th = Math.atan2(x, z)
-    const w = 0.5 * bump(((th - (sd * Math.PI) / 2) / 0.55) ** 2) * smooth(sJY + d.armR, sJY - d.upperArm * 0.25, y)
+    // round the arm the drape goes with it, or a raised arm (grief, a clap) punches through the hide
+    const w = 0.72 * bump(((th - (sd * Math.PI) / 2) / 0.7) ** 2) * smooth(sJY + d.armR, sJY - d.upperArm * 0.25, y)
     const t = ts.skin(x, y, z)
     return { b: [...t.b, sd > 0 ? B.armL : B.armR], w: [...t.w.map((k) => k * (1 - w)), w] }
   }

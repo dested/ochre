@@ -1,15 +1,18 @@
 /**
  * /lab/people: the fixed cast on a warm ground disc under a golden-hour key and a sky-blue fill. Orbit camera,
  * an anim picker, an age slider for the selected person, close-ups that frame a face at 40 cm, and (DEV)
- * window.__lab = { anim, age, closeup, lineup, select, talk, carry, held, cam, count } for bx. ?crowd=N adds N walkers
+ * window.__lab = { anim, age, closeup, lineup, select, talk, carry, held, cam, count, pause, step, only, travel, frame,
+ * contact } for bx. ?crowd=N adds N walkers
  * in circles for the budget test; ?animals=1 swaps in the animal lab (animal-lab.ts).
  */
 import {
   ACESFilmicToneMapping,
+  Box3,
   CircleGeometry,
   Color,
   DirectionalLight,
   Fog,
+  Group,
   HemisphereLight,
   LOD,
   Mesh,
@@ -17,6 +20,8 @@ import {
   PCFShadowMap,
   PerspectiveCamera,
   Scene,
+  SkinnedMesh,
+  SphereGeometry,
   Vector3,
 } from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
@@ -27,6 +32,8 @@ import { createPerson } from './person'
 import { mountAnimals } from './animal-lab'
 import { randomLook } from './looks'
 import { Rng } from '~/core/rng'
+import { clamp } from './geo'
+import { B } from './rig'
 
 const ANIMS: PersonAnim[] = [
   'idle',
@@ -111,6 +118,25 @@ export function mount(el: HTMLElement): () => void {
   ground.receiveShadow = true
   scene.add(ground)
 
+  // (DEV) a hearth marker for the fire anims
+  const hearthMark = new Group()
+  hearthMark.visible = false
+  const coals = new Mesh(new CircleGeometry(0.35, 24), new MeshStandardMaterial({ color: new Color('#3a2418'), emissive: new Color('#c4501c'), emissiveIntensity: 0.6, roughness: 1 }))
+  coals.rotation.x = -Math.PI / 2
+  coals.position.y = 0.01
+  hearthMark.add(coals)
+  const stoneGeo = new SphereGeometry(0.075, 10, 7)
+  const stoneMat = new MeshStandardMaterial({ color: new Color('#7d6a58'), roughness: 0.9 })
+  for (let k = 0; k < 11; k++) {
+    const a = (k / 11) * Math.PI * 2
+    const st = new Mesh(stoneGeo, stoneMat)
+    st.position.set(Math.cos(a) * 0.43, 0.035, Math.sin(a) * 0.43)
+    st.scale.set(1, 0.6, 0.8)
+    st.castShadow = true
+    hearthMark.add(st)
+  }
+  scene.add(hearthMark)
+
   // the cast
   const crowdN = Number(query.get('crowd') ?? 0)
   const people: PersonActor[] = []
@@ -158,6 +184,27 @@ export function mount(el: HTMLElement): () => void {
   let selected = 4
   let closeIdx: number | null = null
   let lookAtCam = true
+  let paused = false
+  let traveller: { p: PersonActor; mps: number } | null = null
+  const levelZero = (p: PersonActor): Mesh[] => {
+    const out: Mesh[] = []
+    p.object.traverse((o) => {
+      if (!(o instanceof LOD)) return
+      o.levels[0]?.object.traverse((m) => {
+        if (m instanceof Mesh) out.push(m)
+      })
+    })
+    return out
+  }
+  /** person i's posed full-detail body (skinned), world space */
+  const bodyBox = (i: number): Box3 => {
+    const box = new Box3()
+    const p = people[i]
+    if (!p) return box
+    p.object.updateMatrixWorld(true)
+    for (const m of levelZero(p)) box.expandByObject(m, true)
+    return box
+  }
 
   const setAnim = (a: PersonAnim): void => {
     anim = a
@@ -440,6 +487,100 @@ export function mount(el: HTMLElement): () => void {
       controls.update()
     },
     count: () => people.length + crowd.length,
+    /** show or hide the panel (clean contact sheets) */
+    ui: (on: boolean) => {
+      panel.style.display = on ? '' : 'none'
+    },
+    /**
+     * a hearth (a ring of stones round a bed of coals, 0.35 m across the bed) where the sim puts the fire a tender
+     * works: 1.27 m in front of person i; a negative index takes it away
+     */
+    hearth: (i: number) => {
+      const p = people[i]
+      hearthMark.visible = !!p
+      if (p) hearthMark.position.set(p.object.position.x, 0, p.object.position.z + 1.27)
+    },
+    /** freeze the actors (the camera still moves); `step` then advances them by hand */
+    pause: (on: boolean) => {
+      paused = on
+    },
+    /** advance every actor `sec` seconds in 1/60 s steps: frames for a contact sheet */
+    step: (sec: number) => {
+      const n = Math.round(clamp(sec, 0, 30) * 60)
+      for (let k = 0; k < n; k++) advance(1 / 60)
+    },
+    /** show only these people (by index; the infant rides with its carrier), or everyone for an empty list */
+    only: (list: number[]) => {
+      people.forEach((p, k) => {
+        p.object.visible = list.length === 0 || list.includes(k)
+      })
+    },
+    /** move person i forward along +Z at `mps` (0 stops and sends them home): a moving crawl in place of the circle */
+    travel: (i: number, mps: number) => {
+      const p = people[i]
+      if (!p) return
+      traveller = mps > 0 ? { p, mps } : null
+      if (mps <= 0) {
+        const w = walkers.find((x) => x.actor === p)
+        if (w) p.object.position.copy(w.home)
+        else p.object.position.set(0, 0, 0.45)
+        p.setSpeed(0)
+      }
+    },
+    /** a fixed full-body camera on person i from its left side or its front, with room for `pad` × the body */
+    frame: (i: number, view: 'side' | 'front', pad = 1.3) => {
+      const b = bodyBox(i)
+      if (b.isEmpty()) return
+      closeIdx = null
+      cradleView = null
+      camera.near = 0.05
+      camera.fov = 35
+      camera.updateProjectionMatrix()
+      const c = b.getCenter(new Vector3())
+      const size = b.getSize(new Vector3())
+      const th = Math.tan((camera.fov * Math.PI) / 360)
+      const across = view === 'side' ? size.z : size.x
+      const dist = Math.max(size.y / 2 / th, across / 2 / (th * camera.aspect)) * pad + (view === 'side' ? size.x : size.z) / 2
+      camera.position.set(c.x + (view === 'side' ? dist : 0), c.y + 0.04, c.z + (view === 'side' ? 0 : dist))
+      controls.target.copy(c)
+      controls.update()
+    },
+    /**
+     * ground contact for person i at full detail: the lowest point of the body, and the lowest point of each foot
+     * (vertices bound mostly to that leg's foot or shin), in world metres
+     */
+    contact: (i: number) => {
+      const p = people[i]
+      if (!p) return null
+      p.object.updateMatrixWorld(true)
+      let minY = Infinity
+      const foot = [new Vector3(0, Infinity, 0), new Vector3(0, Infinity, 0)]
+      const v = new Vector3()
+      levelZero(p).forEach((m, mi) => {
+        if (!(m instanceof SkinnedMesh) || mi !== 0) return
+        const pos = m.geometry.getAttribute('position')
+        const si = m.geometry.getAttribute('skinIndex')
+        const sw = m.geometry.getAttribute('skinWeight')
+        for (let k = 0; k < pos.count; k++) {
+          m.getVertexPosition(k, v).applyMatrix4(m.matrixWorld)
+          if (v.y < minY) minY = v.y
+          let best = -1
+          let bw = 0
+          for (let j = 0; j < 4; j++) {
+            const w = sw.getComponent(k, j)
+            if (w > bw) {
+              bw = w
+              best = si.getComponent(k, j)
+            }
+          }
+          const f = best === B.footL || best === B.shinL ? 0 : best === B.footR || best === B.shinR ? 1 : -1
+          const fv = foot[f]
+          if (fv && v.y < fv.y) fv.copy(v)
+        }
+      })
+      const r = (n: number) => Math.round(n * 1000) / 1000
+      return { minY: r(minY), left: foot[0]?.toArray().map(r), right: foot[1]?.toArray().map(r) }
+    },
     /** triangles per detail level for person i (every level's meshes summed) */
     tris: (i: number) => {
       const p = people[i]
@@ -485,7 +626,8 @@ export function mount(el: HTMLElement): () => void {
 
   const tmp = new Vector3()
   const perf = { n: 0, update: 0, render: 0, dt: 0 }
-  const off = host.onFrame((dt) => {
+  /** move the walkers and update every actor by dt */
+  const advance = (dt: number): void => {
     const walking = anim === 'walk' || anim === 'run'
     for (const w of walkers) {
       if (walking) {
@@ -506,11 +648,21 @@ export function mount(el: HTMLElement): () => void {
       w.actor.setSpeed(w.walkSpeed)
       w.actor.setAnim('walk')
     }
+    if (traveller) {
+      const p = traveller.p.object.position
+      p.z += traveller.mps * dt
+      if (p.z > 1.6) p.z -= 2.4
+      traveller.p.setSpeed(traveller.mps)
+    }
     camera.getWorldPosition(tmp)
     for (const p of people) p.setLookAt(lookAtCam ? tmp : null)
-    const t0 = performance.now()
     for (const p of people) p.update(dt)
     for (const w of crowd) w.actor.update(dt)
+  }
+  const off = host.onFrame((dt) => {
+    const walking = anim === 'walk' || anim === 'run'
+    const t0 = performance.now()
+    advance(paused ? 0 : dt)
     const t1 = performance.now()
     if (closeIdx !== null && !walking) frameClose()
     else if (cradleView) frameCradle()

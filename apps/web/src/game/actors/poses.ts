@@ -294,11 +294,15 @@ export function poseMourn(c: AnimCtx, s: PoseSpec): void {
     if (!a) continue
     a.ik = true
     a.space = B.head
-    a.wrist.set(side * d.ry * 0.32, d.headCy + d.eyeY - d.ry * 0.75, d.headZ + d.ry * 1.05)
+    // the heels of the hands at the jaw, the palms flat on the face and the fingers up over the eyes to the brow.
+    // The bow tips the face toward the knees, so in body space the palms face up and back, the fingers forward
+    a.wrist.set(side * d.ry * 0.36, d.headCy + d.eyeY - d.ry * 0.8, d.headZ + d.ry * 0.95)
     a.pole.set(side * 0.8, -0.6, -0.2)
-    a.hand.set(-0.15, 0, side * 0.1)
-    a.curl = 0.15
-    a.thumb = 0.3
+    a.aim = true
+    a.aimAxis.set(side, 0, 0.12)
+    a.aimPalm.set(-side * 0.25, 0.94, -0.22)
+    a.curl = 0.12
+    a.thumb = 0.25
   }
 }
 
@@ -598,11 +602,13 @@ export function poseDance(c: AnimCtx, s: PoseSpec): void {
     const a = s.arms[i]
     if (!a) continue
     if (d.female) {
+      // the clap rides the chest, so it stays in front of the breastbone however far she bends
       a.ik = true
-      a.wrist.set(side * lerp(0.1, 0.012, clap) * H, d.chestY + 0.05 * H + 0.02 * H * clap, d.chestDepth + 0.16 * H)
+      a.space = B.chest
+      a.wrist.set(side * lerp(0.1, 0.012, clap) * H, d.chestY + 0.07 * H + 0.015 * H * clap, d.chestDepth + 0.13 * H)
       a.pole.set(side, -0.7, -0.3)
       a.aim = true
-      a.aimAxis.set(0, 1, 0.25)
+      a.aimAxis.set(0, 0.75, 0.65)
       a.aimPalm.set(-side, 0, 0)
       a.curl = 0.12
     } else {
