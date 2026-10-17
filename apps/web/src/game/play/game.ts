@@ -123,6 +123,9 @@ const OCC_STEPS = 8
 const OCC_HIDE = 0.2
 /** the held camera hides the carrier's head inside this distance, metres */
 const HEAD_HIDE = 0.3
+/** fade level past which tags and the prompt hide, and how far a face is made out at night */
+const FADE_HIDE = 0.3
+const DARK_RANGE = 10
 /** held.faces opens the look cone this far past the farthest face */
 const FACES_MARGIN = (15 * Math.PI) / 180
 /** an actor's own head bone (people name their bones), not the head of a child it carries */
@@ -250,7 +253,8 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     else focus = null
   }
 
-  const setPrompt = (p: PromptState | null) => {
+  const setPrompt = (want: PromptState | null) => {
+    const p = fadeValue > FADE_HIDE ? null : want
     const l = lastPrompt
     if (
       p === l ||
@@ -268,8 +272,16 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   }
 
   const log: string[] = []
+  /** what a chapter's opening step said after its chapter-start: held until the card closes */
+  let afterCard: SimEvent[] = []
   const route = (events: SimEvent[]) => {
+    let carded = false
     for (const e of events) {
+      if (carded && e.type !== 'teleport') {
+        afterCard.push(e)
+        continue
+      }
+      if (e.type === 'chapter-start') carded = true
       if (e.type !== 'bond' && e.type !== 'sfx') {
         log.push(`${sim.state.chapter.beatId} | ${describe(e)}`)
         if (log.length > LOG_SIZE) log.shift()
@@ -567,8 +579,21 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   const litFires: Vec2[] = []
   let lastTagsAt = 0
 
+  /** beyond DARK_RANGE at night a face can't be made out unless a fire lights it */
+  const inTheDark = (p: Vec2, d: number): boolean => {
+    if (d <= DARK_RANGE || sim.state.clock.daylight > 0.25) return false
+    for (const f of sim.state.fires)
+      if (f.intensity > 0.3 && Math.hypot(p.x - f.x, p.z - f.z) < 3 + f.intensity * 3) return false
+    return true
+  }
+
   const updateTags = (player: SimPerson) => {
     const { width, height } = deps.viewport()
+    // a fade to black takes the tags with it
+    if (fadeValue > FADE_HIDE) {
+      if (bridge.get().nameTags.length > 0) bridge.set({ nameTags: [] })
+      return
+    }
     const tagDt = Math.min(0.25, now - lastTagsAt)
     lastTagsAt = now
     const fading: NameTag[] = []
@@ -592,9 +617,10 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       tmp.project(camera)
       if (tmp.z > 1 || tmp.z < -1 || Math.abs(tmp.x) > 1.1 || Math.abs(tmp.y) > 1.1) continue
       // a person out of sight loses their tag after OCC_HIDE (faded by the UI, then dropped)
-      const hidden = occluded(camera.position, head, playerHead)
-        ? (hiddenFor.get(q.id) ?? 0) + tagDt
-        : 0
+      const hidden =
+        occluded(camera.position, head, playerHead) || inTheDark(q.position, d)
+          ? (hiddenFor.get(q.id) ?? 0) + tagDt
+          : 0
       hiddenFor.set(q.id, hidden)
       if (hidden > OCC_HIDE + 0.6) continue
       const speaking = q.speech && q.speech.until > sim.state.clock.t ? q.speech.text : null
@@ -757,7 +783,14 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
         audio.music(lastStage)
       }
 
-      if (screen === 'playing' && !game.simPaused && !modal) route(sim.step(dt))
+      if (screen === 'playing' && !game.simPaused && !modal) {
+        if (afterCard.length > 0) {
+          const queued = afterCard
+          afterCard = []
+          route(queued)
+        }
+        route(sim.step(dt))
+      }
       player = findPlayer()
       cast.sync(sim.state, dt, pose)
 
