@@ -31,14 +31,15 @@ export type Runtime = {
   dispose(): void
 }
 
-export function createRuntime(el: HTMLElement, opts: { bridge?: Bridge } = {}): Runtime {
+export function createRuntime(el: HTMLElement, opts: { bridge?: Bridge; wrapAudio?: (a: GameAudio) => GameAudio } = {}): Runtime {
   const bridge = opts.bridge ?? pageBridge
   const host = createHost(el)
   const pipeline = modules.createRenderPipeline(host.renderer)
   const scene = new Scene()
   const camera = new PerspectiveCamera(60, 1, 0.05, 4000)
   const input = createInput(host.canvas)
-  const audio = modules.createAudio()
+  const base = modules.createAudio()
+  const audio = opts.wrapAudio ? opts.wrapAudio(base) : base
   const applyVolume = () => {
     const s = bridge.get().settings
     audio.setVolume(s.master, s.music)

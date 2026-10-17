@@ -15,7 +15,7 @@ import type {
   WorldData,
 } from '../contracts'
 import { paint } from '../render/paint'
-import { createStubAudio } from './stubs/audio'
+import { createAudio } from '../audio'
 import { createStubSpoor } from './stubs/spoor'
 import { createStubAnimal, createStubPerson } from './stubs/actors'
 import { createStubPipeline } from './stubs/pipeline'
@@ -46,7 +46,7 @@ export const modules: Modules = {
   createSim,
   createPerson: createStubPerson,
   createAnimal: createStubAnimal,
-  createAudio: createStubAudio,
+  createAudio,
   createSpoor: createStubSpoor,
   paint,
 }

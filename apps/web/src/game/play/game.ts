@@ -72,6 +72,8 @@ const GAZE_RANGE = 7
 const TAG_MARGIN = 48
 const TAG_BOX_W = 120
 const TAG_BOX_H = 40
+/** the tag draws above its anchor (name, relation, tick): keep the anchor this far below the top margin */
+const TAG_TALL = 52
 const MAX_TAGS = 6
 const HELD_FACE_RANGE = 1.2
 
@@ -170,6 +172,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       else if (e.type === 'note' && !bridge.get().notesUnlocked.includes(e.noteId)) audio.sfx('note')
       else if (e.type === 'chapter-start') audio.sfx('chapter')
       else if (e.type === 'life-summary') audio.music('summary')
+      else if (e.type === 'teleport') controller.teleport(e.position.x, e.position.z, e.heading)
       feed.event(e, sim.state, relationOf)
     }
   }
@@ -339,7 +342,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
           name: q.name,
           relation: relationOf(q.id),
           x: Math.min(width - TAG_MARGIN, Math.max(TAG_MARGIN, ((tmp.x + 1) / 2) * width)),
-          y: Math.min(height - TAG_MARGIN, Math.max(TAG_MARGIN, ((1 - tmp.y) / 2) * height)),
+          y: Math.min(height - TAG_MARGIN, Math.max(TAG_MARGIN + TAG_TALL, ((1 - tmp.y) / 2) * height)),
           bond: q.bond,
           opacity: 1 - smooth(heldStage ? 3 : 12, heldStage ? 7 : TAG_RANGE, d),
           speaking,
@@ -357,7 +360,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       if (!c.tag.speaking && quiet >= MAX_TAGS) continue
       if (overlaps(c.tag)) {
         const near = c.d < 8 && placed.some((p) => p.d < 8)
-        const up = { ...c.tag, y: Math.max(TAG_MARGIN, c.tag.y - TAG_BOX_H) }
+        const up = { ...c.tag, y: Math.max(TAG_MARGIN + TAG_TALL, c.tag.y - TAG_BOX_H) }
         if (!near || overlaps(up)) continue
         c.tag = up
       }

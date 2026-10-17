@@ -120,6 +120,8 @@ export function mount(el: HTMLElement): () => void {
   const wakeAudio = () => {
     void rt.audio.resume().catch(() => {})
   }
+  const click = () => rt.audio.sfx('ui-click')
+  const open = () => rt.audio.sfx('ui-open')
 
   const begin = (stage: LifeStageId, saved?: SaveData) => {
     pendingStage = null
@@ -174,12 +176,14 @@ export function mount(el: HTMLElement): () => void {
 
   const pause = () => {
     if (bridge.get().screen !== 'playing' || !rt.game) return
+    open()
     input.releaseLock()
     bridge.set({ screen: 'paused', prompt: null })
     host.setPaused(true)
   }
   const resume = () => {
     if (bridge.get().screen !== 'paused') return
+    click()
     bridge.set({ screen: 'playing' })
     host.setPaused(false)
   }
@@ -187,29 +191,36 @@ export function mount(el: HTMLElement): () => void {
   const uninstall = bridge.provide({
     newLife(name) {
       wakeAudio()
+      click()
       playerName = name.trim() || 'Teni'
       bridge.set({ screen: 'intro', notesUnlocked: [], notesNew: [] })
     },
     introDone() {
+      click()
       begin('held')
     },
     chooseChapter(stage) {
+      click()
       begin(stage)
     },
     continueLife() {
       const file = readSave()
       if (!file) return
+      click()
       playerName = file.name
       begin(file.stage, file.save)
     },
     chapterCardDone() {
-      if (bridge.get().screen === 'chapter-card') bridge.set({ screen: 'playing', chapter: null })
+      if (bridge.get().screen !== 'chapter-card') return
+      click()
+      bridge.set({ screen: 'playing', chapter: null })
     },
     pause,
     resume,
     openNotes() {
       const s = bridge.get().screen
       if (s !== 'notes' && s !== 'lineage') overlayReturn = s
+      open()
       bridge.set({ screen: 'notes' })
     },
     openLineage() {
@@ -217,9 +228,11 @@ export function mount(el: HTMLElement): () => void {
       if (s !== 'notes' && s !== 'lineage') overlayReturn = s
       const g = rt.game
       if (g) bridge.set({ lineage: buildLineage(g.sim) })
+      open()
       bridge.set({ screen: 'lineage' })
     },
     closeOverlay() {
+      click()
       bridge.set({ screen: overlayReturn })
     },
     markNoteRead(id) {
@@ -227,6 +240,7 @@ export function mount(el: HTMLElement): () => void {
       if (s.notesNew.includes(id)) bridge.set({ notesNew: s.notesNew.filter((n) => n !== id) })
     },
     quitToTitle() {
+      click()
       save()
       rt.endLife()
       host.setPaused(false)
@@ -235,6 +249,7 @@ export function mount(el: HTMLElement): () => void {
       bridge.set({ screen: 'title', hasLife: readSave() !== null, summary: null, chapter: null })
     },
     choose(choiceId, optionId) {
+      click()
       rt.game?.sim.command({ type: 'choose', choiceId, optionId })
       bridge.set({ choice: null })
     },
@@ -243,6 +258,7 @@ export function mount(el: HTMLElement): () => void {
       bridge.set({ minigame: null })
     },
     summaryContinue(asHeir) {
+      click()
       const g = rt.game
       if (asHeir && g) {
         g.sim.command({ type: 'continue-as-heir' })
@@ -271,6 +287,9 @@ export function mount(el: HTMLElement): () => void {
     if (bridge.get().screen === 'playing' && !bridge.get().choice && !bridge.get().minigame) pause()
   }
   window.addEventListener('keydown', onKey)
+  // any first gesture (even on the title) lets WebAudio start, so the title music plays
+  window.addEventListener('pointerdown', wakeAudio, true)
+  window.addEventListener('keydown', wakeAudio, true)
   const onHide = () => save()
   window.addEventListener('pagehide', onHide)
 
@@ -316,6 +335,8 @@ export function mount(el: HTMLElement): () => void {
     save()
     if (loadTimer) clearTimeout(loadTimer)
     window.removeEventListener('keydown', onKey)
+    window.removeEventListener('pointerdown', wakeAudio, true)
+    window.removeEventListener('keydown', wakeAudio, true)
     window.removeEventListener('pagehide', onHide)
     offLock()
     offFrame()

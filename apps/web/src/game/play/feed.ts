@@ -121,6 +121,7 @@ export function createFeed(bridge: Bridge, hooks: FeedHooks): Feed {
           break
         case 'bond':
         case 'item':
+        case 'teleport':
           break
       }
     },
