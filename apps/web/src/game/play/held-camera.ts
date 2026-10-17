@@ -157,8 +157,9 @@ export function createHeldCamera(): HeldCamera {
       const breath = Math.sin(phase * 0.35) * 0.004
 
       const yaw = smoothHeading + cam.yaw
-      // looking down never enters her body: lift the gaze until it clears the post under her head
-      if (face) {
+      // looking down never enters her body: lift the gaze until it clears the post under her head (not while she
+      // offers something in her hand, which is held close against her)
+      if (face && !cam.attract) {
         const top = face.y - BODY_BELOW_FACE
         // march the first BODY_REACH of the gaze: any sample inside the post (shoulders, back, sling) is too low
         const into = (pitch: number) => {
