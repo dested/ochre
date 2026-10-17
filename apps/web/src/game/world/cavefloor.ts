@@ -231,7 +231,7 @@ export function createCaveFloor(world: WorldData): CaveFloorView {
   const knap = at(-1.7, -3.7)
   const slabAt = at(-2.2, 3.0)
   // a day bed in the mouth's light, where the view from the hearth falls on it
-  const rest = at(-2.6, -1.4)
+  const rest = at(-1.2, -1.7)
   for (const [a, b, rad] of heaps) {
     const p = at(a, b)
     keep.push({ x: p.x, z: p.z, r: rad })
