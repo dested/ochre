@@ -420,6 +420,12 @@ controller, cameras and verbs that make each stage of life feel different; and t
   `LifeSummary.heirName` carries the grandchild; the summary button reads "Continue as <heirName>". The design doc
   is updated. Applies to: sim, ui, play.
 
+- (2026-10-17 01:38, lead, from world) three 0.185 under `reversedDepthBuffer` reverses its sorted render lists,
+  which also inverts `renderOrder`. `createRenderPipeline` installs compensating sorts, so render through the
+  pipeline. Anyone calling `renderer.render` on their own path (labs) sees inverted renderOrder. Cameras: near 0.1,
+  far ≥ 30000 (the sky dome scales to far). bx runs on the Intel UHD 770 iGPU, so its fps (10–18 in the world)
+  isn't a mid-GPU number: report draw calls and triangles. Applies to: world, people, play.
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: 2078087 (main, 01:15) · Gate: install 0, typecheck 0, test 0 at 2078087 · Deploy: 2078087 live at https://ochre.dested.com (CI 39016003224 green)
