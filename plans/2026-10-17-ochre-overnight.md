@@ -454,13 +454,17 @@ controller, cameras and verbs that make each stage of life feel different; and t
   from the carrier's face. play's held camera widens its FOV (about 60°) so the face and shoulders fit. Replaces the
   01:00 numbers. Applies to: people, play.
 
+- (2026-10-17 02:20, lead) **Seasons:** the sun sets over the sea only in Dec–Feb on this coast. Held, small and youth
+  run in summer (day ~10–40), elder in late summer; provider in late autumn into winter (the storm). The cave mouth
+  faces SW (heading −0.85, world 82b261e); hearth and sleep POIs rotate with it. Applies to: sim, world, play.
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: f48612e (main, 02:05) · Gate: install 0, typecheck 0, test 0, build 0 at f48612e · Deploy: f48612e live (CI 39018937226 green)
 
 | Agent | Model | Owns | Item now | Last sha / artifact | Status |
 | --- | --- | --- | --- | --- | --- |
-| world | opus-xhigh | world-gen, game/world, game/render | W1 | 2edee96 wip (lab washed out at 01:20, not yet ready) | working |
+| world | opus-xhigh | world-gen, game/world, game/render | W2 (atmosphere, coast drama, shelf, cave rock first) | W1 82b261e passed 02:20 | working |
 | people | opus-xhigh | game/actors | P1 fix (resent 02:10; outranks P3) | c66a392 → fix sent 01:35 (budget 7 calls/97k tris per person, 40 cm face, garments, arms) | working |
 | sim | opus-high | sim | S4 (talk) + seat pose | S3 13c05da done (rings, spacing, hysteresis, meal, labels); S2 071949a passed | working |
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | U6 | U5 1fa2a6b passed; U3 bf4973b passed | working |
