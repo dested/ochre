@@ -79,7 +79,8 @@ so cells stay slightly narrower than tall.
 - **Paper** (`.ui-paper`): bone with a faint grain; the torn edge comes from `filter: url(#ui-rough)` on a separate
   backing layer, so the filter never touches text.
 - **Soot wash** (`.ui-wash`): a soft radial soot pool behind HUD text that can land on a bright sky, sand or paper
-  (objective, captions, prompt, name tags; the watch ring has its own).
+  (objective, captions, prompt, name tags; the watch ring has its own). Deep enough (0.6 core) that bone text reads
+  over midday sand; `.ui-wash-tight` is the smaller pool for name tags.
 - **Grain** (`.ui-grain`): an overlay noise for full-screen paintings.
 - SVG filters (`src/ui/defs.tsx`, rendered once by `GameUI`): `#ui-rough` torn edges, `#ui-brush` dry-brush strokes,
   `#ui-brush-soft` a gentle wobble for filled glyphs.
@@ -114,10 +115,17 @@ canvases or full-screen backdrops; an offset that must clear a zoomed block mult
 - **Prompt**: key cap ("E", "Click"), a hold ring around it, the label, and "hold"; disabled shows the reason in
   italic.
 - **Name tags**: name, relation, a small tick down to the head; warmer with the bond; a voice mark while speaking.
+  At most four at once (speaking, then kin, then bond, then nearness); a stranger's "Keda's daughter" line shows only
+  while that person speaks, kin relations always. They fade out while a choice card is up.
+- **Gaze mark**: a dashed bone ring at the centre during `held.faces`, so a baby who can only look knows where it is
+  looking.
+- **Toasts**: "Rebal learned Tides" slips for the same skill fold into one ("Rebal, Wume and 2 others learned
+  Tides").
 - **Control hints** (`hud/Hints.tsx`): first-use lines above the dial, small keycaps and low-contrast words, one at
-  a time: watch ring > aiming > move/look/run (not while held; the elder walks and has no Shift) > an enabled E
-  prompt > Esc. Each shows once per life (`ochre:hints`, cleared by "Begin a life" and by picking a chapter) and
-  fades after use or a timeout. Derived from bridge state only.
+  a time: watch ring > aiming > move/look/run (the elder walks and has no Shift) > look (while held: Mouse only) > an
+  enabled E prompt > Esc. Each shows once per life (`ochre:hints`, cleared by "Begin a life" and by picking a
+  chapter) and fades after use or a timeout. The clocks run only over live play (not under chapter cards, pause or a
+  minigame). Derived from bridge state only.
 - **Name tags** glide between the ~15 Hz positions (transform transition) and are clamped 80 px inside the edges.
   The HUD hides entirely under the pause screen.
 
@@ -194,7 +202,7 @@ foreground layer (`title/key-fg.webp`) is a transparent cut-out of the key art's
   lineage, choice, summary. `src/ui/format.ts`: ages ("a few months old" under 1, whole years after).
 - `src/ui/minigames/`: `MinigameHost` (dispatch, clamps quality, calls `minigameDone`), `kit.tsx` (frame over a
   painting, spoken line, result card, canvas loop), `Knapping` + `knap-geom.ts` (pure outline geometry and
-  `assess`), `Engraving` (keeps the lines in localStorage `ochre:engraving`, shown on the summary as "The mark you
+  `assess`), `Engraving` (keeps the on-stone runs of each line in localStorage `ochre:engraving`, shown on the summary as "The mark you
   left"), `Beads`, `sound.ts` (plays through `game/audio/shared.ts`).
 - `src/ui/motifs.tsx`, `defs.tsx`, `palette.ts`, `widgets.tsx` (`MenuButton`, `TextButton`), `hooks.ts`.
 - `src/content/`: field notes, stages, skill labels.

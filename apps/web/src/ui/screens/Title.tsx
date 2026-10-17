@@ -26,7 +26,7 @@ export function TitleScreen() {
   }
 
   return (
-    <div className="fixed inset-0 overflow-hidden bg-soot">
+    <div className="bg-soot fixed inset-0 overflow-hidden">
       <KeyArt />
       {/* a warm wash from the left so the type always reads */}
       <div
@@ -43,14 +43,14 @@ export function TitleScreen() {
             <Wordmark size={128} className="max-lg:hidden" />
             <Wordmark size={88} className="lg:hidden" />
             <p
-              className="mt-6 font-serif text-[clamp(20px,1.7vw,26px)] italic text-bone ui-halo"
+              className="text-bone ui-halo mt-6 font-serif text-[clamp(20px,1.7vw,26px)] italic"
               style={{ fontVariationSettings: '"opsz" 36, "SOFT" 100', fontWeight: 360 }}>
               One life, eighty thousand years ago
             </p>
           </div>
 
           <nav
-            className="mt-[clamp(28px,6vh,64px)] flex animate-ui-rise flex-col items-start gap-[clamp(6px,1.2vh,12px)]"
+            className="animate-ui-rise mt-[clamp(28px,6vh,64px)] flex flex-col items-start gap-[clamp(6px,1.2vh,12px)]"
             style={{ animationDelay: '600ms' }}>
             <form
               className="mb-2 flex items-end gap-5"
@@ -62,13 +62,13 @@ export function TitleScreen() {
                 Begin a life
               </MenuButton>
               <label className="mb-[9px] flex flex-col gap-0.5">
-                <span className="font-sans text-[12px] text-bone-dim ui-halo">Your name</span>
+                <span className="text-bone-dim ui-halo font-sans text-[12px]">Your name</span>
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value.slice(0, 14))}
                   maxLength={14}
                   spellCheck={false}
-                  className="w-[130px] border-b border-bone/45 bg-transparent pb-0.5 font-serif text-[20px] text-bone outline-none ui-halo-soft focus:border-amber"
+                  className="border-bone/45 text-bone ui-halo-soft focus:border-amber w-[130px] border-b bg-transparent pb-0.5 font-serif text-[20px] outline-none"
                   style={{ fontVariationSettings: '"opsz" 24' }}
                 />
               </label>
@@ -76,12 +76,16 @@ export function TitleScreen() {
             {saved ? (
               <ContinueCard saved={saved} />
             ) : (
-              hasLife && <MenuButton onClick={() => bridge.actions.continueLife()}>Continue</MenuButton>
+              hasLife && (
+                <MenuButton onClick={() => bridge.actions.continueLife()}>Continue</MenuButton>
+              )
             )}
             <MenuButton onClick={() => setPicker(true)}>Chapters</MenuButton>
             <MenuButton onClick={() => bridge.actions.openNotes()}>
               Field Notes
-              {notesCount > 0 && <span className="ml-3 font-sans text-[14px] text-bone-dim">{notesCount}</span>}
+              {notesCount > 0 && (
+                <span className="text-bone-dim ml-3 font-sans text-[14px]">{notesCount}</span>
+              )}
             </MenuButton>
             <MenuButton onClick={() => setAbout(true)}>About this world</MenuButton>
           </nav>
@@ -92,7 +96,7 @@ export function TitleScreen() {
       {about && <AboutScreen onClose={() => setAbout(false)} />}
 
       {!about && (
-        <p className="pointer-events-none absolute bottom-5 left-[clamp(28px,7vw,120px)] font-sans text-[12px] text-bone/60 ui-halo-soft">
+        <p className="text-bone/60 ui-halo-soft pointer-events-none absolute bottom-5 left-[clamp(28px,7vw,120px)] font-sans text-[12px]">
           The southern Cape, about 80,000 years ago
         </p>
       )}
@@ -123,7 +127,8 @@ function KeyArt() {
       const dx = Math.sin(t * 0.05) * 10 + x * 10
       const dy = Math.cos(t * 0.04) * 5 + y * 6
       if (bg.current) bg.current.style.transform = `translate3d(${-dx}px, ${-dy}px, 0) scale(1.08)`
-      if (fg.current) fg.current.style.transform = `translate3d(${-dx * 2.6}px, ${-dy * 1.6}px, 0) scale(1.06)`
+      if (fg.current)
+        fg.current.style.transform = `translate3d(${-dx * 2.6}px, ${-dy * 1.6}px, 0) scale(1.06)`
       raf = requestAnimationFrame(tick)
     }
     window.addEventListener('pointermove', move)
@@ -138,13 +143,18 @@ function KeyArt() {
       <div
         ref={bg}
         className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: 'url(/art/title/key-bg.webp)', transform: 'scale(1.08)', willChange: 'transform' }}
+        style={{
+          backgroundImage: 'url(/art/title/key-bg.webp)',
+          transform: 'scale(1.08)',
+          willChange: 'transform',
+        }}
       />
       {/* the low sun's glow, breathing */}
       <div
-        className="pointer-events-none absolute inset-0 animate-ui-breathe mix-blend-screen"
+        className="animate-ui-breathe pointer-events-none absolute inset-0 mix-blend-screen"
         style={{
-          background: 'radial-gradient(38% 42% at 9% 34%, rgb(255 196 110 / 0.32), transparent 70%)',
+          background:
+            'radial-gradient(38% 42% at 9% 34%, rgb(255 196 110 / 0.32), transparent 70%)',
           animationDuration: '9s',
         }}
       />
@@ -152,7 +162,11 @@ function KeyArt() {
       <div
         ref={fg}
         className="absolute inset-x-0 -bottom-[3%] h-[42%] bg-cover bg-top"
-        style={{ backgroundImage: 'url(/art/title/key-fg.webp)', transform: 'scale(1.06)', willChange: 'transform' }}
+        style={{
+          backgroundImage: 'url(/art/title/key-fg.webp)',
+          transform: 'scale(1.06)',
+          willChange: 'transform',
+        }}
       />
     </div>
   )
@@ -198,11 +212,11 @@ export function ChapterPicker({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener('keydown', key)
   }, [onClose])
   return (
-    <div className="absolute inset-0 flex animate-ui-fade flex-col justify-center bg-soot/70 px-[clamp(24px,5vw,80px)] backdrop-blur-[2px]">
+    <div className="animate-ui-fade bg-soot/70 absolute inset-0 flex flex-col justify-center px-[clamp(24px,5vw,80px)] backdrop-blur-[2px]">
       <div className="mb-6 flex items-end justify-between gap-6">
         <div>
           <h2
-            className="font-serif text-[clamp(34px,3.4vw,52px)] text-bone ui-halo-soft"
+            className="text-bone ui-halo-soft font-serif text-[clamp(34px,3.4vw,52px)]"
             style={{ fontVariationSettings: '"opsz" 96, "SOFT" 100', fontWeight: 480 }}>
             Chapters of a life
           </h2>
@@ -221,23 +235,27 @@ export function ChapterPicker({ onClose }: { onClose: () => void }) {
                 clearHints()
                 bridge.actions.chooseChapter(id)
               }}
-              className="group relative aspect-[3/4] animate-ui-rise overflow-hidden rounded-[4px] text-left outline-none ring-amber/80 focus-visible:ring-2"
+              className="group animate-ui-rise ring-amber/80 relative aspect-[3/4] overflow-hidden rounded-[4px] text-left outline-none focus-visible:ring-2"
               style={{ animationDelay: `${i * 90}ms` }}>
               <div
                 className="absolute inset-0 bg-cover bg-center transition-transform duration-[1600ms] ease-out group-hover:scale-[1.06]"
                 style={{ backgroundImage: `url(${s.painting})` }}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-soot/95 via-soot/30 to-transparent" />
+              <div className="from-soot/95 via-soot/30 absolute inset-0 bg-gradient-to-t to-transparent" />
               <div className="absolute inset-x-0 bottom-0 p-[clamp(10px,1.2vw,18px)]">
                 <h3
-                  className="font-serif text-[clamp(20px,1.8vw,28px)] leading-tight text-bone"
+                  className="text-bone font-serif text-[clamp(20px,1.8vw,28px)] leading-tight"
                   style={{ fontVariationSettings: '"opsz" 48, "SOFT" 100', fontWeight: 500 }}>
                   {s.title}
                 </h3>
-                <p className="mt-0.5 font-sans text-[13px] text-amber">{s.ageYears === 0 ? 'Birth' : `Age ${s.ageYears}`}</p>
-                <p className="mt-1.5 font-sans text-[13px] leading-snug text-bone/80 max-xl:hidden">{s.line}</p>
+                <p className="text-amber mt-0.5 font-sans text-[13px]">
+                  {s.ageYears === 0 ? 'Birth' : `Age ${s.ageYears}`}
+                </p>
+                <p className="text-bone/80 mt-1.5 font-sans text-[13px] leading-snug max-xl:hidden xl:min-h-[4.125em]">
+                  {s.line}
+                </p>
               </div>
-              <div className="absolute inset-0 rounded-[4px] border border-bone/0 transition-colors group-hover:border-bone/40" />
+              <div className="border-bone/0 group-hover:border-bone/40 absolute inset-0 rounded-[4px] border transition-colors" />
             </button>
           )
         })}
@@ -253,21 +271,23 @@ function ContinueCard({ saved }: { saved: NonNullable<BridgeState['saved']> }) {
     <button
       type="button"
       onClick={() => bridge.actions.continueLife()}
-      className="group my-1 flex items-center gap-4 rounded-[4px] bg-soot/45 p-2 pr-6 text-left outline-none ring-amber/80 backdrop-blur-[2px] transition-colors duration-300 hover:bg-soot/65 focus-visible:ring-2">
+      className="group bg-soot/45 ring-amber/80 hover:bg-soot/65 my-1 flex items-center gap-4 rounded-[4px] p-2 pr-6 text-left backdrop-blur-[2px] transition-colors duration-300 outline-none focus-visible:ring-2">
       <span className="relative block aspect-[3/2] w-[112px] shrink-0 overflow-hidden rounded-[3px]">
         <span
           className="absolute inset-0 bg-cover bg-center transition-transform duration-[1200ms] ease-out group-hover:scale-[1.08]"
           style={{ backgroundImage: `url(${stage.painting})` }}
         />
-        <span className="absolute inset-0 rounded-[3px] border border-bone/15 transition-colors group-hover:border-bone/45" />
+        <span className="border-bone/15 group-hover:border-bone/45 absolute inset-0 rounded-[3px] border transition-colors" />
       </span>
       <span className="flex flex-col">
         <span
-          className="font-serif text-[clamp(22px,1.9vw,28px)] leading-tight text-bone transition-colors duration-300 group-hover:text-amber"
+          className="text-bone group-hover:text-amber font-serif text-[clamp(22px,1.9vw,28px)] leading-tight transition-colors duration-300"
           style={{ fontVariationSettings: '"opsz" 72, "SOFT" 100', fontWeight: 420 }}>
           Continue as {saved.name}
         </span>
-        <span className="mt-0.5 font-serif text-[16px] italic text-amber" style={{ fontVariationSettings: '"opsz" 24' }}>
+        <span
+          className="text-amber mt-0.5 font-serif text-[16px] italic"
+          style={{ fontVariationSettings: '"opsz" 24' }}>
           {stage.title} · {ageLabel(saved.ageYears)}
         </span>
       </span>

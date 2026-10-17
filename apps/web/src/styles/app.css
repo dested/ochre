@@ -122,12 +122,12 @@
     inset: -12px -32px;
     z-index: -1;
     pointer-events: none;
-    background: radial-gradient(closest-side, rgb(22 17 14 / 0.5), rgb(22 17 14 / 0.22) 65%, transparent);
+    background: radial-gradient(closest-side, rgb(22 17 14 / 0.6), rgb(22 17 14 / 0.28) 65%, transparent);
   }
   /* a tighter, fainter pool for name tags, which sit right over people and sky */
   .ui-wash-tight::before {
     inset: -5px -14px;
-    background: radial-gradient(closest-side, rgb(22 17 14 / 0.36), rgb(22 17 14 / 0.12) 60%, transparent);
+    background: radial-gradient(closest-side, rgb(22 17 14 / 0.44), rgb(22 17 14 / 0.16) 60%, transparent);
   }
   /* bone paper with a faint grain; the rough edge comes from the #ui-rough filter on a backing layer */
   .ui-paper {

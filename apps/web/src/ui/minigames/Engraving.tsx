@@ -18,7 +18,29 @@ export const ENGRAVING_KEY = 'ochre:engraving'
 /** whose life made it, so a later life doesn't inherit the mark */
 export type SavedEngraving = { name: string; aspect: number; strokes: number[][] }
 
-const NUMBER_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen', 'Twenty']
+const NUMBER_WORDS = [
+  'No',
+  'One',
+  'Two',
+  'Three',
+  'Four',
+  'Five',
+  'Six',
+  'Seven',
+  'Eight',
+  'Nine',
+  'Ten',
+  'Eleven',
+  'Twelve',
+  'Thirteen',
+  'Fourteen',
+  'Fifteen',
+  'Sixteen',
+  'Seventeen',
+  'Eighteen',
+  'Nineteen',
+  'Twenty',
+]
 export const countWord = (n: number) => NUMBER_WORDS[n] ?? String(n)
 
 type Ink = {
@@ -33,7 +55,9 @@ type Ink = {
 const MASK_DOWN = 4
 
 /** the ochre piece: reddish pixels connected to the middle of the painting */
-function buildMask(img: HTMLImageElement): { canvas: HTMLCanvasElement; data: Uint8Array; h: number } | null {
+function buildMask(
+  img: HTMLImageElement
+): { canvas: HTMLCanvasElement; data: Uint8Array; h: number } | null {
   const h = Math.round((img.naturalHeight / img.naturalWidth) * INK_W)
   const w = INK_W / MASK_DOWN
   const mh = Math.round(h / MASK_DOWN)
@@ -151,7 +175,12 @@ export function Engraving({ onDone }: { onDone: (quality: number) => void }) {
     for (let i = 0; i < d / 3; i++) {
       const t = Math.random()
       ctx.fillStyle = `rgba(240, 186, 156, ${0.25 + Math.random() * 0.35})`
-      ctx.fillRect(x0 + (x1 - x0) * t + (Math.random() - 0.5) * 7, y0 + (y1 - y0) * t + (Math.random() - 0.5) * 7, 1.2, 1.2)
+      ctx.fillRect(
+        x0 + (x1 - x0) * t + (Math.random() - 0.5) * 7,
+        y0 + (y1 - y0) * t + (Math.random() - 0.5) * 7,
+        1.2,
+        1.2
+      )
     }
     ctx.globalCompositeOperation = 'destination-in'
     ctx.drawImage(ink.mask, 0, 0)
@@ -214,12 +243,36 @@ export function Engraving({ onDone }: { onDone: (quality: number) => void }) {
     else if (n === 9) say('No one asked for this. You make it anyway.', 4000, true)
   }
 
+  /** the runs of a stroke that lie on the stone; a drag that slides off the edge leaves no line there */
+  const onStone = (pts: readonly number[]): number[][] => {
+    const runs: number[][] = []
+    let run: number[] = []
+    for (let i = 0; i + 1 < pts.length; i += 2) {
+      const x = pts[i]
+      const y = pts[i + 1]
+      if (x !== undefined && y !== undefined && inside(x, y)) {
+        run.push(x, y)
+        continue
+      }
+      if (run.length >= 4) runs.push(run)
+      run = []
+    }
+    if (run.length >= 4) runs.push(run)
+    return runs
+  }
+
   const finish = () => {
     const ink = inkRef.current
     const saved: SavedEngraving = {
       name,
       aspect: ink ? INK_W / ink.h : 1.5,
-      strokes: strokes.current.map((pts) => pts.map((v, i) => Math.round((v / (i % 2 === 0 ? INK_W : (ink?.h ?? INK_W))) * 1000) / 1000)),
+      strokes: strokes.current
+        .flatMap(onStone)
+        .map((pts) =>
+          pts.map(
+            (v, i) => Math.round((v / (i % 2 === 0 ? INK_W : (ink?.h ?? INK_W))) * 1000) / 1000
+          )
+        ),
     }
     try {
       window.localStorage.setItem(ENGRAVING_KEY, JSON.stringify(saved))
@@ -237,7 +290,9 @@ export function Engraving({ onDone }: { onDone: (quality: number) => void }) {
         <>
           Drag the stone point across the ochre. Every line stays.
           {lines > 0 && (
-            <span className="ml-2 font-serif text-amber" style={{ fontVariationSettings: '"opsz" 24' }}>
+            <span
+              className="text-amber ml-2 font-serif"
+              style={{ fontVariationSettings: '"opsz" 24' }}>
               {lines} {lines === 1 ? 'line' : 'lines'}
             </span>
           )}

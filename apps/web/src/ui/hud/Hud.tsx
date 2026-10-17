@@ -10,7 +10,7 @@ import { useRecent, useRevealKey } from '../hooks'
 import { Dial } from './Dial'
 import { ControlHints } from './Hints'
 import { Captions, ObjectiveLine } from './Lines'
-import { NameTags, Prompt, Reticle, WatchRing } from './Marks'
+import { GazeMark, NameTags, Prompt, Reticle, WatchRing } from './Marks'
 import { NeedGlyphs } from './Needs'
 import { Toasts } from './Toasts'
 
@@ -23,17 +23,25 @@ export function Hud({ dimmed = false }: { dimmed?: boolean }) {
   const prompt = useBridge((s) => s.prompt)
   const toasts = useBridge((s) => s.toasts)
   const nameTags = useBridge((s) => s.nameTags)
+  const choosing = useBridge((s) => s.choice !== null)
   const largeCaptions = useBridge((s) => s.settings.largeCaptions)
   const reveal = useRevealKey()
 
   const needs = hud.needs
-  const needsKey = needs ? `${q(needs.fed)}.${q(needs.warmth)}.${q(needs.energy)}.${q(needs.health)}` : 'none'
+  const needsKey = needs
+    ? `${q(needs.fed)}.${q(needs.warmth)}.${q(needs.energy)}.${q(needs.health)}`
+    : 'none'
   const needsRecent = useRecent(needsKey, 7000)
   const clock = hud.clock
   // wake the dial when the hour ticks over, the tide turns a corner or the wind shifts
-  const dialKey = clock ? `${Math.floor(clock.hour)}.${q(clock.tide, 4)}.${hud.wind ? q(hud.wind.strength, 4) : 0}` : 'none'
+  const dialKey = clock
+    ? `${Math.floor(clock.hour)}.${q(clock.tide, 4)}.${hud.wind ? q(hud.wind.strength, 4) : 0}`
+    : 'none'
   const dialRecent = useRecent(dialKey, 6000)
-  const objectiveRecent = useRecent(objective ? `${objective.id}.${objective.text}.${objective.done}` : 'none', 12000)
+  const objectiveRecent = useRecent(
+    objective ? `${objective.id}.${objective.text}.${objective.done}` : 'none',
+    12000
+  )
 
   if (!hud.visible) return null
   const held = hud.stage === 'held'
@@ -42,21 +50,24 @@ export function Hud({ dimmed = false }: { dimmed?: boolean }) {
 
   return (
     <div
-      className="pointer-events-none fixed inset-0 select-none overflow-hidden"
+      className="pointer-events-none fixed inset-0 overflow-hidden select-none"
       style={{ opacity: dimmed ? 0 : 1, transition: 'opacity 400ms ease' }}>
-      <NameTags tags={nameTags} />
+      {/* a choice card owns the frame; tags over its dimmed scene only compete with the options */}
+      <div style={{ opacity: choosing ? 0 : 1, transition: 'opacity 300ms ease' }}>
+        <NameTags tags={nameTags} />
+      </div>
 
-      <div className="absolute left-[clamp(20px,3vw,44px)] top-[clamp(18px,3.4vh,36px)]">
+      <div className="absolute top-[clamp(18px,3.4vh,36px)] left-[clamp(20px,3vw,44px)]">
         <div className="ui-scale">
           {objective && <ObjectiveLine objective={objective} dim={!objectiveRecent && !reveal} />}
         </div>
       </div>
 
-      <div className="absolute left-1/2 top-[clamp(18px,3.4vh,36px)] -translate-x-1/2">
+      <div className="absolute top-[clamp(18px,3.4vh,36px)] left-1/2 -translate-x-1/2">
         <div className="ui-scale">{hud.watching && <WatchRing watching={hud.watching} />}</div>
       </div>
 
-      <div className="absolute right-[clamp(20px,3vw,44px)] top-[clamp(18px,3.4vh,36px)]">
+      <div className="absolute top-[clamp(18px,3.4vh,36px)] right-[clamp(20px,3vw,44px)]">
         <div className="ui-scale">
           <Toasts toasts={toasts} />
         </div>
@@ -80,15 +91,24 @@ export function Hud({ dimmed = false }: { dimmed?: boolean }) {
       <div
         className="absolute left-[clamp(20px,3vw,44px)] max-w-[min(560px,46vw)]"
         style={{
-          bottom: !held && (clock || needs) ? 'calc(clamp(120px,17vh,160px) * var(--ui-zoom))' : 'clamp(24px,4vh,44px)',
+          bottom:
+            !held && (clock || needs)
+              ? 'calc(clamp(120px,17vh,160px) * var(--ui-zoom))'
+              : 'clamp(24px,4vh,44px)',
         }}>
         <div className="ui-scale">
           <ControlHints />
         </div>
       </div>
 
+      {!hud.aiming && objective?.id.startsWith('held.faces') && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+          <GazeMark />
+        </div>
+      )}
+
       {hud.aiming && (
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
           <Reticle />
         </div>
       )}

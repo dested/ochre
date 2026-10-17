@@ -7,19 +7,27 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useBridge } from '~/game/bridge'
 
-type HintId = 'move' | 'menu' | 'act' | 'watch' | 'aim'
+type HintId = 'move' | 'look' | 'menu' | 'act' | 'watch' | 'aim'
 
 const KEY = 'ochre:hints'
 
 type Stored = { name: string; seen: HintId[] }
 
-const isHint = (v: unknown): v is HintId => v === 'move' || v === 'menu' || v === 'act' || v === 'watch' || v === 'aim'
+const isHint = (v: unknown): v is HintId =>
+  v === 'move' || v === 'look' || v === 'menu' || v === 'act' || v === 'watch' || v === 'aim'
 
 function load(name: string): Set<HintId> {
   try {
     const raw = window.localStorage.getItem(KEY)
     const v: unknown = raw ? JSON.parse(raw) : null
-    if (typeof v === 'object' && v !== null && 'name' in v && 'seen' in v && v.name === name && Array.isArray(v.seen)) {
+    if (
+      typeof v === 'object' &&
+      v !== null &&
+      'name' in v &&
+      'seen' in v &&
+      v.name === name &&
+      Array.isArray(v.seen)
+    ) {
       return new Set(v.seen.filter(isHint))
     }
   } catch {
@@ -47,18 +55,29 @@ export function clearHints() {
 }
 
 /** how each hint ends: the keys or buttons that count as using it, and how long it stays at most */
-const DONE: Record<HintId, { codes: string[]; buttons: number[]; ms: number; useMs: number }> = {
-  move: { codes: ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'], buttons: [], ms: 16000, useMs: 1400 },
-  menu: { codes: ['Escape'], buttons: [], ms: 7000, useMs: 0 },
-  act: { codes: ['KeyE'], buttons: [], ms: 12000, useMs: 0 },
-  watch: { codes: [], buttons: [], ms: 7000, useMs: 0 },
-  aim: { codes: [], buttons: [0], ms: 9000, useMs: 0 },
+const DONE: Record<
+  HintId,
+  { codes: string[]; buttons: number[]; mouseMove: boolean; ms: number; useMs: number }
+> = {
+  move: {
+    codes: ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'],
+    buttons: [],
+    mouseMove: false,
+    ms: 16000,
+    useMs: 1400,
+  },
+  look: { codes: [], buttons: [], mouseMove: true, ms: 16000, useMs: 3000 },
+  menu: { codes: ['Escape'], buttons: [], mouseMove: false, ms: 7000, useMs: 0 },
+  act: { codes: ['KeyE'], buttons: [], mouseMove: false, ms: 12000, useMs: 0 },
+  watch: { codes: [], buttons: [], mouseMove: false, ms: 7000, useMs: 0 },
+  aim: { codes: [], buttons: [0], mouseMove: false, ms: 9000, useMs: 0 },
 }
 
 export function ControlHints() {
   const name = useBridge((s) => s.hud.name)
   const stage = useBridge((s) => s.hud.stage)
-  const visible = useBridge((s) => s.hud.visible)
+  // only over live play: a hint's clock must not run out under a chapter card or the pause screen
+  const visible = useBridge((s) => s.hud.visible && s.screen === 'playing' && s.minigame === null)
   const watching = useBridge((s) => s.hud.watching !== null)
   const aiming = useBridge((s) => s.hud.aiming)
   const promptE = useBridge((s) => s.prompt !== null && s.prompt.key === 'E' && s.prompt.enabled)
@@ -70,20 +89,24 @@ export function ControlHints() {
   }, [name])
 
   const walking = stage !== 'held'
-  // what is on screen right now (the watch ring, the spear) first, then moving, then the first prompt, then Esc
-  const active: HintId | null = !seen || !visible
-    ? null
-    : watching && !seen.has('watch')
-      ? 'watch'
-      : aiming && !seen.has('aim')
-        ? 'aim'
-        : walking && !seen.has('move')
-          ? 'move'
-          : promptE && !seen.has('act')
-            ? 'act'
-            : !seen.has('menu')
-              ? 'menu'
-              : null
+  // what is on screen right now (the watch ring, the spear) first, then moving (looking while held), then the first
+  // prompt, then Esc
+  const active: HintId | null =
+    !seen || !visible
+      ? null
+      : watching && !seen.has('watch')
+        ? 'watch'
+        : aiming && !seen.has('aim')
+          ? 'aim'
+          : walking && !seen.has('move')
+            ? 'move'
+            : !walking && !seen.has('look')
+              ? 'look'
+              : promptE && !seen.has('act')
+                ? 'act'
+                : !seen.has('menu')
+                  ? 'menu'
+                  : null
 
   useEffect(() => {
     if (!active) return
@@ -107,15 +130,21 @@ export function ControlHints() {
       useTimer = window.setTimeout(finish, rule.useMs)
     }
     const button = (e: MouseEvent) => {
-      if (rule.buttons.includes(e.button) && useTimer === null) useTimer = window.setTimeout(finish, rule.useMs)
+      if (rule.buttons.includes(e.button) && useTimer === null)
+        useTimer = window.setTimeout(finish, rule.useMs)
+    }
+    const moved = () => {
+      if (rule.mouseMove && useTimer === null) useTimer = window.setTimeout(finish, rule.useMs)
     }
     window.addEventListener('keydown', key)
     window.addEventListener('mousedown', button)
+    window.addEventListener('mousemove', moved)
     return () => {
       window.clearTimeout(timeout)
       if (useTimer !== null) window.clearTimeout(useTimer)
       window.removeEventListener('keydown', key)
       window.removeEventListener('mousedown', button)
+      window.removeEventListener('mousemove', moved)
     }
   }, [active, name])
 
@@ -133,6 +162,11 @@ export function ControlHints() {
             <Keys k={['Shift']} /> run
           </>
         )}
+      </>
+    ),
+    look: (
+      <>
+        <Keys k={['Mouse']} /> look around
       </>
     ),
     menu: (
@@ -157,7 +191,7 @@ export function ControlHints() {
   return (
     <p
       key={active}
-      className="ui-wash animate-ui-rise font-sans text-[13.5px] text-bone/75 ui-halo-soft"
+      className="ui-wash animate-ui-rise text-bone/75 ui-halo-soft font-sans text-[13.5px]"
       style={{ opacity: fading ? 0 : 1, transition: 'opacity 900ms ease' }}>
       {content[active]}
     </p>
@@ -170,7 +204,7 @@ function Keys({ k }: { k: string[] }) {
       {k.map((c) => (
         <kbd
           key={c}
-          className="inline-grid h-[20px] min-w-[20px] place-items-center rounded-[5px] border border-bone/35 bg-soot/40 px-1.5 font-sans text-[11.5px] font-semibold not-italic text-bone/85">
+          className="border-bone/35 bg-soot/40 text-bone/85 inline-grid h-[20px] min-w-[20px] place-items-center rounded-[5px] border px-1.5 font-sans text-[11.5px] font-semibold not-italic">
           {c}
         </kbd>
       ))}
@@ -179,5 +213,5 @@ function Keys({ k }: { k: string[] }) {
 }
 
 function Gap() {
-  return <span className="mx-2.5 text-bone/30">·</span>
+  return <span className="text-bone/30 mx-2.5">·</span>
 }

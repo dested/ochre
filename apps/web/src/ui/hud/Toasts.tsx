@@ -32,47 +32,100 @@ const MARKS: Record<Toast['kind'], ReactNode> = {
   ),
   item: (
     <g fill="none" stroke={C.ochre} strokeWidth="1.6" strokeLinecap="round">
-      <path d="M5 17.5 C3 13 7 5 14 4 C18.5 3.4 19.5 7.4 17 10.8 C14.4 14.4 9 19 5 17.5 Z" fill={C.ochre} fillOpacity="0.15" />
+      <path
+        d="M5 17.5 C3 13 7 5 14 4 C18.5 3.4 19.5 7.4 17 10.8 C14.4 14.4 9 19 5 17.5 Z"
+        fill={C.ochre}
+        fillOpacity="0.15"
+      />
       <path d="M7.4 15.4 C9.6 11.6 12.4 8.4 16 6.2" strokeWidth="1.1" />
     </g>
   ),
   event: (
     <g fill="none" stroke={C.ochre} strokeWidth="1.6" strokeLinecap="round">
       <circle cx="11" cy="11" r="4.2" fill={C.ochre} fillOpacity="0.2" />
-      <path d="M11 2 L11 4.5 M11 17.5 L11 20 M2 11 L4.5 11 M17.5 11 L20 11 M4.6 4.6 L6.4 6.4 M15.6 15.6 L17.4 17.4 M17.4 4.6 L15.6 6.4 M6.4 15.6 L4.6 17.4" strokeWidth="1.3" />
+      <path
+        d="M11 2 L11 4.5 M11 17.5 L11 20 M2 11 L4.5 11 M17.5 11 L20 11 M4.6 4.6 L6.4 6.4 M15.6 15.6 L17.4 17.4 M17.4 4.6 L15.6 6.4 M6.4 15.6 L4.6 17.4"
+        strokeWidth="1.3"
+      />
     </g>
   ),
+}
+
+const OTHER_LEARNED = /^(.+) learned (.+)$/
+
+function joinNames(names: readonly string[]): string {
+  if (names.length <= 1) return names.join('')
+  if (names.length > 3) return `${names.slice(0, 2).join(', ')} and ${names.length - 2} others`
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
+/** folds "Rebal learned Tides", "Wume learned Tides"… into one slip, "Rebal, Wume and 2 others learned Tides" */
+export function mergeToasts(toasts: readonly Toast[]): Toast[] {
+  const out: Toast[] = []
+  const groups = new Map<string, { at: number; names: string[]; skill: string }>()
+  for (const t of toasts) {
+    const m = t.kind === 'learned' ? OTHER_LEARNED.exec(t.title) : null
+    const name = m?.[1]
+    const skill = m?.[2]
+    if (!name || !skill || name === 'You') {
+      out.push(t)
+      continue
+    }
+    const key = `${skill}|${t.body ?? ''}`
+    const group = groups.get(key)
+    if (!group) {
+      groups.set(key, { at: out.length, names: [name], skill })
+      out.push(t)
+      continue
+    }
+    group.names.push(name)
+    const first = out[group.at]
+    if (first) out[group.at] = { ...first, title: `${joinNames(group.names)} learned ${skill}` }
+  }
+  return out
 }
 
 export function Toasts({ toasts }: { toasts: readonly Toast[] }) {
   return (
     <div className="flex w-[300px] flex-col items-end gap-2.5" aria-live="polite">
-      {toasts.slice(-4).map((t, i) => (
-        <ToastSlip key={t.id} toast={t} tilt={i % 2 === 0 ? -0.5 : 0.4} />
-      ))}
+      {mergeToasts(toasts)
+        .slice(-4)
+        .map((t, i) => (
+          <ToastSlip key={t.id} toast={t} tilt={i % 2 === 0 ? -0.5 : 0.4} />
+        ))}
     </div>
   )
 }
 
 function ToastSlip({ toast, tilt }: { toast: Toast; tilt: number }) {
   return (
-    <div className="relative animate-ui-slip" style={{ rotate: `${tilt}deg` }}>
+    <div className="animate-ui-slip relative" style={{ rotate: `${tilt}deg` }}>
       {/* the torn-paper backing, kept separate so the rough filter never touches the text */}
       <div
         className="ui-paper absolute inset-0 rounded-[3px]"
         style={{ filter: 'url(#ui-rough) drop-shadow(0 4px 10px rgb(22 17 14 / 0.45))' }}
       />
-      <div className="relative flex min-w-[220px] max-w-[300px] items-start gap-3 px-4 py-3">
-        <svg width="22" height="22" viewBox="0 0 22 22" className="mt-0.5 shrink-0" aria-hidden style={{ filter: 'url(#ui-brush)' }}>
+      <div className="relative flex max-w-[300px] min-w-[220px] items-start gap-3 px-4 py-3">
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 22 22"
+          className="mt-0.5 shrink-0"
+          aria-hidden
+          style={{ filter: 'url(#ui-brush)' }}>
           {MARKS[toast.kind]}
         </svg>
         <div className="min-w-0">
           <p
-            className="font-serif text-[17px] font-semibold leading-tight text-charcoal"
+            className="text-charcoal font-serif text-[17px] leading-tight font-semibold"
             style={{ fontVariationSettings: '"opsz" 24, "SOFT" 50' }}>
             {toast.title}
           </p>
-          {toast.body && <p className="mt-0.5 font-sans text-[13.5px] leading-snug text-charcoal/75">{toast.body}</p>}
+          {toast.body && (
+            <p className="text-charcoal/75 mt-0.5 font-sans text-[13.5px] leading-snug">
+              {toast.body}
+            </p>
+          )}
         </div>
       </div>
     </div>

@@ -16,14 +16,14 @@ export const STAGES: Record<LifeStageId, StageInfo> = {
     id: 'held',
     title: 'Held',
     ageYears: 0,
-    line: 'Everything is faces, warmth and the breath of the sea.',
+    line: 'Everything is faces, warmth and the breath of the sea',
     painting: '/art/chapters/held.webp',
   },
   small: {
     id: 'small',
     title: 'Small',
     ageYears: 6,
-    line: 'You learn by watching. The shore is wide and full of wonders.',
+    line: 'You learn by watching, on a shore wide and full of wonders',
     painting: '/art/chapters/small.webp',
   },
   youth: {
