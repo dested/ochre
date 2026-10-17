@@ -542,6 +542,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
         reach.position.z
       )
     held.attract = reach ? reachAt : null
+    offerer = reach ? carrier.id : null
     if (reach) {
       tmp2.copy(reachAt).sub(camera.position)
       const looking = fwd.angleTo(tmp2) < REACH_CONE
@@ -682,6 +683,8 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   }
   const hiddenFor = new Map<string, number>()
   const reachAt = new Vector3()
+  /** the carrier holding out what she offers (cast shows her standing, the offer up where the infant sees it) */
+  let offerer: string | null = null
   const selfHead = new Vector3()
   const litFires: Vec2[] = []
   let lastTagsAt = 0
@@ -1022,7 +1025,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
         route(sim.step(dt))
       }
       player = findPlayer()
-      cast.sync(sim.state, dt, pose)
+      cast.sync(sim.state, dt, pose, player?.carriedBy ? offerer : null)
       // the elder sits by the sea (the walk's objective is met): the life's last line
       if (sim.state.chapter.beatId === 'elder.walk' && !lastWords) {
         if (sim.state.chapter.objective) walkSet = true

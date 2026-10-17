@@ -42,8 +42,11 @@ export type Cast = {
   readonly root: Object3D
   person(id: string): PersonActor | null
   animal(id: string): AnimalActor | null
-  /** player pose overrides the sim's copy (no one-frame lag for the controlled body) */
-  sync(state: SimState, dt: number, player: PlayerPose | null): void
+  /**
+   * player pose overrides the sim's copy (no one-frame lag for the controlled body); `offerer` is a carrier
+   * holding something out to the infant: shown standing, not crouched, so the offered hand is up in front of her
+   */
+  sync(state: SimState, dt: number, player: PlayerPose | null, offerer?: string | null): void
   dispose(): void
 }
 
@@ -62,7 +65,7 @@ export function createCast(
     root,
     person: (id) => people.get(id)?.actor ?? null,
     animal: (id) => animals.get(id)?.actor ?? null,
-    sync(state, dt, playerPose) {
+    sync(state, dt, playerPose, offerer = null) {
       seen.clear()
       for (const p of state.people) {
         seen.add(p.id)
@@ -84,7 +87,7 @@ export function createCast(
         }
         const a = e.actor
         const pose = p.isPlayer && playerPose && !p.carriedBy ? playerPose : null
-        const anim = pose ? pose.anim : p.anim
+        const anim = pose ? pose.anim : p.id === offerer && p.anim === 'crouch' ? 'idle' : p.anim
         if (anim !== e.anim) {
           a.setAnim(anim, e.anim === null ? 0 : 0.25)
           e.anim = anim

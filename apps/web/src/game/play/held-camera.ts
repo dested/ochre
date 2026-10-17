@@ -30,6 +30,10 @@ const CRADLE_DROP = 0.22
 const BODY_RADIUS = 0.34
 const BODY_BELOW_FACE = 0.12
 const BODY_REACH = 1.6
+/** the infant's field of view, and narrowed while the gaze rests within FOCUS_CONE of an offered thing */
+const FOV = 62
+const FOV_FOCUS = 46
+const FOCUS_CONE = (10 * Math.PI) / 180
 
 export type HeldCamera = {
   /** relative to the carrier's heading */
@@ -63,6 +67,7 @@ export function createHeldCamera(): HeldCamera {
   const eyeSmooth = new Vector3()
   const eyeWant = new Vector3()
   const look = new Vector3()
+  const focusTmp = new Vector3()
   /** which shoulder (+1 her left, −1 her right) and its eased value */
   let side = 1
   let sideEase = 1
@@ -95,13 +100,16 @@ export function createHeldCamera(): HeldCamera {
       }
       if (input.mouse.dx !== 0 || input.mouse.dy !== 0) idle = 0
       else idle += dt
+      // measured from where the view actually sits (beside her head on the back), not the infant's head: the
+      // offered hand is under a metre away, so the shoulder offset alone is a 25° miss
+      const from = first ? eye : eyeSmooth
       if (cam.attract && idle > ATTRACT_IDLE) {
-        const dx = cam.attract.x - eye.x
-        const dz = cam.attract.z - eye.z
+        const dx = cam.attract.x - from.x
+        const dz = cam.attract.z - from.z
         let ty = Math.atan2(dx, dz) - facing
         ty = MathUtils.clamp(Math.atan2(Math.sin(ty), Math.cos(ty)), -cam.cone, cam.cone)
         const tp = MathUtils.clamp(
-          -Math.atan2(cam.attract.y - eye.y, Math.hypot(dx, dz)),
+          -Math.atan2(cam.attract.y - from.y, Math.hypot(dx, dz)),
           pitchMin,
           pitchMax
         )
@@ -184,8 +192,16 @@ export function createHeldCamera(): HeldCamera {
       camera.up.set(0, 1, 0)
       camera.lookAt(look)
       camera.rotateZ(sway)
-      if (Math.abs(camera.fov - 62) > 0.01) {
-        camera.fov = 62
+      // resting on what she offers, the view narrows onto it (a shell bead is a fingertip across)
+      let fovWant = FOV
+      if (cam.attract) {
+        look.sub(camera.position)
+        if (look.angleTo(focusTmp.copy(cam.attract).sub(camera.position)) < FOCUS_CONE)
+          fovWant = FOV_FOCUS
+      }
+      const fov = camera.fov + (fovWant - camera.fov) * Math.min(1, dt * 2)
+      if (Math.abs(camera.fov - fov) > 0.01) {
+        camera.fov = Math.abs(fov - fovWant) < 0.02 ? fovWant : fov
         camera.updateProjectionMatrix()
       }
     },
