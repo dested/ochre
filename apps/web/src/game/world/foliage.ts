@@ -466,6 +466,12 @@ const WIND_PRE = /* glsl */ `
 
 const PAINT_HEAD = /* glsl */ `
 vec4 ocFacetR = vec4( 0.0 );
+vec3 ocLeafTilt = vec3( 0.0 );
+vec3 ocLeafH( vec3 p ) {
+	p = fract( p * vec3( 0.1031, 0.103, 0.0973 ) );
+	p += dot( p, p.yxz + 33.33 );
+	return fract( ( p.xxy + p.yxx ) * p.zyx );
+}
 vec3 ocLinF( vec3 c ) { return pow( c, vec3( 2.2 ) ); }
 float ocEdgeF( float t, float n ) {
 	float w = max( fwidth( n ) * 0.75, 1e-4 );
@@ -486,12 +492,49 @@ const LEAF_ALBEDO = /* glsl */ `
 		float lc = smoothstep( 6.0, 11.0, uLeaf );
 		float leafy = mix( ocEdgeF( 0.4, lf ), smoothstep( 0.2, 0.8, lf ), lc );
 		diffuseColor.rgb *= mix( mix( 0.58, 0.8, lc ), 1.07, leafy );
+		// near the eye a clump breaks into leaf clusters, as a painter dabs a bush: each a small dome with its own lit
+		// side, tilt and tone, the dark of the inside showing between them, and a few missing, open through to the
+		// twigs behind (a smooth lump with one shadow across it reads as a boulder)
+		float near = 1.0 - smoothstep( 9.0, 30.0, distance( vOcWorld, cameraPosition ) );
+		if ( near > 0.0 ) {
+			vec3 cp = wp * 1.4;
+			vec3 ci = floor( cp );
+			vec3 cf = fract( cp );
+			float d1 = 9.0;
+			vec3 id = vec3( 0.0 );
+			vec3 rn = vec3( 0.0 );
+			for ( int z = - 1; z <= 1; z ++ ) {
+				for ( int y = - 1; y <= 1; y ++ ) {
+					for ( int x = - 1; x <= 1; x ++ ) {
+						vec3 o = vec3( float( x ), float( y ), float( z ) );
+						vec3 r = o + ocLeafH( ci + o ) - cf;
+						float d = dot( r, r );
+						if ( d < d1 ) { d1 = d; id = ci + o; rn = r; }
+					}
+				}
+			}
+			vec3 h = ocLeafH( id + 19.7 );
+			float rad = mix( 0.4, 0.7, h.y ) + ( ocNoise( wp.xz * 3.7 + wp.y * 2.9 ) - 0.5 ) * 0.3;
+			float dab = 1.0 - smoothstep( rad - 0.2, rad + 0.04, sqrt( d1 ) );
+			diffuseColor.rgb *= mix( 1.0, mix( 0.86, 1.12, h.z ) * mix( 0.66, 1.0, dab ), near );
+			ocKeyOcc *= 1.0 - 0.4 * ( 1.0 - dab ) * near;
+			ocLeafTilt = ( - rn * 0.35 * dab + ( h - 0.5 ) * 1.2 ) * near;
+			// the outline is the clusters' edge, not the lump's: between them, where the surface turns away, it opens
+			// (the facet's own normal: the shading normal leans toward the clump's dome and faces the eye too often)
+			vec3 fN = normalize( cross( dFdx( vViewPosition ), dFdy( vViewPosition ) ) );
+			float ndvL = abs( dot( fN, normalize( vViewPosition ) ) );
+			if ( ( dab < 0.55 && ndvL < 0.5 * near ) || h.x < 0.1 * near * lc ) discard;
+		}
 		#ifndef FLAT_SHADED
 			float ndv = abs( dot( normalize( vNormal ), normalize( vViewPosition ) ) );
 			float rag = ocNoise( wp.xz * 1.6 + wp.y * 1.3 + 7.0 );
 			if ( ndv < 0.5 + 0.15 * lc && rag > ndv * ( 1.9 - 0.4 * lc ) + 0.3 - 0.08 * lc ) discard;
 		#endif
 	}
+`
+
+const LEAF_NORMAL = /* glsl */ `
+	normal = normalize( normal + ( viewMatrix * vec4( ocLeafTilt, 0.0 ) ).xyz );
 `
 
 const ROCK_ALBEDO = /* glsl */ `
@@ -543,6 +586,7 @@ function foliageMaterial(key: string, flex: number, brush: number, leaf: number)
     vertexPre: flex > 0 ? WIND_PRE : '',
     fragmentHead: `${PAINT_HEAD}\nuniform float uLeaf;`,
     albedo: leaf > 0 ? LEAF_ALBEDO : '',
+    normal: leaf > 0 ? LEAF_NORMAL : '',
     uniforms: { uFlex: { value: flex }, uLeaf: { value: leaf } },
   })
   return m
