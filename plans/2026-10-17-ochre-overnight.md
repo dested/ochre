@@ -557,6 +557,46 @@ controller, cameras and verbs that make each stage of life feel different; and t
   the player is within 30 m of the hearth. Where a beat needs a later day, the jump is a fade cut after the wait, with
   no sleep required (Sleep stays optional in the evening). Target: no free wait over 100 s real time. Applies to: sim.
 
+- (2026-10-17 03:45, lead) **Fix round F1, from ui's U7 fresh-eyes pass** (shots in `/w/junk/sim-80k/ui/shots/u7/`).
+  Contracts d564210: `Objective.target?: ObjectiveTarget` (`{kind:'person', id}` | `{kind:'point', at}`) and
+  `BridgeState.objectiveMark` (`{x, y, onScreen, angle, distance}` | null). Each owner works in this order:
+  **play** (stops PL3 run 3; fixes first):
+  1. Held camera never inside the carrier (`19-shell-look.png`: a hollow face and floating eyes). Nothing of the carrier
+     is inside the near plane. On the back, the camera sits beside her head, over the shoulder (0.25 m to the side,
+     0.1 m up from the child's eyes), and the carrier's head and hair hide whenever the camera is within 0.3 m. Check
+     held.faces, held.sea, held.shell, held.night and the small carries.
+  2. elder.walk is playable: the HUD shows "Walk down to the sea", the elder walks at 0.8 m/s, and the death lands even
+     when skipped (last caption, slow fade, sound, then the summary). No beat freezes input for more than 20 s without
+     a caption or a camera move.
+  3. Nothing starts under the chapter card or a fade: the director clock holds until `chapterCardDone`, and tags and the
+     prompt hide during fades (`sheet-57.png`).
+  4. The beat's interaction wins the E prompt (Talk to Maku in provider.whale, provider.teach). Offer Eat only when
+     fed < 0.5 or no beat interaction is in reach.
+  5. held.faces: every face reachable inside the yaw clamp (widen it to the faces' bearings at beat start, plus 15°).
+  6. Name tags hide when the head is behind terrain (8 `heightAt` samples along the ray) or the person is beyond 10 m
+     in the dark.
+  7. The camera never sits inside foliage (bushes within 1.2 m of the camera fade, or it passes through them), and the
+     player never sinks into rock.
+  8. `objectiveMark`: resolve `Objective.target` each frame (a person at +1.7 m, a point at `heightAt` +1 m), project
+     it, and publish at about 15 Hz. Null when there's no target, within 6 m, in the held stage, and during cinematics
+     and fades.
+  9. The heir card: after "Continue as <name>", the chapter card's title is the heir's name and the subtitle is
+     "<old name>'s grandchild · six summers". Fade in from the card, never a black first frame under the HUD.
+  **sim:** (1) `Objective.target` on every objective with a place (follow X → person; back to the sand → safe-sand;
+  tell the others → the nearest untold person; shore and rocks → their POIs; the honeyguide aside → Tuk), with a test
+  that every movement objective has one. (2) Relations rebased to the current player in lineage and tags (Teni's
+  partner is Rebal's grandparent, not "Partner"). (3) provider.teach in afternoon daylight, with a hint line that says
+  what to do (dig where the leaves are and let the child watch) and chatter about corms, not stone. (4) The whale lands
+  in daylight with the band running to the shore, calling out, and a caption chain.
+  **world** (after W3 1–3): (a) a readable ambient floor inside the cave by day and away from the fire at night
+  (`71-elder-out.png`, `20-shell-3.png`, taken before 7ebcd6f, so recheck on the current build). (b) The opening's near
+  cave wall is huge blurry orange blobs (`04-held-look.png`): finer near rock with no blur, and a golden 18:20 sky
+  through the mouth, not blue. (c) The youth scrub floor reads as camo with identical bushes (`49-youth-start.png`).
+  (d) The tide is a flat white sheet (`36-run-sand.png`): lace foam lines and wet-sand sheen instead. (e) A backlit player
+  is a black silhouette (`26-small-next.png`): more sky fill and rim on people.
+  **ui:** draw `objectiveMark`. On screen it's a small ochre diamond over the target; off screen, an edge arrow at
+  the clamped point with its angle. It fades in 4 s after the objective changes and hides when null.
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: 927056d (main, 03:05) · Gate: install 0, typecheck 0, test 0 (52), build 0 at 927056d · Deploy: 927056d live (CI 39022048182 green, /healthz ok)
