@@ -48,7 +48,8 @@ export function createCaveRock(seed: number, finalH: HeightSampler, preH: Height
     const faceN = n3.fbm(x / 9, 3.7, z / 9, 2)
     // rock stands proud only on the steep faces; on gentle ground it stays under the soil
     let bulge = (slopeK * (1.3 + faceN * 1.3) - 0.7 * (1 - slopeK)) * (1 - edge) - 4 * edge
-    bulge -= 5 * (1 - smoothstep(2.4, 5.5, pathNear(x, z)))
+    const onPath = 1 - smoothstep(2.4, 5.5, pathNear(x, z))
+    bulge -= 5 * onPath
     const hw = caveHalfWidth(Math.min(a, 0))
     const terraceK =
       (1 - smoothstep(CAVE.terrace, CAVE.terrace + 4, a)) *
@@ -60,9 +61,12 @@ export function createCaveRock(seed: number, finalH: HeightSampler, preH: Height
       (1 - smoothstep(0.5, 3.5, a)) *
       (1 - smoothstep(hw + 1, hw + 4.5, Math.abs(b))) *
       smoothstep(-CAVE.depth - 6, -CAVE.depth - 1, a)
-    const topOver = over > 0 ? hPre + 0.35 + faceN * 0.6 - (1 - over) * 8 : -1e9
+    // beside the mouth (never over it) a path also cuts the overhang's and the brow's flanks, which would
+    // otherwise stand as a slab across the cliff path the player walks through
+    const flankCut = 6 * onPath * smoothstep(hw + 0.5, hw + 3, Math.abs(b))
+    const topOver = over > 0 ? hPre + 0.35 + faceN * 0.6 - (1 - over) * 8 - flankCut : -1e9
     const browK = (1 - smoothstep(1.2, 3.6, a)) * smoothstep(-6, -1, a) * (1 - smoothstep(hw + 2, hw + 7, Math.abs(b)))
-    const topBrow = browK > 0 ? CAVE.floor + CAVE.ceiling + 3.4 + faceN * 1.2 - (1 - browK) * 9 : -1e9
+    const topBrow = browK > 0 ? CAVE.floor + CAVE.ceiling + 3.4 + faceN * 1.2 - (1 - browK) * 9 - flankCut : -1e9
     return { x, z, a, b, hFinal, top0, topOver, topBrow }
   }
 
