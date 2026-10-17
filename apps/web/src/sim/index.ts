@@ -14,7 +14,7 @@ import { interact, interactionsNear, playerOf, relationOf, updateSleepSkip } fro
 import { gaze, spoil, updateAge, updateBonds, updateFires, updateLearning, updateNeeds } from './life'
 import { PathService } from './path'
 import { decodeSave, encodeSave, type SavePayload } from './save'
-import { emptyMoments, showerOver, updateMoments } from './moments'
+import { afterLoad, emptyMoments, momentExtras, showerOver, updateMoments } from './moments'
 import { emptyTalk, noticeRecent, updateChatter } from './talk'
 import { resetStage } from './setup'
 import { STAGE_EPOCH } from './time'
@@ -100,7 +100,10 @@ export function createSimWith(opts: SimOptions, flags: { director: boolean }): S
 
   resetStage(ctx, stage, buildBand(seed, stage, playerName))
   const saved = opts.save ? decodeSave(opts.save) : null
-  if (saved) restore(ctx, saved)
+  if (saved) {
+    restore(ctx, saved)
+    afterLoad(ctx)
+  }
   for (const p of state.people) if (p.carriedBy) syncCarried(ctx, p)
 
   const director: Director | null = flags.director
@@ -222,6 +225,7 @@ export function createSimWith(opts: SimOptions, flags: { director: boolean }): S
   }
 
   function serialize() {
+    const extras = momentExtras(ctx)
     const payload: SavePayload = {
       seed,
       stage: ctx.stage,
@@ -229,8 +233,9 @@ export function createSimWith(opts: SimOptions, flags: { director: boolean }): S
       epoch: ctx.epoch,
       t: state.clock.t,
       timeScale: ctx.sleepSkip ? ctx.sleepSkip.restore : state.timeScale,
-      people: state.people,
-      animals: state.animals,
+      // a half-played moment's visitor or lion is not part of the world the save keeps
+      people: state.people.filter((p) => !extras.people.has(p.id)),
+      animals: state.animals.filter((a) => !extras.animals.has(a.id)),
       fires: state.fires,
       fuel: Object.fromEntries(Object.entries(ctx.fuel).map(([k, v]) => [k, { fuel: v.fuel }])),
       hearth: state.hearth,
@@ -239,7 +244,7 @@ export function createSimWith(opts: SimOptions, flags: { director: boolean }): S
       chapter: state.chapter,
       playerId: state.playerId,
       playerControlled: ctx.playerControlled,
-      agents: [...ctx.agents.values()].map((a) => ({
+      agents: [...ctx.agents.values()].filter((a) => !extras.people.has(a.id)).map((a) => ({
         id: a.id,
         sleepId: a.sleepId,
         seat: a.seat,

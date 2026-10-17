@@ -5,7 +5,7 @@
  * beat runs, and chosen by a hash of the seed and the hour, so the same seed lives the same days.
  */
 import { hashString, mix32, Rng } from '../core/rng'
-import type { LifeStageId, SimPerson, Vec2 } from '../game/contracts'
+import type { LifeStageId, Objective, SimPerson, Vec2 } from '../game/contracts'
 import { bedPos, createAgent, roleOf, seatPos, setOrder } from './ai'
 import { addAnimal, findWalkable, headingTo, removeAnimal } from './animals'
 import type { Order, Pose, SimCtx } from './ctx'
@@ -52,10 +52,17 @@ export type MomentState = {
   rain: { level: number; until: number } | null
   /** a log of moments begun, for the lab and run-day */
   log: string[]
+  /** a director's free wait: one moment is sure to happen in it */
+  window: FreeWindow | null
+  /** an optional objective a moment offers ("Follow Tuk and the honeyguide"), shown when the director has none */
+  aside: Objective | null
 }
 
+/** game times; `pick` names the moment that should come (else any that can), `got` once one has begun */
+export type FreeWindow = { from: number; until: number; pick: MomentId | null; got: boolean }
+
 export function emptyMoments(): MomentState {
-  return { active: null, lastAt: -1e9, slot: -1, fired: {}, rain: null, log: [] }
+  return { active: null, lastAt: -1e9, slot: -1, fired: {}, rain: null, log: [], window: null, aside: null }
 }
 
 type Step = {
@@ -159,6 +166,12 @@ function arrived(ctx: SimCtx, ids: readonly (string | undefined)[]): boolean {
   return ids.every((id) => !id || ctx.agents.get(id)?.order?.arrived !== false)
 }
 
+/** a call across the camp: shown wherever the player is */
+function call(ctx: SimCtx, r: Run, who: string | undefined, text: string): void {
+  const p = personById(ctx, who)
+  if (p) speak(ctx, p, fill(ctx, text), `moment-${r.id}-${r.step}-call-${Math.floor(ctx.state.clock.t)}`)
+}
+
 /** speech is shown when the speaker is near the player, narration when the moment is */
 function say(ctx: SimCtx, r: Run, who: string | null, text: string): void {
   const pl = playerOf(ctx)
@@ -238,7 +251,7 @@ const MOMENTS: readonly Moment[] = [
   {
     id: 'honeyguide',
     label: 'A honeyguide leads the men to honey',
-    stages: ['small', 'provider', 'elder'],
+    stages: ['small', 'youth', 'provider', 'elder'],
     ok: (ctx) => isDay(ctx, 9, 3) && !wet(ctx),
     cast(ctx) {
       const m = men(ctx).sort((a, b) => dist(a.position, hearth(ctx)) - dist(b.position, hearth(ctx)))
@@ -252,7 +265,9 @@ const MOMENTS: readonly Moment[] = [
       {
         run(ctx, r) {
           say(ctx, r, null, 'A small brown bird chatters at the men and flits from bush to bush.')
-          say(ctx, r, r.cast.lead ?? null, 'A honeyguide. Come. It knows where the bees are.')
+          call(ctx, r, r.cast.lead, 'Come. The bird is talking.')
+          const lead = personById(ctx, r.cast.lead)
+          ctx.moments.aside = { id: 'moment-honeyguide', text: `Go with ${lead ? lead.name : 'the men'} after the honeyguide`, done: null, total: null }
           const bees = r.spots.bees ?? hearth(ctx)
           order(ctx, r, r.cast.lead, { kind: 'goto', dest: bees, near: 1.2, speed: 1.4, pose: CROUCH, face: bees })
           order(ctx, r, r.cast.second, { kind: 'goto', dest: { x: bees.x + 1.6, z: bees.z + 0.8 }, near: 1.2, speed: 1.4, pose: CROUCH, face: bees })
@@ -270,9 +285,15 @@ const MOMENTS: readonly Moment[] = [
         after: 15,
         run(ctx, r) {
           say(ctx, r, null, 'They leave a piece of the comb on a branch for the bird.')
+          ctx.moments.aside = null
+          // whoever came along walks back with them
+          const pl = playerOf(ctx)
+          const came = pl && dist(pl.position, r.anchor) < 30 ? pl : null
+          if (came) r.cast.came = came.id
           for (const id of [r.cast.lead, r.cast.second]) {
             const ag = id ? ctx.agents.get(id) : undefined
-            if (ag) order(ctx, r, id, { kind: 'goto', dest: seatPos(ctx, ag), near: 0.8, pose: SIT, face: hearth(ctx) })
+            const wait = came ? { waitFor: came.id, waitDist: 12 } : {}
+            if (ag) order(ctx, r, id, { kind: 'goto', dest: seatPos(ctx, ag), near: 0.8, pose: SIT, face: hearth(ctx), ...wait })
           }
         },
       },
@@ -280,13 +301,17 @@ const MOMENTS: readonly Moment[] = [
         until: (ctx, r) => arrived(ctx, [r.cast.lead, r.cast.second]),
         max: 50,
         run(ctx, r) {
+          // the sweet share, at the fire
           r.anchor = hearth(ctx)
           say(ctx, r, r.cast.lead ?? null, 'Honey. One piece each, and the little ones first.')
           say(ctx, r, null, 'Sweet and smoky, passed from hand to hand.')
           for (const p of ctx.state.people) {
             if (!p.alive || dist(p.position, hearth(ctx)) > 12) continue
             p.needs.fed = Math.min(1, p.needs.fed + 0.05)
-            if (!p.isPlayer && (p.id === r.cast.lead || p.id === r.cast.second)) addBond(ctx, p, 0.02)
+          }
+          for (const id of [r.cast.lead, r.cast.second]) {
+            const q = personById(ctx, id)
+            if (q) addBond(ctx, q, r.cast.came ? 0.05 : 0.02)
           }
         },
       },
@@ -296,7 +321,7 @@ const MOMENTS: readonly Moment[] = [
   {
     id: 'lion-eyes',
     label: "A lion's eyes at the edge of the firelight",
-    stages: ['small', 'provider', 'elder'],
+    stages: ['small', 'youth', 'provider', 'elder'],
     ok(ctx) {
       const h = hourNow(ctx)
       const { set } = sun(ctx)
@@ -359,7 +384,7 @@ const MOMENTS: readonly Moment[] = [
   {
     id: 'visitor',
     label: 'A visitor from the lagoon band',
-    stages: ['small', 'provider', 'elder'],
+    stages: ['small', 'youth', 'provider', 'elder'],
     ok: (ctx) => isDay(ctx, 9.5, 3) && !wet(ctx) && !ctx.state.people.some((p) => p.familyId === 'lagoon'),
     cast(ctx) {
       const h = hearth(ctx)
@@ -408,7 +433,7 @@ const MOMENTS: readonly Moment[] = [
   {
     id: 'seal-pup',
     label: 'A seal pup on the rocks',
-    stages: ['small', 'provider', 'elder'],
+    stages: ['small', 'youth', 'provider', 'elder'],
     ok: (ctx) => isDay(ctx, 8, 2) && !ctx.state.weather.storm,
     cast(ctx) {
       const pl = playerOf(ctx)
@@ -466,7 +491,7 @@ const MOMENTS: readonly Moment[] = [
   {
     id: 'rain-dash',
     label: 'A sudden shower sends everyone running for the cave',
-    stages: ['small', 'provider', 'elder'],
+    stages: ['small', 'youth', 'provider', 'elder'],
     ok: (ctx) => isDay(ctx, 10, 2) && !wet(ctx),
     cast(ctx) {
       const pl = playerOf(ctx)
@@ -509,7 +534,7 @@ const MOMENTS: readonly Moment[] = [
   {
     id: 'moon-dance',
     label: 'A full-moon dance at the hearth',
-    stages: ['small', 'provider', 'elder'],
+    stages: ['small', 'youth', 'provider', 'elder'],
     ok(ctx) {
       const h = hourNow(ctx)
       const { set } = sun(ctx)
@@ -585,11 +610,15 @@ const MOMENTS: readonly Moment[] = [
           const carrier = personById(ctx, child.carriedBy ?? undefined)
           if (carrier) carrier.carrying = null
           child.carriedBy = null
-          const at = findWalkable(ctx, { x: pl.position.x + Math.sin(pl.heading) * 3.2, z: pl.position.z + Math.cos(pl.heading) * 3.2 }, 6)
+          // in front of the player, or off to one side when the fire is in front
+          const ahead = (a: number): Vec2 => ({ x: pl.position.x + Math.sin(a) * 3.2, z: pl.position.z + Math.cos(a) * 3.2 })
+          const byFire = (q: Vec2) => ctx.state.fires.some((f) => f.intensity > 0.05 && dist(f, q) < 2)
+          const at = findWalkable(ctx, [pl.heading, pl.heading + 1.1, pl.heading - 1.1, pl.heading + Math.PI].map(ahead).find((q) => !byFire(q)) ?? ahead(pl.heading), 6)
           child.position = { x: at.x, z: at.z }
           order(ctx, r, child.id, { kind: 'hold', pose: STAND, face: pl.position })
           const mum = personById(ctx, child.motherId ?? undefined)
-          const voice = carrier && !carrier.isPlayer ? carrier : mum && !mum.isPlayer ? mum : null
+          const near = (q: SimPerson | undefined): q is SimPerson => !!q && !q.isPlayer && dist(q.position, pl.position) < 25
+          const voice = near(carrier) ? carrier : near(mum) ? mum : null
           say(ctx, r, voice?.id ?? null, voice ? `${child.name}, look. Look who is there.` : `${child.name} stands, swaying, and looks at you.`)
         },
       },
@@ -598,7 +627,8 @@ const MOMENTS: readonly Moment[] = [
         run(ctx, r) {
           const pl = playerOf(ctx)
           if (!pl) return
-          order(ctx, r, r.cast.child, { kind: 'follow', targetId: pl.id, near: 0.7, speed: 0.45 })
+          // toddling, never the follow order's catch-up trot
+          order(ctx, r, r.cast.child, { kind: 'goto', dest: { ...pl.position }, near: 0.7, speed: 0.45, face: pl.position })
           say(ctx, r, null, 'One step. Two. A wobble, and three.')
         },
       },
@@ -641,6 +671,7 @@ function begin(ctx: SimCtx, m: Moment, parts: NonNullable<ReturnType<Moment['cas
   st.active = { id: m.id, step: 0, stepAt: ctx.state.clock.t, ordered: [], people: [], animals: [], forced, ...parts }
   st.lastAt = ctx.state.clock.t
   st.fired[m.id] = dayKey(ctx)
+  if (st.window && ctx.state.clock.t >= st.window.from) st.window.got = true
   const h = Math.floor(ctx.state.clock.hour)
   const mm = Math.floor((ctx.state.clock.hour - h) * 60)
   st.log.push(`D${ctx.state.clock.day} ${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')} ${m.label}`)
@@ -654,6 +685,7 @@ function finish(ctx: SimCtx): void {
   for (const id of r.people) removePerson(ctx, id)
   for (const id of r.animals) removeAnimal(ctx, id)
   if (r.id === 'rain-dash') ctx.moments.rain = null
+  ctx.moments.aside = null
   const child = personById(ctx, r.cast.child)
   const carrier = personById(ctx, r.carrier ?? undefined)
   if (r.id === 'first-steps' && child && carrier && !carrier.carrying && child.alive) {
@@ -688,6 +720,14 @@ export function updateMoments(ctx: SimCtx): void {
   const st = ctx.moments
   const t = ctx.state.clock.t
   if (st.rain && t > st.rain.until) st.rain = null
+  advance(ctx)
+  syncAside(ctx)
+}
+
+/** play the moment in progress a step on, or perhaps begin one */
+function advance(ctx: SimCtx): void {
+  const st = ctx.moments
+  const t = ctx.state.clock.t
   const r = st.active
   if (r) {
     // a director beat taking over ends a free-day moment (the lab's triggered ones run in a sandbox)
@@ -715,21 +755,87 @@ export function updateMoments(ctx: SimCtx): void {
   const slot = Math.floor(t / SLOT)
   if (slot === st.slot) return
   st.slot = slot
-  if (!allowed(ctx) || t - st.lastAt < GAME_HOUR) return
+  if (!allowed(ctx)) return
+  // a free wait that has had no moment yet: past its middle (or soon, for a named one), one comes for sure
+  const w = st.window
+  if (w && !w.got && t >= w.from && t < w.until) {
+    // from the middle one the player can see; in the last quarter any at all
+    const dueAt = w.pick ? w.from + SLOT : w.from + (w.until - w.from) / 2
+    const lastAt = w.until - (w.until - w.from) / 4
+    if (t >= dueAt) {
+      // a named one is waited for until the last quarter, then any will do
+      const named = w.pick ? readyNow(ctx, [w.pick], false) : []
+      const seen = !w.pick || t >= lastAt ? readyNow(ctx, MOMENT_IDS, true) : []
+      const anywhere = t >= lastAt ? readyNow(ctx, MOMENT_IDS, false) : []
+      const pick = pickOf(ctx, named, 'moment-due') ?? pickOf(ctx, seen, 'moment-due') ?? pickOf(ctx, anywhere, 'moment-due')
+      if (pick) {
+        begin(ctx, pick.m, pick.parts, false)
+        return
+      }
+    }
+  }
+  // a wait for one named moment keeps the others away
+  if (t - st.lastAt < GAME_HOUR || (w && w.pick && !w.got)) return
   const roll = (mix32(ctx.state.seed, hashString(`moment|${ctx.stage}|${slot}`)) >>> 0) / 4294967296
   if (roll >= ROLL) return
+  const pick = pickOf(ctx, readyNow(ctx, MOMENT_IDS, true), 'moment-pick')
+  if (pick) begin(ctx, pick.m, pick.parts, false)
+}
+
+/** the moments that could begin now: right stage, not yet today, time and weather allow, people about */
+function readyNow(ctx: SimCtx, ids: readonly MomentId[], nearPlayer: boolean): Array<{ m: Moment; parts: NonNullable<ReturnType<Moment['cast']>> }> {
+  const st = ctx.moments
   const today = dayKey(ctx)
   const pl = playerOf(ctx)
   const ready: Array<{ m: Moment; parts: NonNullable<ReturnType<Moment['cast']>> }> = []
   for (const m of MOMENTS) {
-    if (!m.stages.includes(ctx.stage) || st.fired[m.id] === today || !m.ok(ctx)) continue
+    if (!ids.includes(m.id) || !m.stages.includes(ctx.stage) || st.fired[m.id] === today || !m.ok(ctx)) continue
     const parts = m.cast(ctx)
     if (!parts) continue
-    if (pl && dist(pl.position, parts.anchor) > NEAR_PLAYER * 1.5) continue
+    if (nearPlayer && pl && dist(pl.position, parts.anchor) > NEAR_PLAYER * 1.5) continue
     ready.push({ m, parts })
   }
-  const pick = pickOf(ctx, ready, 'moment-pick')
-  if (pick) begin(ctx, pick.m, pick.parts, false)
+  return ready
+}
+
+/** a sandbox has no director to show a moment's aside; put it on the chapter state ourselves */
+function syncAside(ctx: SimCtx): void {
+  if (ctx.director) return
+  const now = ctx.state.chapter.objective
+  const want = ctx.moments.aside
+  if ((now?.id ?? null) === (want?.id ?? null)) return
+  if (now && !now.id.startsWith('moment-')) return
+  ctx.state.chapter.objective = want
+  ctx.events.push({ type: 'objective', objective: want })
+}
+
+/** a director's free wait of `hours`: the band lives its own life, and one moment (`pick`, or any) is sure to come */
+export function openWindow(ctx: SimCtx, hours: number, pick: MomentId | null = null): void {
+  const t = ctx.state.clock.t
+  ctx.moments.window = { from: t, until: t + hours * GAME_HOUR, pick, got: false }
+}
+
+/** the free wait is over: its time is up and no moment is still playing (true when there is none) */
+export function windowOver(ctx: SimCtx): boolean {
+  const w = ctx.moments.window
+  if (!w) return true
+  if (ctx.moments.active) return false
+  // a wait for one named moment ends once it has played
+  if (ctx.state.clock.t < w.until && !(w.pick && w.got)) return false
+  ctx.moments.window = null
+  return true
+}
+
+/** what a save should leave out: the people and animals a half-played moment put into the world */
+export function momentExtras(ctx: SimCtx): { people: ReadonlySet<string>; animals: ReadonlySet<string> } {
+  const r = ctx.moments.active
+  return { people: new Set(r?.people ?? []), animals: new Set(r?.animals ?? []) }
+}
+
+/** after a load: no visitor stays on from another band, and no moment is half played */
+export function afterLoad(ctx: SimCtx): void {
+  for (const p of [...ctx.state.people]) if (p.familyId === 'lagoon-visit') removePerson(ctx, p.id)
+  ctx.moments = emptyMoments()
 }
 
 /** the weather with any passing shower laid over it */

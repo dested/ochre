@@ -10,6 +10,7 @@ import { addBond } from '../life'
 import { randomLook } from '../looks'
 import { makeName } from '../names'
 import { createAgent, seatPos } from '../ai'
+import { openWindow, windowOver, type MomentId } from '../moments'
 import { hashString, mix32, Rng } from '../../core/rng'
 import { ageBand } from './history'
 import {
@@ -52,6 +53,7 @@ import {
   type Chapter,
   type D,
   type Role,
+  type Step,
 } from './runtime'
 
 // ─── poses ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -197,6 +199,17 @@ function walkedDown(d: D, mark: 'shore-path-top' | 'mid' | 'shelf', near: number
   if (mark === 'shore-path-top') return dist(m.position, top) < near || left < dist(top, bed)
   if (mark === 'mid') return left < (dist(top, bed) + dist(bottom, bed)) / 2
   return left < bed.radius + 16
+}
+
+/** free hours: everyone back to their own lives for a while, and one of the day's moments (`pick`, or any) is sure to come */
+function freeHours(hours: number, pick: MomentId | null = null): Step[] {
+  return [
+    run((d) => {
+      releaseAll(d)
+      openWindow(d.ctx, hours, pick)
+    }),
+    freeUntil((d) => windowOver(d.ctx)),
+  ]
 }
 
 // ─── Stage 1: Held ──────────────────────────────────────────────────────────────────────────────────────────
@@ -489,6 +502,7 @@ const small: Chapter = {
         return [extra('tag', 'tag', `Tag ${kid.name}`, kid.position, () => {}, { targetKind: 'person', targetId: kid.id })]
       },
     },
+    { id: 'small.free', steps: freeHours(2) },
     {
       id: 'small.dig',
       steps: [
@@ -836,6 +850,7 @@ const youth: Chapter = {
       extras: (d) => [extra('share', 'give', 'Share the meat', hearth(d), () => {}, { targetId: 'hearth-main' })],
       allows: (_d, i) => i.verb !== 'give',
     },
+    { id: 'youth.free', steps: freeHours(2) },
     {
       id: 'youth.gathering',
       steps: [
@@ -906,7 +921,7 @@ const provider: Chapter = {
   next: 'elder',
   beats: [
     {
-      id: 'provider.teach',
+      id: 'provider.steps',
       steps: [
         run((d) => {
           d.ctx.noAiHunts = false
@@ -915,7 +930,14 @@ const provider: Chapter = {
           seatPlayer(d, 0.5)
         }),
         ...fadeIn(2),
-        wait(4),
+        wait(3),
+        // a morning with the little one before the years go by: its first steps, toward you
+        ...freeHours(1.5, 'first-steps'),
+      ],
+    },
+    {
+      id: 'provider.teach',
+      steps: [
         ...fadeOut(1.5),
         say('Four summers pass.', null, 4),
         run((d) => {
@@ -1161,6 +1183,7 @@ const elder: Chapter = {
       ],
       extras: (d) => [extra('engrave', 'engrave', 'Engrave the ochre', hearth(d), () => {}, { targetId: 'hearth-main' })],
     },
+    { id: 'elder.free', steps: freeHours(2) },
     {
       id: 'elder.story',
       steps: [

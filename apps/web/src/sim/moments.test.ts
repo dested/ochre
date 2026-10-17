@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import type { LifeStageId, Sim, SimEvent, Vec2 } from '../game/contracts'
 import { createSandboxSim, createSim, debugCtx } from './index'
-import { activeMoment, MOMENT_IDS, triggerMoment, type MomentId } from './moments'
+import { activeMoment, MOMENT_IDS, openWindow, triggerMoment, windowOver, type MomentId } from './moments'
 import { createTestWorld } from './test-world'
 
 const world = createTestWorld(1)
@@ -53,7 +53,7 @@ describe('days worth living', () => {
       const corms0 = sim.state.hearth.corms
       expect(triggerMoment(ctx, id)).toBe(true)
       const caps: string[] = []
-      const seen = { lion: false, seal: false, visitor: false, rain: false, dance: false, setDown: false }
+      const seen = { lion: false, seal: false, visitor: false, rain: false, dance: false, setDown: false, aside: false }
       for (let i = 0; i < 30 * 400 && activeMoment(ctx) === id; i++) {
         hold()
         for (const e of sim.step(1 / 30)) if (e.type === 'caption' && e.caption.id.startsWith('moment-')) caps.push(e.caption.text)
@@ -64,6 +64,7 @@ describe('days worth living', () => {
         if (s.people.some((p) => p.anim === 'dance')) seen.dance = true
         if (s.people.some((p) => !p.carriedBy && p.look.ageYears < 2.2 && p.anim === 'walk')) seen.setDown = true
         if (ctx.moments.active?.animals.length && id === 'seal-pup') seen.seal = true
+        if (sim.state.chapter.objective?.id === 'moment-honeyguide') seen.aside = true
       }
       expect(activeMoment(ctx)).toBeNull()
       expect(caps.length).toBeGreaterThanOrEqual(2)
@@ -83,7 +84,13 @@ describe('days worth living', () => {
         expect(seen.setDown).toBe(true)
         expect(sim.state.people.find((p) => p.id === 'child-1')?.carriedBy).toBe(pl.id)
       }
-      if (id === 'honeyguide') expect(caps.some((c) => c.startsWith('Honey'))).toBe(true)
+      if (id === 'honeyguide') {
+        expect(caps).toContain('Come. The bird is talking.')
+        expect(caps.some((c) => c.startsWith('Honey'))).toBe(true)
+        // the optional "go with Tuk" objective comes and goes with the walk
+        expect(seen.aside).toBe(true)
+        expect(sim.state.chapter.objective).toBeNull()
+      }
     }, 30_000)
   }
 
@@ -106,6 +113,48 @@ describe('days worth living', () => {
     for (let i = 1; i < a.starts.length; i++) expect((a.starts[i] ?? 0) - (a.starts[i - 1] ?? 0)).toBeGreaterThanOrEqual(3600)
     expect(run().log).toEqual(a.log)
   }, 60_000)
+
+  test('a free wait brings one moment for sure, and ends when its time is up', () => {
+    const sim = createSandboxSim({ seed: 5, world, stage: 'small', playerName: 'Teni' })
+    runTo(sim, 10)
+    const ctx = ctxOf(sim)
+    const from = sim.state.clock.t
+    const before = ctx.moments.log.length
+    openWindow(ctx, 2)
+    let over = false
+    for (let i = 0; i < 20_000 && !over; i++) {
+      sim.step(10 / sim.state.timeScale)
+      over = windowOver(ctx)
+    }
+    expect(over).toBe(true)
+    expect(ctx.moments.log.length).toBeGreaterThan(before)
+    expect(sim.state.clock.t).toBeGreaterThanOrEqual(from + 2 * 3600)
+  }, 30_000)
+
+  test("provider opens on the child's first steps, toward the player, before the years skip", () => {
+    const sim = createSim({ seed: 1, world, stage: 'provider', playerName: 'Teni' })
+    const ctx = ctxOf(sim)
+    const caps: string[] = []
+    for (let i = 0; i < 30 * 300 && sim.state.chapter.beatId !== 'provider.teach'; i++) {
+      for (const e of sim.step(1 / 30)) if (e.type === 'caption' && e.caption.id.startsWith('moment-')) caps.push(e.caption.text)
+    }
+    expect(sim.state.chapter.beatId).toBe('provider.teach')
+    expect(ctx.moments.log.map((l) => l.replace(/^D\d+ \d\d:\d\d /, ''))).toEqual(["The child's first steps toward the player"])
+    expect(caps).toContain('Into your arms.')
+  }, 30_000)
+
+  test('a save made mid-moment loads with no visitor and no half-played moment', () => {
+    const sim = createSandboxSim({ seed: 1, world, stage: 'small', playerName: 'Teni' })
+    runTo(sim, 11)
+    const ctx = ctxOf(sim)
+    expect(triggerMoment(ctx, 'visitor')).toBe(true)
+    for (let i = 0; i < 30 * 5; i++) sim.step(1 / 30)
+    expect(sim.state.people.some((p) => p.id.startsWith('visitor-'))).toBe(true)
+    const loaded = createSandboxSim({ seed: 1, world, stage: 'small', playerName: 'Teni', save: sim.serialize() })
+    expect(loaded.state.people.some((p) => p.id.startsWith('visitor-'))).toBe(false)
+    expect(activeMoment(ctxOf(loaded))).toBeNull()
+    expect(loaded.state.people.length).toBe(sim.state.people.length - 1)
+  })
 
   test('no moment starts while a director beat runs', () => {
     const sim = createSim({ seed: 1, world, stage: 'small', playerName: 'Teni' })
