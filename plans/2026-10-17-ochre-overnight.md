@@ -484,7 +484,7 @@ Board: down · Last pushed: f48612e (main, 02:05) · Gate: install 0, typecheck 
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | on call for PL3 findings | U6 ce615bc passed; U5, U3 passed | idle |
 | play | opus-high | game/play, game/audio, app/play.tsx | PL3 (director in; real world + people swapped) | PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
 
-Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); QA server :4090 (prod build of 069899a, log /w/junk/sim-80k/qa-server.log); Drydock portal :4400 (Windows bun, log in
+Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); QA server :4090 (prod build of b76f9bc, log /w/junk/sim-80k/qa-server.log); Drydock portal :4400 (Windows bun, log in
 scratchpad drydock-portal.log)
 Images used: 47 / 200 (lead 2, ui 45). OpenAI credit exhausted 01:05; generation stopped (needs-sal Check 2)
 Waiting on Sal: none (needs-sal file: plans/2026-10-17-needs-sal.md)
