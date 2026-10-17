@@ -623,11 +623,11 @@ controller, cameras and verbs that make each stage of life feel different; and t
   reach their props (fire stick to the hearth, engraving stone in the off hand and point on the stone), no limb passes
   through the body or the hides, and `lie-dead` lies flat on the ground with no limb clipping into it. Fix what fails;
   list what you changed per anim in the ready line, with the sheet paths.
-  **P4 item 0a, before everything (04:50):** in held.shell, with Ama crouched, the back-carried infant's head sits
+  **P4 item 0a, before everything (04:30):** in held.shell, with Ama crouched, the back-carried infant's head sits
   inside hers (0.1 m apart, in front of her body centre): the back carry attach doesn't follow the crouch (play's
   report). The infant on the back rides the carrier's spine and shoulders through every carrier pose (crouch, sit,
   kneel, gather), head clear of hers by at least 0.18 m. Sheet: crouch, sit, kneel, walk, side and front.
-  **P4 item 0, first (04:45):** in sim's provider.whale shot at 10:03 the beach shows no whale
+  **P4 item 0, first (04:28):** in sim's provider.whale shot at 10:03 the beach shows no whale
   (`/w/junk/sim-80k/sim/f2-dev-beach.png`; the sim spawns it 15 m from the `whale-beach` POI). On :4080 with `?qa`,
   jump to provider.whale, walk to the whale beach and confirm the stranded whale renders, beached on the sand (not
   under it, not floating, not in the water), big enough to read from the cliff path. If it's missing, find why; a fix
