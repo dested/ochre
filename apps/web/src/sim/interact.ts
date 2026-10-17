@@ -89,9 +89,11 @@ function poiInteractions(ctx: SimCtx, player: SimPerson, poi: Poi): Draft[] {
 
 export function interactionsNear(ctx: SimCtx, p: Vec2, radius: number): Interaction[] {
   const s = ctx.state
-  if (s.stage === 'held') return []
-  const player = playerOf(ctx)
+  const dir = ctx.director
   const found: { d: number; i: Interaction }[] = []
+  for (const i of dir ? dir.extras(p, radius) : []) found.push({ d: Math.max(0, dist(p, i.position) - 0.5), i })
+  if (s.stage === 'held') return found.map((f) => f.i)
+  const player = playerOf(ctx)
   for (const poi of ctx.world.pois) {
     const d = Math.max(0, dist(p, poi) - poi.radius)
     if (d > radius) continue
@@ -108,8 +110,9 @@ export function interactionsNear(ctx: SimCtx, p: Vec2, radius: number): Interact
       found.push({ d: d + 0.01, i: make({ ...base, verb: 'give-beads', label: `Give your beads to ${q.name}`, holdSeconds: 1, reason: null }) })
     }
   }
-  found.sort((a, b) => a.d - b.d)
-  return found.map((f) => f.i)
+  const kept = dir ? found.filter((f) => f.i.id.startsWith('dir:') || dir.allows(f.i)) : found
+  kept.sort((a, b) => a.d - b.d)
+  return kept.map((f) => f.i)
 }
 
 // ─── doing it ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -154,16 +157,20 @@ export function interact(ctx: SimCtx, interactionId: string): Interaction | null
   const inv = s.inventory
   const at = it.position
   const item = (key: keyof typeof inv, delta: number) => ctx.events.push({ type: 'item', item: key, delta })
+  // the director's own verbs (reach, tag, knap, share…) are its to carry out
+  if (it.id.startsWith('dir:')) return it
   const verb: Verb = it.verb
   switch (verb) {
     case 'gather':
       inv.shellfish++
       item('shellfish', 1)
+      ctx.demo = { skill: 'shellfish', left: 6 }
       ctx.events.push({ type: 'sfx', name: 'gather', at })
       break
     case 'dig':
       inv.corms++
       item('corms', 1)
+      ctx.demo = { skill: 'corms', left: 6 }
       ctx.events.push({ type: 'sfx', name: 'dig', at })
       break
     case 'fetch-wood':
@@ -221,7 +228,7 @@ export function interact(ctx: SimCtx, interactionId: string): Interaction | null
     case 'talk': {
       const q = s.people.find((x) => x.id === it.targetId)
       if (!q) break
-      const text = talkLine(ctx, q)
+      const text = ctx.director?.talk(q.id) ?? talkLine(ctx, q)
       q.speech = { text, until: s.clock.t + 4 * s.timeScale }
       ctx.events.push({ type: 'caption', caption: { id: `talk-${q.id}-${Math.floor(s.clock.t)}`, text, speaker: q.name, kind: 'speech', seconds: 4 } })
       const last = talkedAt.get(q)

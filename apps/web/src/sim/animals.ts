@@ -37,7 +37,7 @@ export function findWalkable(ctx: SimCtx, p: Vec2, radius: number): Vec2 {
   return { x: p.x, z: p.z }
 }
 
-function addAnimal(ctx: SimCtx, kind: AnimalKind, pos: Vec2, herdId: string | null, brain: Partial<AnimalBrain> = {}): SimAnimal {
+export function addAnimal(ctx: SimCtx, kind: AnimalKind, pos: Vec2, herdId: string | null, brain: Partial<AnimalBrain> = {}): SimAnimal {
   const id = `${kind}-${ctx.nextAnimalId++}`
   const a: SimAnimal = {
     id,

@@ -140,6 +140,30 @@ const agentSchema = z.object({
   gaze: z.number(),
 })
 
+export const lifeSchema = z.object({
+  beadsGivenTo: z.string().nullable(),
+  partnerName: z.string().nullable(),
+  partnerSex: z.enum(['female', 'male']).nullable(),
+  storyTold: z.string().nullable(),
+  taught: z.array(z.object({ name: z.string(), skill })),
+  shareChoice: z.string().nullable(),
+  pointQuality: z.number().nullable(),
+  engraving: z.number().nullable(),
+})
+
+/** the director's place in the life: the chapter, the beat, what it counted and remembers */
+export const directorSchema = z.object({
+  stage: z.enum(STAGES),
+  beat: z.number().int(),
+  begun: z.boolean(),
+  finished: z.boolean(),
+  heir: z.boolean(),
+  cast: z.record(z.string(), z.string()),
+  counters: z.record(z.string(), z.number()),
+  life: lifeSchema,
+})
+export type DirectorSave = z.infer<typeof directorSchema>
+
 export const payloadSchema = z.object({
   seed: z.number(),
   stage: z.enum(STAGES),
@@ -170,8 +194,8 @@ export const payloadSchema = z.object({
   agents: z.array(agentSchema),
   herds: z.array(z.object({ id: z.string(), center: vec2, home: vec2, settleAt: z.number() })),
   nextAnimalId: z.number(),
-  /** the director's own state (S2); opaque here */
-  director: z.unknown().optional(),
+  /** the director's place in the life; absent in a sandbox sim */
+  director: directorSchema.optional(),
 })
 
 export type SavePayload = z.infer<typeof payloadSchema>

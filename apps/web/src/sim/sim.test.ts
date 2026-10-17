@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { REQUIRED_POIS, type Sim, type SimPerson } from '../game/contracts'
-import { createSim } from './index'
+import { createSandboxSim as createSim } from './index'
 import { NEED_SKILL } from './interact'
 import { createTestWorld } from './test-world'
 

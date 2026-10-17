@@ -4,42 +4,58 @@
  */
 import { clockAt, DEFAULT_TIME_SCALE } from '../core/clock'
 import { hashString, mix32, Rng } from '../core/rng'
-import type { CreateSim, FireState, PlayerCommand, Sim, SimEvent, SimState } from '../game/contracts'
+import type { CreateSim, FireState, PlayerCommand, Sim, SimEvent, SimOptions, SimState } from '../game/contracts'
 import { createAgent, syncCarried, updatePerson } from './ai'
-import { replenishHerds, spawnAnimals, startleHerd, updateAnimals, woundAnimal } from './animals'
+import { replenishHerds, startleHerd, updateAnimals, woundAnimal } from './animals'
 import { buildBand, PLAYER_ID } from './band'
 import { MAX_SUBSTEP, moveDt, PATH_BUDGET, type Agent, type SimCtx } from './ctx'
+import { createDirector, type Director } from './director'
 import { interact, interactionsNear, playerOf, relationOf, updateSleepSkip } from './interact'
 import { gaze, spoil, updateAge, updateBonds, updateFires, updateLearning, updateNeeds } from './life'
 import { PathService } from './path'
 import { decodeSave, encodeSave, type SavePayload } from './save'
+import { resetStage } from './setup'
 import { STAGE_EPOCH } from './time'
 import { weatherAt } from './weather'
 
 export { createTestWorld } from './test-world'
 export { randomLook } from './looks'
 
-const SLEEP_SPOTS = ['sleep-1', 'sleep-2', 'sleep-3', 'sleep-4', 'sleep-5', 'sleep-6']
+/** game seconds per substep while the director skips time */
+const SKIP_SUBSTEP = 30
 
 const contexts = new WeakMap<Sim, SimCtx>()
+const directors = new WeakMap<Sim, Director>()
 
 /** the sim's internals, for the lab and tests only */
 export function debugCtx(sim: Sim): SimCtx | undefined {
   return contexts.get(sim)
 }
 
-export const createSim: CreateSim = (opts) => {
+/** the sim's director (current beat, complete-beat), for the lab, QA and tests; none in a sandbox sim */
+export function debugDirector(sim: Sim): Director | undefined {
+  return directors.get(sim)
+}
+
+/** the game's sim: the living band with the director running the chapters */
+export const createSim: CreateSim = (opts) => createSimWith(opts, { director: true })
+
+/** the band without the director: daily life only (the lab's sandbox, tests, run-day) */
+export function createSandboxSim(opts: SimOptions): Sim {
+  return createSimWith(opts, { director: false })
+}
+
+export function createSimWith(opts: SimOptions, flags: { director: boolean }): Sim {
   const { world, seed, stage, playerName } = opts
   const epoch = { ...STAGE_EPOCH[stage] }
   const clock = clockAt(0, epoch)
-  const people = buildBand(seed, stage, playerName)
   const fires: FireState[] = world.poisOf('hearth').map((h) => ({ id: h.id, x: h.x, z: h.z, intensity: 0.5 }))
 
   const state: SimState = {
     seed,
     clock,
     weather: weatherAt(seed, stage, clock),
-    people,
+    people: [],
     animals: [],
     fires,
     hearth: { shellfish: 20, corms: 30, meat: 0, firewood: 24 },
@@ -63,39 +79,29 @@ export const createSim: CreateSim = (opts) => {
     agents: new Map(),
     brains: new Map(),
     herds: [],
-    fuel: Object.fromEntries(fires.map((f, i) => [f.id, { fuel: i === 0 ? 0.7 : 0.4, tender: null }])),
+    fuel: {},
     playerControlled: false,
     sleepSkip: null,
     sunCache: new Map(),
     nextAnimalId: 1,
     lastHour: 0,
     live: false,
+    fastForward: false,
+    noAiHunts: false,
+    demo: null,
+    director: null,
+    pupil: null,
   }
 
-  // families share a sleeping hollow; everyone has a seat at the hearth
-  const familyOrder: string[] = []
-  const bedsTaken = new Map<string, number>()
-  people.forEach((p, i) => {
-    if (!familyOrder.includes(p.familyId)) familyOrder.push(p.familyId)
-    const fi = familyOrder.indexOf(p.familyId)
-    const bed = bedsTaken.get(p.familyId) ?? 0
-    bedsTaken.set(p.familyId, bed + 1)
-    ctx.agents.set(p.id, createAgent(p.id, SLEEP_SPOTS[fi % SLEEP_SPOTS.length] ?? 'sleep-1', i, bed))
-  })
-  // start the morning where each family slept
-  for (const p of people) {
-    const ag = ctx.agents.get(p.id)
-    if (!ag) continue
-    const spot = world.poi(ag.sleepId)
-    const ang = ag.bed * 1.7
-    const r = ag.bed === 0 ? 0 : 0.9 + ag.bed * 0.25
-    p.position = { x: spot.x + Math.sin(ang) * r, z: spot.z + Math.cos(ang) * r }
-    p.heading = ctx.rng.range(0, Math.PI * 2)
-  }
-  spawnAnimals(ctx)
-
-  if (opts.save) restore(ctx, decodeSave(opts.save))
+  resetStage(ctx, stage, buildBand(seed, stage, playerName))
+  const saved = opts.save ? decodeSave(opts.save) : null
+  if (saved) restore(ctx, saved)
   for (const p of state.people) if (p.carriedBy) syncCarried(ctx, p)
+
+  const director: Director | null = flags.director
+    ? createDirector({ ctx, advance: (s) => skip(s), playerName }, ctx.stage, saved?.director ?? null)
+    : null
+  ctx.director = director ? director.hooks : null
 
   function substep(gameDt: number, realDt: number): void {
     const t = state.clock.t + gameDt
@@ -128,13 +134,31 @@ export const createSim: CreateSim = (opts) => {
     }
   }
 
+  // events raised by commands between steps (a talk caption, an item, a face) go out with the next step
+  let returned = 0
   function step(dt: number): SimEvent[] {
-    ctx.events = []
+    ctx.events = ctx.events.slice(returned)
+    returned = ctx.events.length
     if (!(dt > 0)) return ctx.events
     const gameDt = dt * state.timeScale
     const n = Math.max(1, Math.ceil(gameDt / MAX_SUBSTEP))
     for (let i = 0; i < n; i++) substep(gameDt / n, dt / n)
+    director?.update(dt)
+    returned = ctx.events.length
     return ctx.events
+  }
+
+  /** a director time skip: the world lives through it at speed; only deaths are reported */
+  function skip(gameSeconds: number): void {
+    if (!(gameSeconds > 0)) return
+    const kept = ctx.events
+    ctx.events = []
+    ctx.fastForward = true
+    const n = Math.max(1, Math.ceil(gameSeconds / SKIP_SUBSTEP))
+    for (let i = 0; i < n; i++) substep(gameSeconds / n, 0)
+    ctx.fastForward = false
+    for (const e of ctx.events) if (e.type === 'death') kept.push(e)
+    ctx.events = kept
   }
 
   function command(cmd: PlayerCommand): void {
@@ -150,30 +174,39 @@ export const createSim: CreateSim = (opts) => {
         player.anim = cmd.anim
         player.task = { kind: 'idle', targetId: null, target: null, until: null, skill: null }
         return
-      case 'interact':
-        interact(ctx, cmd.interactionId)
+      case 'interact': {
+        const inv = state.inventory
+        const before = { firewood: inv.firewood, food: inv.shellfish + inv.corms }
+        const it = interact(ctx, cmd.interactionId)
+        if (it && director) director.onInteract(it, before)
         return
+      }
       case 'gaze':
         ctx.live = true
         gaze(ctx, cmd.personId, cmd.dt)
         return
-      case 'spear-hit':
-        woundAnimal(ctx, cmd.animalId, player.position)
+      case 'spear-hit': {
+        const hit = woundAnimal(ctx, cmd.animalId, player.position)
+        director?.onSpearHit(cmd.animalId, hit)
         return
+      }
       case 'spear-miss': {
         const herd = ctx.herds.find((h) => Math.hypot(h.center.x - player.position.x, h.center.z - player.position.z) < 120)
         if (herd) startleHerd(ctx, herd, player.position)
         return
       }
       case 'minigame-result':
-        if (cmd.game === 'knapping') state.inventory.point = Math.max(0.05, Math.min(1, cmd.quality))
+        if (director) director.onMinigame(cmd.game, cmd.quality)
+        else if (cmd.game === 'knapping') state.inventory.point = Math.max(0.05, Math.min(1, cmd.quality))
         return
       case 'set-time-scale':
         state.timeScale = Math.max(0, cmd.scale)
         return
       case 'choose':
+        director?.onChoose(cmd.choiceId, cmd.optionId)
+        return
       case 'continue-as-heir':
-        // the director's commands arrive in S2
+        director?.continueAsHeir()
         return
     }
   }
@@ -209,6 +242,7 @@ export const createSim: CreateSim = (opts) => {
       })),
       herds: ctx.herds,
       nextAnimalId: ctx.nextAnimalId,
+      ...(director ? { director: director.save() } : {}),
     }
     return encodeSave(payload)
   }
@@ -222,6 +256,7 @@ export const createSim: CreateSim = (opts) => {
     serialize,
   }
   contexts.set(sim, ctx)
+  if (director) directors.set(sim, director)
   return sim
 }
 

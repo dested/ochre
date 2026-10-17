@@ -3,7 +3,7 @@
  */
 import type { ClockEpoch } from '../core/clock'
 import type { Rng } from '../core/rng'
-import type { LifeStageId, SimEvent, SimState, SkillId, Vec2, WorldData } from '../game/contracts'
+import type { CarrySlot, HeldItem, Interaction, LifeStageId, PersonAnim, SimEvent, SimState, SkillId, TaskKind, Vec2, WorldData } from '../game/contracts'
 import type { PathRequest, PathService } from './path'
 
 /** game seconds per substep at most (movement and decisions stay stable at ×600) */
@@ -93,6 +93,31 @@ export type Plan = {
   shuffle: Vec2 | null
 }
 
+/** how a person looks while doing something: the task (and the skill it teaches), the pose, the hands */
+export type Pose = { task: TaskKind; anim: PersonAnim; skill: SkillId | null; right: HeldItem; left: HeldItem }
+
+/**
+ * The director's hold on a person: while set, the AI's plans wait.
+ * goto: walk to dest (pausing while `waitFor` lags more than `waitDist` behind), then hold the pose there.
+ * hold: stay and hold the pose. follow: keep within `near` of targetId. flee: keep away from targetId inside `area`.
+ */
+export type Order = {
+  kind: 'goto' | 'hold' | 'follow' | 'flee'
+  dest: Vec2 | null
+  targetId: string | null
+  speed: number | null
+  near: number
+  waitFor: string | null
+  waitDist: number
+  pose: Pose | null
+  /** face this point when standing */
+  face: Vec2 | null
+  slot: CarrySlot | null
+  /** flee: stay inside this circle */
+  area: { x: number; z: number; r: number } | null
+  arrived: boolean
+}
+
 export type Load = { shellfish: number; corms: number; meat: number; firewood: number; silcrete: number }
 
 export type Agent = {
@@ -119,6 +144,8 @@ export type Agent = {
   learn: Partial<Record<SkillId, number>>
   /** stage 1: seconds the player has looked at this face */
   gaze: number
+  /** the director's hold on this person, if any */
+  order: Order | null
 }
 
 export type AnimalBrain = {
@@ -135,6 +162,16 @@ export type AnimalBrain = {
 export type Herd = { id: string; center: Vec2; home: Vec2; settleAt: number }
 
 export type FireFuel = Record<string, { fuel: number; tender: string | null }>
+
+/** what the director adds to the player's verbs */
+export type DirectorHooks = {
+  /** extra interactions here and now (reach, tag, knap, tell a story, sit…) */
+  extras(p: Vec2, radius: number): Interaction[]
+  /** false hides one of the sandbox's own interactions during a beat */
+  allows(i: Interaction): boolean
+  /** a line a person says when the player talks to them during a beat, or null for their usual talk */
+  talk(personId: string): string | null
+}
 
 export type SimCtx = {
   world: WorldData
@@ -159,6 +196,15 @@ export type SimCtx = {
   lastHour: number
   /** someone is playing (a move or gaze command arrived): things near the player move in real time */
   live: boolean
+  /** a director time skip is running: everything moves in game time */
+  fastForward: boolean
+  /** the director runs this chapter's hunt itself: the AI's men stay off the herd */
+  noAiHunts: boolean
+  /** what the player is showing right now (a dig, a gather), for the watchers; real seconds left */
+  demo: { skill: SkillId; left: number } | null
+  director: DirectorHooks | null
+  /** this child learns only from the player (Provider's teaching beat) */
+  pupil: string | null
 }
 
 /**
@@ -167,7 +213,7 @@ export type SimCtx = {
  * still fits. In the lab and headless (nobody playing) everything moves in game time.
  */
 export function moveDt(ctx: SimCtx, pos: Vec2, gameDt: number, realDt: number): number {
-  if (!ctx.live) return gameDt
+  if (!ctx.live || ctx.fastForward) return gameDt
   const player = ctx.state.people.find((p) => p.id === ctx.state.playerId)
   if (!player) return gameDt
   const d = Math.hypot(pos.x - player.position.x, pos.z - player.position.z)

@@ -12,7 +12,9 @@ import {
   FOOD_VALUE,
   type Agent,
   type HuntStage,
+  type Order,
   type Plan,
+  type Pose,
   type PlanKind,
   type SimCtx,
 } from './ctx'
@@ -69,6 +71,7 @@ export function createAgent(id: string, sleepId: string, seat: number, bed: numb
     load: { shellfish: 0, corms: 0, meat: 0, firewood: 0, silcrete: 0 },
     learn: {},
     gaze: 0,
+    order: null,
   }
 }
 
@@ -83,14 +86,14 @@ function inCamp(ctx: SimCtx, p: SimPerson): boolean {
 }
 
 /** a seat in the ring around the hearth */
-function seatPos(ctx: SimCtx, ag: Agent, ring = 1): Vec2 {
+export function seatPos(ctx: SimCtx, ag: Agent, ring = 1): Vec2 {
   const h = hearth(ctx)
   const ang = ag.seat * 2.39996 // golden angle spreads the seats
   const r = (2.4 + (ag.seat % 3) * 0.9) * ring
   return findWalkable(ctx, { x: h.x + Math.sin(ang) * r, z: h.z + Math.cos(ang) * r }, 8)
 }
 
-function bedPos(ctx: SimCtx, ag: Agent): Vec2 {
+export function bedPos(ctx: SimCtx, ag: Agent): Vec2 {
   const spot = ctx.world.poi(ag.sleepId)
   const ang = ag.bed * 1.7
   const r = ag.bed === 0 ? 0 : 0.9 + ag.bed * 0.25
@@ -207,7 +210,7 @@ function chooseManDay(ctx: SimCtx, p: SimPerson, ag: Agent): Agent['dayChoice'] 
   if (ag.dayChoice && ag.dayChoice.day === day) return ag.dayChoice
   const rng = new Rng(mix32(ctx.state.seed ^ 0x3a9, day * 131 + (ag.seat + 1) * 17))
   let kind: NonNullable<Agent['dayChoice']>['kind']
-  if (huntDay(ctx, day) && has(p, 'spear') && ctx.herds.length > 0) kind = 'hunt'
+  if (huntDay(ctx, day) && has(p, 'spear') && ctx.herds.length > 0 && !ctx.noAiHunts) kind = 'hunt'
   else {
     const r = rng.next()
     kind = r < 0.25 && has(p, 'knapping') ? 'stone' : r < 0.55 && has(p, 'knapping') ? 'knap' : r < 0.75 ? 'wood' : 'corms'
@@ -541,9 +544,7 @@ function abandon(ctx: SimCtx, p: SimPerson, ag: Agent): void {
 
 // ─── work ───────────────────────────────────────────────────────────────────────────────────────────────────
 
-type Look = { task: TaskKind; anim: PersonAnim; skill: SkillId | null; right: HeldItem; left: HeldItem }
-
-const WORK: Record<PlanKind, Look> = {
+export const WORK: Record<PlanKind, Pose> = {
   sleep: { task: 'sleep', anim: 'sleep', skill: null, right: 'none', left: 'none' },
   shore: { task: 'gather-shellfish', anim: 'gather', skill: 'shellfish', right: 'shell', left: 'bag' },
   corms: { task: 'dig-corms', anim: 'dig', skill: 'corms', right: 'digging-stick', left: 'none' },
@@ -918,6 +919,10 @@ function deposit(ctx: SimCtx, p: SimPerson, ag: Agent): void {
 export function updatePerson(ctx: SimCtx, p: SimPerson, ag: Agent, dt: number, mdt: number): void {
   const t = ctx.state.clock.t
   if (p.speech && p.speech.until < t) p.speech = null
+  if (ag.order) {
+    runOrder(ctx, p, ag, ag.order, mdt)
+    return
+  }
   if (!ag.plan || t >= ag.nextThink) think(ctx, p, ag)
   const plan = ag.plan
   if (!plan) return
@@ -987,9 +992,186 @@ export function syncCarried(ctx: SimCtx, p: SimPerson): void {
   if (!c) return
   p.position.x = c.position.x
   p.position.z = c.position.z
-  p.heading = c.heading
+  // in arms the child faces the carrier; on the back it looks the way she walks
+  p.heading = c.carrying?.slot === 'arms' ? c.heading + Math.PI : c.heading
   p.speed = c.speed
   const asleep = c.task.kind === 'sleep'
   p.anim = asleep ? 'sleep' : 'held'
   p.task = { kind: asleep ? 'sleep' : 'idle', targetId: c.id, target: null, until: null, skill: null }
+}
+
+// ─── the director's orders ──────────────────────────────────────────────────────────────────────────────────
+
+/** a person under a director order: no plans, just the order */
+export function runOrder(ctx: SimCtx, p: SimPerson, ag: Agent, o: Order, mdt: number): void {
+  if (p.carrying && o.slot) p.carrying.slot = o.slot
+  const people = ctx.state.people
+  const target = o.targetId ? people.find((q) => q.id === o.targetId) : undefined
+  const stand = () => {
+    p.speed = 0
+    const face = o.face ?? (o.kind === 'follow' && target ? target.position : null)
+    if (face && dist(face, p.position) > 0.2) p.heading = headingTo(p.position, face)
+    if (o.pose) {
+      p.task = { kind: o.pose.task, targetId: o.targetId, target: o.dest ? { ...o.dest } : null, until: null, skill: o.pose.skill }
+      p.anim = o.pose.anim
+      p.held.right = o.pose.right
+      p.held.left = o.pose.left
+    } else {
+      p.task = { kind: 'scripted', targetId: o.targetId, target: null, until: null, skill: null }
+      p.anim = 'idle'
+    }
+  }
+  const walking = (speed: number, kind: TaskKind) => {
+    p.task = { kind, targetId: o.targetId, target: o.dest ? { ...o.dest } : null, until: null, skill: null }
+    p.anim = speed > 2 ? 'run' : 'walk'
+  }
+  const go = (dest: Vec2, speed: number): Travel => {
+    if (ag.plan?.dest && dist(ag.plan.dest, dest) > 1.5) {
+      ag.path = []
+      if (ag.pathReq) ctx.paths.cancel(ag.pathReq)
+      ag.pathReq = null
+    }
+    // the order borrows the plan slot for its destination so travel can re-aim
+    ag.plan = { kind: 'follow', phase: 'go', dest: { ...dest }, targetId: o.targetId, until: null, tick: 0, hunt: null, shuffle: null }
+    return travel(ctx, p, ag, dest, speed, mdt)
+  }
+  switch (o.kind) {
+    case 'hold':
+      stand()
+      return
+    case 'goto': {
+      if (!o.dest || o.arrived) {
+        stand()
+        return
+      }
+      const lag = o.waitFor ? people.find((q) => q.id === o.waitFor) : undefined
+      if (lag && dist(lag.position, p.position) > o.waitDist) {
+        // wait for them, looking back
+        p.speed = 0
+        p.heading = headingTo(p.position, lag.position)
+        p.task = { kind: 'scripted', targetId: lag.id, target: null, until: null, skill: null }
+        p.anim = 'idle'
+        return
+      }
+      const speed = o.speed ?? walkSpeed(p)
+      if (dist(p.position, o.dest) <= o.near) {
+        o.arrived = true
+        stand()
+        return
+      }
+      const went = go(o.dest, speed)
+      if (went === 'arrived' || went === 'failed') {
+        o.arrived = true
+        stand()
+        return
+      }
+      walking(speed, 'walk-to')
+      if (p.speed === 0) p.anim = 'idle'
+      return
+    }
+    case 'follow': {
+      if (!target) {
+        stand()
+        return
+      }
+      const d = dist(p.position, target.position)
+      if (d <= o.near) {
+        ag.path = []
+        stand()
+        return
+      }
+      const speed = o.speed ?? Math.max(walkSpeed(p), target.speed > 0 ? Math.min(3, target.speed * 1.1) : 0)
+      const went = go(target.position, d > o.near * 3 ? Math.max(speed, 2.4) : speed)
+      if (went === 'failed') {
+        stand()
+        return
+      }
+      walking(p.speed, 'follow')
+      if (p.speed === 0) p.anim = 'idle'
+      return
+    }
+    case 'flee': {
+      if (!target) {
+        stand()
+        return
+      }
+      const d = dist(p.position, target.position)
+      const area = o.area
+      if (d < 7) {
+        // run away from the chaser, bending back toward the middle of the play ground
+        let ax = p.position.x - target.position.x
+        let az = p.position.z - target.position.z
+        const len = Math.hypot(ax, az) || 1
+        ax /= len
+        az /= len
+        if (area) {
+          const cx = area.x - p.position.x
+          const cz = area.z - p.position.z
+          const cd = Math.hypot(cx, cz)
+          const pull = Math.min(1, cd / area.r)
+          ax += (cx / (cd || 1)) * pull * 1.2
+          az += (cz / (cd || 1)) * pull * 1.2
+        }
+        const h = Math.atan2(ax, az)
+        const speed = o.speed ?? 2.4
+        const nx = p.position.x + Math.sin(h) * speed * mdt
+        const nz = p.position.z + Math.cos(h) * speed * mdt
+        if (ctx.paths.passableAt(nx, nz, ctx.state.clock.seaLevel)) {
+          p.position.x = nx
+          p.position.z = nz
+          p.heading = h
+          p.speed = speed
+        } else {
+          // cornered: dodge sideways
+          const h2 = h + (ctx.rng.chance(0.5) ? 1.2 : -1.2)
+          const sx = p.position.x + Math.sin(h2) * speed * mdt
+          const sz = p.position.z + Math.cos(h2) * speed * mdt
+          if (ctx.paths.passableAt(sx, sz, ctx.state.clock.seaLevel)) {
+            p.position.x = sx
+            p.position.z = sz
+            p.heading = h2
+          }
+          p.speed = speed
+        }
+        p.task = { kind: 'play', targetId: target.id, target: null, until: null, skill: null }
+        p.anim = 'run'
+        return
+      }
+      // not chased: taunt, facing the chaser
+      p.speed = 0
+      p.heading = headingTo(p.position, target.position)
+      p.task = { kind: 'play', targetId: target.id, target: null, until: null, skill: null }
+      p.anim = d < 14 ? 'wave' : 'idle'
+      return
+    }
+  }
+}
+
+/** put the director's hold on someone; null lets the AI decide again */
+export function setOrder(ctx: SimCtx, id: string, order: Partial<Order> & { kind: Order['kind'] } | null): void {
+  const ag = ctx.agents.get(id)
+  if (!ag) return
+  if (ag.pathReq) ctx.paths.cancel(ag.pathReq)
+  ag.pathReq = null
+  ag.path = []
+  ag.plan = null
+  ag.nextThink = 0
+  if (!order) {
+    ag.order = null
+    return
+  }
+  ag.order = {
+    dest: null,
+    targetId: null,
+    speed: null,
+    near: 0.6,
+    waitFor: null,
+    waitDist: 10,
+    pose: null,
+    face: null,
+    slot: null,
+    area: null,
+    arrived: false,
+    ...order,
+  }
 }

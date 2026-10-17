@@ -110,7 +110,9 @@ function teacherFor(ctx: SimCtx, p: SimPerson): { teacher: SimPerson; skill: Ski
   let bestD = WATCH_RADIUS
   for (const q of ctx.state.people) {
     if (q === p || !q.alive) continue
-    const skill = q.task.skill
+    if (ctx.pupil === p.id && !q.isPlayer) continue
+    // the player shows a skill for a few seconds after doing it (play drives their task, not the sim)
+    const skill = q.isPlayer && ctx.demo ? ctx.demo.skill : q.task.skill
     if (!skill || p.skills.includes(skill) || p.look.ageYears < SKILL_MIN_AGE[skill]) continue
     // grown people in the band keep their own crafts; the young and the player learn by watching
     if (!p.isPlayer && p.look.ageYears >= NPC_LEARN_MAX_AGE) continue
@@ -126,6 +128,10 @@ function teacherFor(ctx: SimCtx, p: SimPerson): { teacher: SimPerson; skill: Ski
 /** dtReal: real seconds (learning runs on the player's clock, not the game's) */
 export function updateLearning(ctx: SimCtx, realDt: number): void {
   const state = ctx.state
+  if (ctx.demo) {
+    ctx.demo.left -= realDt
+    if (ctx.demo.left <= 0) ctx.demo = null
+  }
   for (const p of state.people) {
     if (!p.alive || p.carriedBy || p.task.kind === 'sleep') {
       if (p.isPlayer) state.watching = null

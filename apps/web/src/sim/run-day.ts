@@ -4,7 +4,7 @@
  */
 import type { LifeStageId, SimPerson, TaskKind } from '../game/contracts'
 import { LIFE_STAGES } from '../game/contracts'
-import { createSim } from './index'
+import { createSandboxSim as createSim } from './index'
 import { createTestWorld } from './test-world'
 
 function arg(name: string, fallback: string): string {

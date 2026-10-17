@@ -37,7 +37,7 @@ type Spec = {
 }
 
 /** generic skills for an age and sex; elders know the old things */
-function defaultSkills(rng: Rng, sex: Sex, age: number): SkillId[] {
+export function defaultSkills(rng: Rng, sex: Sex, age: number): SkillId[] {
   const s = new Set<SkillId>()
   if (age >= 1) s.add('faces')
   if (age >= 8) {
