@@ -73,17 +73,17 @@ export function garmentPlan(ctx: BuildCtx): Plan {
 const tmpC = new Color()
 
 const BROWNING = new Color(0.6, 0.47, 0.36)
-const CREAM = new Color('#dcc6a0')
+const CREAM = new Color('#d8b47e')
 
 /** mottled hide: from cream patches through the base suede to warm brown blotches, finer grain, worn darker edges */
 function hide(base: Color, p: Vector3, edge: number, seed: number, out: Color): Color {
-  const n = fbm3(p.x * 6, p.y * 6, p.z * 6, seed)
+  const n = fbm3(p.x * 8, p.y * 8, p.z * 8, seed)
   const n2 = fbm3(p.x * 17, p.y * 17, p.z * 17, seed ^ 0x51)
   const fine = noise3(p.x * 45, p.y * 45, p.z * 45, seed ^ 0x77)
   out.copy(base)
   out.lerp(tmpC.copy(base).multiply(BROWNING), smooth(0.46, 0.62, n) * 0.9)
   out.lerp(tmpC.copy(CREAM).lerp(base, 0.3), smooth(0.37, 0.22, n) * 0.75)
-  out.multiplyScalar(0.86 + 0.26 * n2 + 0.1 * (fine - 0.5))
+  out.multiplyScalar(0.8 + 0.34 * n2 + 0.12 * (fine - 0.5))
   if (edge > 0) out.lerp(tmpC.copy(base).multiply(BROWNING).multiplyScalar(0.8), edge * 0.7)
   return out
 }
@@ -500,17 +500,67 @@ function shoulderStrap(ctx: BuildCtx, ts: TorsoShape, yFront: number, yBack: num
   const { d } = ctx
   const H = d.stature
   const x = side * d.shoulderW * 0.55
+  const ax = Math.abs(x)
+  // the height where the trapezius slope passes a given |x|: the strap's crest there (the torso narrows toward the neck)
+  const crest = (at: number): number => {
+    let lo = d.shoulderY
+    let hi = d.topY
+    for (let i = 0; i < 24; i++) {
+      const m = (lo + hi) / 2
+      if (ts.radius((side * Math.PI) / 2, m) >= at) lo = m
+      else hi = m
+    }
+    return lo
+  }
+  const yTop = crest(ax)
+  // the slope rises toward the neck under the band's inner edge: lift the crest by that much
+  const rise = crest(ax - 0.01 * H) - yTop
+  // the torso's section in the x = const plane: front surface up to the crest, back surface down from it
+  const Q = new Vector3()
+  const surf = (y: number, front: boolean): Vector3 => {
+    const r = Math.max(ax + 1e-4, ts.radius((side * Math.PI) / 2, y))
+    // invert the superellipse x = r·|sin θ|^e (e = 2/2.3) for this x
+    const th = Math.asin(Math.min(1, (ax / r) ** 1.15))
+    ts.point(side * (front ? th : Math.PI - th), y, Q)
+    return new Vector3(x, y, Q.z)
+  }
+  const raw: Vector3[] = []
+  const m = 48
+  const yF = Math.min(yFront, yTop - 0.004 * H)
+  const yB = Math.min(yBack, yTop - 0.004 * H)
+  // squared spacing crowds the samples at the crest, where the section turns fastest
+  for (let i = 0; i <= m; i++) raw.push(surf(yTop - (yTop - yF) * (1 - i / m) ** 2, true))
+  for (let i = m - 1; i >= 0; i--) raw.push(surf(yTop - (yTop - yB) * (1 - i / m) ** 2, false))
+  const cum: number[] = []
+  let total = 0
+  let prev: Vector3 | null = null
+  for (const q of raw) {
+    if (prev) total += q.distanceTo(prev)
+    cum.push(total)
+    prev = q
+  }
+  // resample evenly by arc length and lift each point off the skin along the section's outward normal (the path runs
+  // front → crest → back, so the tangent turned a quarter clockwise in the z-y plane points out)
   const pts: Vector3[] = []
-  const n = 14
+  const n = 16
+  let j = 0
   for (let i = 0; i <= n; i++) {
-    const t = i / n
-    // front edge → over the shoulder → back edge, in the x = const plane
-    const a = lerp(0.15, Math.PI - 0.15, t)
-    const y = lerp(yFront, yBack, t) + Math.sin(a) * (d.topY - lerp(yFront, yBack, t) + 0.006 * H)
-    const th = Math.atan2(x, Math.cos(a))
-    const r = ts.radius(th, Math.min(y, d.topY - 0.002))
-    const zr = Math.cos(a) * Math.max(0.002, Math.sqrt(Math.max(0, r * r - x * x))) + Math.cos(a) * 0.008 * H
-    pts.push(new Vector3(x, y + 0.004 * H * Math.sin(a), zr))
+    const at = (i / n) * total
+    while (j < raw.length - 2 && (cum[j + 1] ?? total) < at) j++
+    const a = raw[j]
+    const b = raw[j + 1]
+    if (!a || !b) continue
+    const ca = cum[j] ?? 0
+    const cb = cum[j + 1] ?? total
+    const q = a.clone().lerp(b, cb > ca ? Math.min(1, Math.max(0, (at - ca) / (cb - ca))) : 0)
+    const tz = b.z - a.z
+    const ty = b.y - a.y
+    const tl = Math.hypot(tz, ty) || 1
+    const ny = -tz / tl
+    const lift = 0.0055 * H + rise * Math.max(0, ny)
+    q.z += (ty / tl) * lift
+    q.y += ny * lift
+    pts.push(q)
   }
   // a flat band lying on the shoulder (rolled a quarter turn: the transported frame would stand it on edge), mottled
   // along its length and a touch narrower where it tucks into the wrap

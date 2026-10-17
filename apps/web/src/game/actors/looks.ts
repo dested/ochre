@@ -90,7 +90,7 @@ export const SINEW = new Color('#3b2a1f')
 export const CORD = new Color('#5a3e28')
 
 /** hide tones: tan, brown and ochre; a person's garments draw from these with seeded variation */
-const HIDES = ['#c9a873', '#b8925f', '#d4b783', '#a77d4c', '#c4a06a', '#8e6a44', '#b07f4f', '#dcc193'].map((h) => new Color(h))
+const HIDES = ['#c99d62', '#b8874f', '#d2ac70', '#a7733f', '#c49660', '#8e623a', '#b07444', '#d6b37c'].map((h) => new Color(h))
 export function hideColor(seed: number, k: number): Color {
   const rng = new Rng(mix32(seed, 0x41de + k * 977))
   const a = rng.pick(HIDES)

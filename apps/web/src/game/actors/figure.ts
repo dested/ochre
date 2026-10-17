@@ -258,13 +258,13 @@ function buildHand(ctx: BuildCtx, s: 1 | -1, sx: number, wristY: number, handBon
     y1,
     r: (y) => {
       const t = (y - y0) / (y1 - y0)
-      const cap = Math.sqrt(Math.max(0, 1 - Math.max(0, (0.12 - t) / 0.12) ** 2)) * Math.sqrt(Math.max(0, 1 - Math.max(0, (t - 0.88) / 0.12) ** 2))
+      const cap = Math.sqrt(Math.max(0, 1 - Math.max(0, (0.22 - t) / 0.22) ** 2)) * Math.sqrt(Math.max(0, 1 - Math.max(0, (t - 0.88) / 0.12) ** 2))
       return thick * lerp(0.82, 1, smooth(0.9, 0.5, t)) * Math.max(0.05, cap)
     },
     depth: (hw * 0.5) / thick,
-    sq: 2.3,
+    sq: 2.15,
     segs: near ? 20 : 12,
-    rings: near ? 14 : 8,
+    rings: near ? 16 : 8,
     color: palmColor,
     deform: (v, th, y) => {
       const t = (y - y0) / (y1 - y0)
@@ -277,6 +277,10 @@ function buildHand(ctx: BuildCtx, s: 1 | -1, sx: number, wristY: number, handBon
       // the hollow of the palm, and the knuckle ridge across the back
       v.x += s * thick * 0.18 * inner * bump(((t - 0.45) / 0.2) ** 2) * bump((v.z / (hw * 0.3)) ** 2)
       v.x += s * thick * 0.14 * back * bump(((t - 0.06) / 0.08) ** 2)
+      // a knuckle under each finger along that ridge, the grooves between them running a little way up the back
+      let kn = 0
+      for (let i = 0; i < 4; i++) kn += bump(((v.z - hw * (0.33 - i * 0.22)) / (hw * 0.085)) ** 2)
+      v.x += s * thick * 0.16 * back * Math.min(1, kn) * bump(((t - 0.1) / 0.12) ** 2)
     },
   })
   // fingers: four, gently curled, spread a little, each with knuckle, joints and a rounded tip
