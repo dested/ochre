@@ -3,7 +3,7 @@
  * the bridge feed, drawn through the shared world view and pipeline. The session creates one per life; the
  * lab drives one directly.
  */
-import { Mesh, type Object3D, PerspectiveCamera, Scene, Vector3 } from 'three'
+import { MathUtils, Mesh, type Object3D, PerspectiveCamera, Scene, Vector3 } from 'three'
 import type { Bridge, NameTag, ObjectiveMark, PromptState } from '../bridge'
 import type {
   CameraCue,
@@ -163,6 +163,41 @@ const SUMMERS = [
   'nine',
   'ten',
 ]
+/** a stranded whale for line of sight: a capsule half its 14 m long (head and tail taper), its axis this high */
+const WHALE_HALF = 5.5
+const WHALE_MID = 1.2
+const WHALE_RADIUS = 1.5
+/** squared distance between segments p1p2 and q1q2 (closest points, clamped to both) */
+function segmentsDist2(p1: Vector3, p2: Vector3, q1: Vector3, q2: Vector3): number {
+  const dx = p2.x - p1.x
+  const dy = p2.y - p1.y
+  const dz = p2.z - p1.z
+  const ex = q2.x - q1.x
+  const ey = q2.y - q1.y
+  const ez = q2.z - q1.z
+  const rx = p1.x - q1.x
+  const ry = p1.y - q1.y
+  const rz = p1.z - q1.z
+  const a = dx * dx + dy * dy + dz * dz
+  const e = ex * ex + ey * ey + ez * ez
+  const f = ex * rx + ey * ry + ez * rz
+  const c = dx * rx + dy * ry + dz * rz
+  const b = dx * ex + dy * ey + dz * ez
+  const denom = a * e - b * b
+  let s = a > 1e-9 && denom > 1e-9 ? MathUtils.clamp((b * f - c * e) / denom, 0, 1) : 0
+  let t = e > 1e-9 ? (b * s + f) / e : 0
+  if (t < 0) {
+    t = 0
+    s = a > 1e-9 ? MathUtils.clamp(-c / a, 0, 1) : 0
+  } else if (t > 1) {
+    t = 1
+    s = a > 1e-9 ? MathUtils.clamp((b - c) / a, 0, 1) : 0
+  }
+  const wx = rx + dx * s - ex * t
+  const wy = ry + dy * s - ey * t
+  const wz = rz + dz * s - ez * t
+  return wx * wx + wy * wy + wz * wz
+}
 /** held.faces opens the look cone this far past the farthest face */
 const FACES_MARGIN = (15 * Math.PI) / 180
 /** an actor's own head bone (people name their bones), not the head of a child it carries */
@@ -660,6 +695,8 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   }
   const head = new Vector3()
   /** terrain, the cave's rock (crossing its footprint anywhere but the mouth) and lit flames block the line */
+  const whaleA = new Vector3()
+  const whaleB = new Vector3()
   const occluded = (from: Vector3, to: Vector3, body: Vector3 | null): boolean => {
     // the player's own body (a vertical post up to the head), seen from behind
     if (body) {
@@ -671,6 +708,20 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
         const off = Math.hypot(from.x + dx * t - body.x, from.z + dz * t - body.z)
         if (off < 0.22 && from.y + (to.y - from.y) * t < body.y + 0.1) return true
       }
+    }
+    // a beached whale is a hill of its own: a capsule along its body
+    for (const an of sim.state.animals) {
+      if (an.kind !== 'whale') continue
+      const ground = Math.max(
+        world.heightAt(an.position.x, an.position.z),
+        sim.state.clock.seaLevel - 0.3
+      )
+      const hx = Math.sin(an.heading) * WHALE_HALF
+      const hz = Math.cos(an.heading) * WHALE_HALF
+      const y = ground + an.altitude + WHALE_MID
+      whaleA.set(an.position.x - hx, y, an.position.z - hz)
+      whaleB.set(an.position.x + hx, y, an.position.z + hz)
+      if (segmentsDist2(from, to, whaleA, whaleB) < WHALE_RADIUS * WHALE_RADIUS) return true
     }
     // the cave's rock (its overhang and side walls aren't in the height field)
     caveRock ??= findCaveRock()
