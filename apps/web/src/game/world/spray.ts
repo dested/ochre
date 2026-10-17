@@ -86,7 +86,7 @@ void main() {
 	float a = 1.0 - smoothstep( 0.35, 0.95, d + ( n - 0.5 ) * ( 0.5 + vAge * 0.6 ) );
 	a *= vA * mix( 0.85, 0.4, vAge );
 	if ( a < 0.01 ) discard;
-	vec3 col = vec3( 0.95, 0.94, 0.9 ) * ( uSkyAmb * 0.85 + uKeyColor * ( 0.45 + 0.2 * vUv.y ) );
+	vec3 col = vec3( 0.95, 0.94, 0.9 ) * ( uSkyAmb * 0.8 + uKeyColor * ( 0.22 + 0.1 * vUv.y ) );
 	gl_FragColor = vec4( col, a );
 }
 `

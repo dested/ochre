@@ -177,10 +177,12 @@ void main() {
 	body += uShallow * uKeyColor * clamp( vWaveH * 1.4, 0.0, 1.0 ) * 0.12 * ( 1.0 - b2 );
 	vec3 col = mix( body, refl, fres );
 	// the sun's path: sparkles and a broad sheen
-	float spk = pow( max( dot( R, uKeyDir ), 0.0 ), 900.0 );
+	float spk = pow( max( dot( R, uKeyDir ), 0.0 ), 260.0 );
 	float sheen = pow( max( dot( R, uKeyDir ), 0.0 ), 60.0 );
 	float glint = step( 0.72, ocNoise( vWorld.xz * 2.2 + uTime * 0.6 ) ) * step( 0.6, ocNoise( vWorld.xz * 5.3 - uTime * 0.9 ) );
-	col += uKeyColor * ( spk * 40.0 + sheen * 0.35 + sheen * glint * 6.0 * ( 0.4 + far ) );
+	// the sun's own image is broken into glints by the chop, never a solid disc
+	float chop = step( 0.55, ocNoise( vWorld.xz * vec2( 1.1, 3.3 ) + uTime * vec2( 0.4, -1.3 ) ) );
+	col += uKeyColor * ( spk * 9.0 * ( 0.1 + 0.9 * chop ) + sheen * 0.35 + sheen * glint * 6.0 * ( 0.4 + far ) );
 	// foam
 	float foam = 0.0;
 	if ( uFoamK > 0.0 ) {

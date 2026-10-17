@@ -183,6 +183,7 @@ varying vec4 vSplatA;
 varying vec4 vSplatB;
 uniform vec3 uKeyDirT;
 uniform vec4 uOchre;
+uniform vec4 uHearths;
 vec4 ocFacetT = vec4( 0.0 );
 vec3 ocLin( vec3 c ) { return pow( c, vec3( 2.2 ) ); }
 // a hard painted edge at threshold t of a field n, antialiased to a pixel however close the camera is
@@ -341,6 +342,27 @@ const TERRAIN_ALBEDO = /* glsl */ `
 			rub = mix( rub, ocLin( vec3( 0.5, 0.48, 0.45 ) ), step( 0.82, st.w ) * 0.7 );
 			earth = mix( earth * ( 0.86 + 0.28 * bl.w ), rub, stone * 0.75 );
 			earth *= 0.92 + 0.16 * fine;
+			// the cave floor is a midden: trodden dark, shell grit and bits of bone, ash and charcoal round the
+			// hearths, a smear of ground ochre here and there
+			vec2 cRel = p - uCave.xy;
+			float ca = dot( cRel, uCave.zw );
+			float cb = cRel.x * uCave.w - cRel.y * uCave.z;
+			float inCave = ( 1.0 - smoothstep( 2.0, 6.0, ca ) ) * smoothstep( - uCave2.y - 3.0, - uCave2.y, ca ) * ( 1.0 - smoothstep( uCave2.z - 1.0, uCave2.z + 2.0, abs( cb ) ) );
+			if ( inCave > 0.01 ) {
+				vec3 mid = earth * vec3( 0.82, 0.78, 0.74 );
+				float shellA = ocEdge( 0.83, ocNoise( p * 7.0 ) * 0.65 + ocNoise( p * 19.0 ) * 0.35 );
+				float shellB = ocEdge( 0.84, ocNoise( p * 13.0 + 4.0 ) * 0.6 + ocNoise( p * 31.0 ) * 0.4 );
+				mid = mix( mid, ocLin( vec3( 0.86, 0.81, 0.72 ) ), shellA * 0.6 );
+				mid = mix( mid, ocLin( vec3( 0.62, 0.6, 0.62 ) ), shellB * 0.6 );
+				float dh = min( length( p - uHearths.xy ), length( p - uHearths.zw ) ) + ( ocNoise( p * 1.6 ) - 0.5 ) * 0.9;
+				float ash = 1.0 - smoothstep( 0.8, 2.8, dh );
+				mid = mix( mid, ocLin( vec3( 0.42, 0.4, 0.38 ) ), ash * 0.7 );
+				float coal = ocEdge( 0.62, ocNoise( p * 6.0 + 3.0 ) * 0.7 + ocNoise( p * 17.0 ) * 0.3 ) * ( 1.0 - smoothstep( 0.6, 1.8, dh ) );
+				mid = mix( mid, ocLin( vec3( 0.06, 0.05, 0.05 ) ), coal * 0.85 );
+				float och = ocEdge( 0.78, ocNoise( p * 0.9 + 17.0 ) * 0.7 + ocNoise( p * 4.0 ) * 0.3 );
+				mid = mix( mid, ocLin( vec3( 0.58, 0.25, 0.14 ) ), och * 0.45 );
+				earth = mix( earth, mid, inCave );
+			}
 		}
 		vec3 col = sand * wa.x + dune * wa.y + fyn * wa.z + grass * wa.w + rock * wb.x + cliff * wb.y + shelf * wb.z + earth * wb.w;
 		// the far ranges: Table Mountain sandstone, grey and cool under dark fynbos
@@ -416,6 +438,10 @@ export function createTerrainView(world: WorldData, grid: TerrainGrid | null): T
 
   const ochre = world.pois.find((p) => p.id === 'ochre-seam')
   const ochreU = { value: ochre ? new Vector4(ochre.x + 6, ochre.z, 9, 0) : new Vector4(0, 0, 0, 0) }
+  const hs = world.pois.filter((p) => p.kind === 'hearth')
+  const h0 = hs[0]
+  const h1 = hs[1] ?? h0
+  const hearthU = { value: new Vector4(h0?.x ?? -9999, h0?.z ?? -9999, h1?.x ?? -9999, h1?.z ?? -9999) }
   const material = new MeshStandardMaterial({ roughness: 0.92, metalness: 0 })
   patchPaint(material, { brush: 0.35, rim: 0.15 }, {
     key: 'terrain',
@@ -424,7 +450,7 @@ export function createTerrainView(world: WorldData, grid: TerrainGrid | null): T
     fragmentHead: TERRAIN_FRAG_HEAD,
     albedo: TERRAIN_ALBEDO,
     normal: TERRAIN_NORMAL,
-    uniforms: { uKeyDirT: LIGHT.uKeyDir, uOchre: ochreU },
+    uniforms: { uKeyDirT: LIGHT.uKeyDir, uOchre: ochreU, uHearths: hearthU },
   })
 
   // detail tiles

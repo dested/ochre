@@ -151,7 +151,9 @@ void main() {
 	vec3 c = texture2D( tHdr, vUv ).rgb;
 	vec3 bl = texture2D( tBloom, vUv ).rgb * uBloomNorm;
 	// energy-conserving bloom plus the excess over a knee (fire, sun, sparkle)
-	c = mix( c, bl, uBloom.x ) + max( bl - uBloom.z, vec3( 0.0 ) ) * uBloom.y;
+	// (the knee is taken on the brightest channel so the halo keeps its hue: a per-channel knee turns gold glare red)
+	float bm = max( max( bl.r, bl.g ), bl.b );
+	c = mix( c, bl, uBloom.x ) + bl * ( max( bm - uBloom.z, 0.0 ) / max( bm, 1e-4 ) ) * uBloom.y;
 	// god rays
 	c += texture2D( tRays, vUv ).rgb * uRayColor * uRays.x;
 	// the infant's dream: softened everywhere, more so toward the edges
@@ -403,7 +405,8 @@ void main() {
 		// only the far side of a step pools (the background just outside a silhouette)
 		float behind = step( 0.0, max( max( wl, wr ), max( wu, wd ) ) - w0 * 1.02 );
 		float edge = smoothstep( 0.08, 0.4, jump ) * behind * ( 1.0 - smoothstep( 300.0, 2000.0, z0 ) );
-		vec3 deep = c * c * 1.1;
+		// deepen mid-tones; a bright ground (sky glare, foam) only darkens a touch instead of turning red
+		vec3 deep = mix( c * c * 1.1, c * 0.84, smoothstep( 0.45, 0.85, dot( c, vec3( 0.3, 0.55, 0.15 ) ) ) );
 		c = mix( c, deep, edge * uPool );
 	}
 	vec2 fc = vUv * uRes;

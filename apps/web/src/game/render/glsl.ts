@@ -93,7 +93,7 @@ vec3 ocSkyBase( vec3 d ) {
 	vec3 hs = sqrt( uHorizon );
 	vec3 zs = sqrt( uZenith );
 	vec3 pale = mix( hs, zs, 0.5 );
-	pale = mix( pale, vec3( dot( pale, vec3( 0.3, 0.55, 0.15 ) ) ) * vec3( 1.04, 1.02, 0.95 ), 0.6 ) * 1.08;
+	pale = mix( pale, vec3( dot( pale, vec3( 0.3, 0.55, 0.15 ) ) ) * vec3( 1.04, 1.02, 0.95 ), 0.4 ) * 1.06;
 	vec3 cs = t < 0.3 ? mix( hs, pale, smoothstep( 0.0, 0.3, t ) ) : mix( pale, zs, smoothstep( 0.3, 1.0, t ) );
 	vec3 col = cs * cs;
 	// a brighter band hugging the horizon
@@ -104,7 +104,7 @@ vec3 ocSkyBase( vec3 d ) {
 	float m = max( mu, 0.0 );
 	float band = exp( - abs( y ) * 5.0 );
 	float sunUp = smoothstep( - 0.28, 0.02, uSunDir.y );
-	col += uSunGlow * ( pow( m, 4.0 ) * ( 0.15 + 0.85 * band ) * 0.42 + pow( m, 24.0 ) * 0.8 + pow( m, 400.0 ) * 2.0 ) * sunUp;
+	col += uSunGlow * ( pow( m, 5.0 ) * ( 0.1 + 0.9 * band ) * 0.4 + pow( m, 28.0 ) * 0.85 + pow( m, 400.0 ) * 2.0 ) * sunUp;
 	// the earth's shadow and the pink belt opposite the sun at twilight
 	float twi = smoothstep( 0.18, 0.0, abs( uSunDir.y + 0.02 ) );
 	float anti = max( - mu, 0.0 );
