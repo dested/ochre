@@ -386,6 +386,12 @@ controller, cameras and verbs that make each stage of life feel different; and t
   (0 = the player's generation, −1 parents, +1 children) and `isPlayer`. play fills them from `SimPerson`; ui's
   family tree draws from them instead of parsing relation strings. Applies to: play, ui.
 
+- (2026-10-17 01:40, lead) Chapter transitions happen **in place**: on a chapter's last beat the director emits
+  `chapter-end {stage, next}`, then (same sim) skips time, ages the band and applies that stage's history (births,
+  Oro's death, the partner), sets `state.stage = next` and a fresh `state.chapter`, and emits `chapter-start` for
+  `next`. One life stays one sim, so bonds, skills and notes carry over. `createSim({ stage })` is only for
+  skip-to-chapter from the title. play keeps its 2 s fallback as a safety net. Applies to: sim, play.
+
 ## Ledger (lead, updated 2026-10-17 00:40)
 
 Board: down · Last pushed: 60add27 (main) · Gate: typecheck green at 60add27 · Deploy: c61a551 live at https://ochre.dested.com (CI green)
