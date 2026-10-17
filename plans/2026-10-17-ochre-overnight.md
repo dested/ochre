@@ -422,7 +422,7 @@ Board: down · Last pushed: 2078087 (main, 01:15) · Gate: install 0, typecheck 
 | Agent | Model | Owns | Item now | Last sha / artifact | Status |
 | --- | --- | --- | --- | --- | --- |
 | world | opus-xhigh | world-gen, game/world, game/render | W1 | 2edee96 wip (lab washed out at 01:20, not yet ready) | working |
-| people | opus-xhigh | game/actors | P1 | — | working (spawned 00:39) |
+| people | opus-xhigh | game/actors | P1 fix | c66a392 → fix sent 01:35 (budget 7 calls/97k tris per person, 40 cm face, garments, arms) | working |
 | sim | opus-high | sim | S2 | S1 854d192 passed (spacing, hearth ring, child hysteresis, meal mix, hunt label → S2) | working |
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | U5 | U3 bf4973b passed; 627cf52 lineage fix passed | working |
 | play | opus-high | game/play, game/audio, app/play.tsx | PL3 (swapping in world modules) | PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
