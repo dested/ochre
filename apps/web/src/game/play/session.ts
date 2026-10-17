@@ -302,8 +302,10 @@ export function mount(el: HTMLElement): () => void {
       click()
       const g = rt.game
       if (asHeir && g) {
-        g.sim.command({ type: 'continue-as-heir' })
-        bridge.set({ screen: 'playing', summary: null })
+        // the heir's chapter card replaces the summary directly; it falls back to playing if no card came up
+        g.continueAsHeir()
+        if (bridge.get().screen === 'summary') bridge.set({ screen: 'playing' })
+        bridge.set({ summary: null })
         save()
       } else {
         rt.endLife()

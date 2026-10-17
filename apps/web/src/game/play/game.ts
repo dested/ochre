@@ -4,13 +4,14 @@
  * lab drives one directly.
  */
 import { Mesh, type Object3D, PerspectiveCamera, Scene, Vector3 } from 'three'
-import type { Bridge, NameTag, PromptState } from '../bridge'
+import type { Bridge, NameTag, ObjectiveMark, PromptState } from '../bridge'
 import type {
   CameraCue,
   ClockState,
   GameAudio,
   Interaction,
   LifeStageId,
+  LifeSummary,
   PersonActor,
   PersonAnim,
   RenderPipeline,
@@ -67,6 +68,8 @@ export type Game = {
   player(): SimPerson
   /** the last events, compact, newest last (QA reads it) */
   readonly log: readonly string[]
+  /** after the summary: the grandchild's life begins behind their own chapter card */
+  continueAsHeir(): void
   dispose(): void
 }
 
@@ -128,6 +131,29 @@ const FADE_HIDE = 0.3
 /** an interaction this close to the objective's point is the beat's work, metres */
 const GOAL_NEAR = 6
 const DARK_RANGE = 10
+/** the objective mark hides inside this distance, metres */
+const MARK_NEAR = 6
+/** an off-screen mark sits this far inside the screen edge, css pixels */
+const MARK_EDGE = 44
+/** the end of a life: the last line holds this long before the slow fade, then the sound, then the summary */
+const LAST_LINE = 3.5
+const LAST_FADE = 5
+const LAST_HUSH = 2.5
+/** seconds into a chapter card before the scene behind it clears (the card is opaque by then) */
+const CARD_CLEAR = 1.5
+const SUMMERS = [
+  'no',
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+  'ten',
+]
 /** held.faces opens the look cone this far past the farthest face */
 const FACES_MARGIN = (15 * Math.PI) / 180
 /** an actor's own head bone (people name their bones), not the head of a child it carries */
@@ -276,14 +302,46 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   const log: string[] = []
   /** what a chapter's opening step said after its chapter-start: held until the card closes */
   let afterCard: SimEvent[] = []
+  /** the life-summary held back while the death plays out */
+  let closing: { event: SimEvent; t: number; sounded: boolean } | null = null
+  let lastSummary: LifeSummary | null = null
+  let lastWords = false
+  let walkSet = false
+  /** the old player's name while their heir's first chapter card is on its way */
+  let heirOf: string | null = null
+  let cardT = 0
+  /** the chapter's opening asks for black after its card (its last queued fade is to black) */
+  const opensBlack = () => {
+    let black = false
+    for (const e of afterCard)
+      if (e.type === 'camera' && e.cue.kind === 'fade') black = e.cue.to === 'black'
+    return black
+  }
   const route = (events: SimEvent[]) => {
     let carded = false
-    for (const e of events) {
+    for (let e of events) {
       if (carded && e.type !== 'teleport') {
         afterCard.push(e)
         continue
       }
       if (e.type === 'chapter-start') carded = true
+      // the end of a life plays out (last line, slow fade, sound) before the summary
+      if (e.type === 'life-summary' && !closing) {
+        closing = { event: e, t: 0, sounded: false }
+        lastSummary = e.summary
+        log.push(`${sim.state.chapter.beatId} | ${describe(e)}`)
+        continue
+      }
+      // the grandchild's first card is theirs: their name, whose grandchild, how many summers
+      if (e.type === 'chapter-start' && heirOf) {
+        const years = Math.floor(e.ageYears)
+        e = {
+          ...e,
+          title: findPlayer().name,
+          subtitle: `${heirOf}'s grandchild · ${SUMMERS[years] ?? years} summers`,
+        }
+        heirOf = null
+      }
       if (e.type !== 'bond' && e.type !== 'sfx') {
         log.push(`${sim.state.chapter.beatId} | ${describe(e)}`)
         if (log.length > LOG_SIZE) log.shift()
@@ -687,19 +745,120 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     const s = sim.state
     const w = s.weather
     const clock: ClockState = { ...s.clock }
+    const lastWalk = s.chapter.beatId === 'elder.walk'
     bridge.setHud({
-      // the last walk to the sea has no HUD
-      visible: s.chapter.beatId !== 'elder.walk',
+      visible: true,
       name: player.name,
       // whole years from one, tenths for an infant
       ageYears: shownAge(player.look.ageYears),
       stage: s.stage,
-      needs: s.stage === 'held' ? null : { ...player.needs },
+      // the last walk to the sea keeps only its objective
+      needs: s.stage === 'held' || lastWalk ? null : { ...player.needs },
       clock,
-      inventory: { ...s.inventory },
+      inventory: lastWalk ? null : { ...s.inventory },
       // screen-space wind: 0 = blowing away from the camera (up the screen)
-      wind: s.stage === 'held' ? null : { dir: controller.yaw - w.windDir, strength: w.wind },
+      wind:
+        s.stage === 'held' || lastWalk
+          ? null
+          : { dir: controller.yaw - w.windDir, strength: w.wind },
     })
+  }
+
+  const sayLastWords = (player: SimPerson) => {
+    lastWords = true
+    feed.caption({
+      id: `last-words-${player.id}`,
+      text: `${player.name} sits where the sand is dry and watches the sea come in, the way it always has.`,
+      speaker: null,
+      kind: 'narration',
+      seconds: LAST_LINE + LAST_FADE,
+    })
+  }
+
+  /** last line, slow fade to black, the sea, then the summary; whether the walk ran or was skipped */
+  const updateClosing = (dt: number) => {
+    const c = closing
+    if (!c) return
+    if (c.t === 0 && !lastWords) sayLastWords(findPlayer())
+    c.t += dt
+    if (c.t >= LAST_LINE && fade.to < 1)
+      cameraCue({ kind: 'fade', to: 'black', seconds: LAST_FADE })
+    if (fadeValue < 0.99) return
+    if (!c.sounded) {
+      c.sounded = true
+      c.t = Math.max(c.t, LAST_LINE + LAST_FADE)
+      audio.sfx('wave-crash')
+    }
+    if (c.t < LAST_LINE + LAST_FADE + LAST_HUSH) return
+    closing = null
+    route([c.event])
+  }
+
+  const markAt = new Vector3()
+  const updateMark = (player: SimPerson) => {
+    const mark = objectiveMarkNow(player)
+    const l = bridge.get().objectiveMark
+    if (
+      mark === l ||
+      (mark &&
+        l &&
+        mark.onScreen === l.onScreen &&
+        Math.abs(mark.x - l.x) < 1 &&
+        Math.abs(mark.y - l.y) < 1 &&
+        Math.abs(mark.distance - l.distance) < 0.5)
+    )
+      return
+    bridge.set({ objectiveMark: mark })
+  }
+
+  /** the objective's target on screen, or clamped to the edge toward it; null in held, cinematics and fades */
+  const objectiveMarkNow = (player: SimPerson): ObjectiveMark | null => {
+    const t = sim.state.chapter.objective?.target
+    if (!t || mode !== 'third' || sim.state.stage === 'held') return null
+    if (fadeValue > FADE_HIDE || closing || (focus && now < focus.until)) return null
+    if (bridge.get().screen !== 'playing') return null
+    if (t.kind === 'person') {
+      const q = sim.state.people.find((p) => p.id === t.id)
+      if (!q || !q.alive) return null
+      const carrier = q.carriedBy ? sim.state.people.find((p) => p.id === q.carriedBy) : undefined
+      const at = (carrier ?? q).position
+      markAt.set(at.x, world.heightAt(at.x, at.z) + 1.7, at.z)
+    } else markAt.set(t.at.x, world.heightAt(t.at.x, t.at.z) + 1, t.at.z)
+    const distance = Math.hypot(markAt.x - player.position.x, markAt.z - player.position.z)
+    if (distance < MARK_NEAR) return null
+    const { width, height } = deps.viewport()
+    // camera space: x right, y up, looking down −z; (x, −y) is the screen direction in front and behind alike
+    tmp.copy(markAt).applyMatrix4(camera.matrixWorldInverse)
+    const behind = tmp.z > -0.1
+    const dx = tmp.x
+    const dy = -tmp.y
+    tmp.copy(markAt).project(camera)
+    const sx = ((tmp.x + 1) / 2) * width
+    const sy = ((1 - tmp.y) / 2) * height
+    const onScreen =
+      !behind &&
+      sx >= MARK_EDGE &&
+      sx <= width - MARK_EDGE &&
+      sy >= MARK_EDGE &&
+      sy <= height - MARK_EDGE
+    const angle = Math.atan2(dx, -dy)
+    if (onScreen) return { x: sx, y: sy, onScreen, angle, distance }
+    // off screen: from the centre along the target's direction to the inset edge (straight behind points down)
+    const ex = Math.abs(dx) < 1e-4 && Math.abs(dy) < 1e-4 ? 0 : dx
+    const ey = ex === 0 && Math.abs(dy) < 1e-4 ? 1 : dy
+    const hw = width / 2 - MARK_EDGE
+    const hh = height / 2 - MARK_EDGE
+    const k = Math.min(
+      Math.abs(ex) > 1e-6 ? hw / Math.abs(ex) : Infinity,
+      Math.abs(ey) > 1e-6 ? hh / Math.abs(ey) : Infinity
+    )
+    return {
+      x: width / 2 + ex * k,
+      y: height / 2 + ey * k,
+      onScreen: false,
+      angle: Math.atan2(ex, -ey),
+      distance,
+    }
   }
 
   let watchKey = ''
@@ -723,7 +882,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       const settings = deps.settings()
       const screen = bridge.get().screen
       const modal = bridge.get().choice !== null || bridge.get().minigame !== null
-      const live = screen === 'playing' && !game.simPaused && !modal
+      const live = screen === 'playing' && !game.simPaused && !modal && closing === null
       input.enabled = live
       input.wantLock = live
 
@@ -799,7 +958,14 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
         audio.music(lastStage)
       }
 
+      // behind the chapter card the scene comes up from black, so the card lifts onto the world, not onto black
+      if (screen === 'chapter-card') {
+        cardT += dt
+        if (cardT > CARD_CLEAR && fade.to > 0 && !opensBlack())
+          cameraCue({ kind: 'fade', to: 'clear', seconds: 0.6 })
+      } else cardT = 0
       if (screen === 'playing' && !game.simPaused && !modal) {
+        if (closing) updateClosing(dt)
         if (afterCard.length > 0) {
           const queued = afterCard
           afterCard = []
@@ -809,6 +975,11 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       }
       player = findPlayer()
       cast.sync(sim.state, dt, pose)
+      // the elder sits by the sea (the walk's objective is met): the life's last line
+      if (sim.state.chapter.beatId === 'elder.walk' && !lastWords) {
+        if (sim.state.chapter.objective) walkSet = true
+        else if (walkSet) sayLastWords(player)
+      }
 
       if (mode === 'held') updateHeld(dt, player, settings)
       else {
@@ -855,6 +1026,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       if (tagTimer >= 1 / 15) {
         tagTimer = 0
         updateTags(player)
+        updateMark(player)
         updateWatching()
       }
       hudTimer += dt
@@ -896,6 +1068,12 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     },
     player: findPlayer,
     log,
+    continueAsHeir() {
+      heirOf = lastSummary?.name ?? null
+      sim.command({ type: 'continue-as-heir' })
+      // the chapter card comes up in this same call, so no frame of the old black under the HUD
+      route(sim.step(0))
+    },
     dispose() {
       hideHead(null, false)
       feed.reset()
