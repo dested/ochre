@@ -308,6 +308,8 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   let closing: { event: SimEvent; t: number; sounded: boolean } | null = null
   let lastSummary: LifeSummary | null = null
   let lastWords = false
+  /** the held life-summary once its death has played (routed through to the summary) */
+  let released: SimEvent | null = null
   let walkSet = false
   /** the old player's name while their heir's first chapter card is on its way */
   let heirOf: string | null = null
@@ -328,7 +330,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       }
       if (e.type === 'chapter-start') carded = true
       // the end of a life plays out (last line, slow fade, sound) before the summary
-      if (e.type === 'life-summary' && !closing) {
+      if (e.type === 'life-summary' && e !== released) {
         closing = { event: e, t: 0, sounded: false }
         lastSummary = e.summary
         log.push(`${sim.state.chapter.beatId} | ${describe(e)}`)
@@ -749,7 +751,8 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     const clock: ClockState = { ...s.clock }
     const lastWalk = s.chapter.beatId === 'elder.walk'
     bridge.setHud({
-      visible: true,
+      // the death plays without the HUD
+      visible: closing === null,
       name: player.name,
       // whole years from one, tenths for an infant
       ageYears: shownAge(player.look.ageYears),
@@ -781,7 +784,19 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   const updateClosing = (dt: number) => {
     const c = closing
     if (!c) return
-    if (c.t === 0 && !lastWords) sayLastWords(findPlayer())
+    if (c.t === 0) {
+      const pl = findPlayer()
+      if (!lastWords) sayLastWords(pl)
+      // skipped walk or not, the elder ends sitting by the sea
+      if (!pl.carriedBy && pl.anim !== 'sit')
+        sim.command({
+          type: 'move',
+          position: pl.position,
+          heading: pl.heading,
+          speed: 0,
+          anim: 'sit',
+        })
+    }
     c.t += dt
     if (c.t >= LAST_LINE && fade.to < 1)
       cameraCue({ kind: 'fade', to: 'black', seconds: LAST_FADE })
@@ -793,6 +808,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
     }
     if (c.t < LAST_LINE + LAST_FADE + LAST_HUSH) return
     closing = null
+    released = c.event
     route([c.event])
   }
 
