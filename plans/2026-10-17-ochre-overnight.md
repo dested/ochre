@@ -612,6 +612,8 @@ controller, cameras and verbs that make each stage of life feel different; and t
   body when the point target is straight ahead (`09-walk-b.png`; point targets project at ground + 1 m in
   `objectiveMarkNow`, game.ts ~850). Project the player's screen box (feet to head top + 0.2 m, ±0.35 m wide); when an
   on-screen mark falls inside it, move the mark to just above the box's top edge.
+  (8) When a fade reaches full black, drop the captions on screen (lines said during or after the black stay). The
+  story caption ("You tell them how the moon pulls...") still shows when elder.walk fades in (ui's recheck).
   **sim:** the whale was still at night in ui's run at 478ad65 (`06-whale-a.png`). Check daylight holds on every path
   into provider.whale (normal flow, the Chapters menu, the QA jump).
 
@@ -650,7 +652,8 @@ controller, cameras and verbs that make each stage of life feel different; and t
   (4) After the heir takes over, Teni's sister Kaya reads "Elder"; she is the heir's great-aunt ("Great-aunt" /
   "Great-uncle" for a grandparent's sibling) (`/w/junk/sim-80k/ui/shots/f1/sheet-11.png`). (5) The elder.mark QA skip
   doesn't advance; ui had to engrave by hand. (6) The story caption ("You tell them how the moon pulls...") is still on
-  screen when elder.walk fades in: clear captions when a beat opens behind a fade.
+  screen when elder.walk fades in: clear captions when a beat opens behind a fade. **(Moved to play as F2 item 8,
+  04:40: the contract has no caption-clear event.)**
 
 ## Ledger (lead, updated 2026-10-17 01:05)
 
