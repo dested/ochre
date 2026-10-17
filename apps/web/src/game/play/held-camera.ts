@@ -26,6 +26,15 @@ const FORWARD_YAW = 0.12
  */
 const CRADLE_OUT = 0.42
 const CRADLE_DROP = 0.22
+const CRADLE_PITCH = -Math.atan2(CRADLE_DROP, CRADLE_OUT)
+/**
+ * cradled, turning off her face eases the upward look back toward level (else the cave roof fills the view):
+ * fully level past LEVEL_YAW, and how much of the way one radian of turn takes it
+ */
+const FACE_YAW = 0.2
+const LEVEL_YAW = 0.9
+const LEVEL_PITCH = 0.05
+const LEVEL_GAIN = 2.5
 /** her body as a post under her head, for keeping a downward look out of it */
 const BODY_RADIUS = 0.34
 const BODY_BELOW_FACE = 0.12
@@ -99,7 +108,7 @@ export function createHeldCamera(): HeldCamera {
         // cradled, the view sits out along her heading and faces back up at her face
         if (slot === 'arms') {
           cam.yaw = 0
-          cam.pitch = -Math.atan2(CRADLE_DROP, CRADLE_OUT)
+          cam.pitch = CRADLE_PITCH
         }
         lastSlot = slot
       }
@@ -134,6 +143,12 @@ export function createHeldCamera(): HeldCamera {
         pitchMin,
         pitchMax
       )
+      const turn = Math.abs(input.mouse.dx) * k
+      if (slot === 'arms' && !cam.attract && turn > 0) {
+        const away = MathUtils.smoothstep(Math.abs(cam.yaw), FACE_YAW, LEVEL_YAW)
+        const want = MathUtils.lerp(CRADLE_PITCH, LEVEL_PITCH, away)
+        cam.pitch += (want - cam.pitch) * Math.min(1, turn * LEVEL_GAIN)
+      }
       // on the back: beside her head, on the side the infant is turned to; while she offers something, on the
       // side of her hand (aiming at a hand straight ahead would otherwise swing the view shoulder to shoulder)
       if (cam.attract && face) {
