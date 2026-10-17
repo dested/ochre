@@ -19,8 +19,19 @@ const saveSchema = z.object({
   stage: stageSchema,
   seed: z.number(),
   save: z.object({ version: z.literal(1), payload: z.unknown() }),
+  /** the player's age when saved, for the title's Continue card */
+  age: z.number().optional(),
 })
 type SaveFile = z.infer<typeof saveSchema>
+
+/** a stage's opening age, for saves written before `age` was stored */
+const STAGE_AGE: Record<LifeStageId, number> = {
+  held: 0.3,
+  small: 6,
+  youth: 14,
+  provider: 26,
+  elder: 58,
+}
 
 function readSave(): SaveFile | null {
   try {
@@ -118,7 +129,15 @@ export function mount(el: HTMLElement): () => void {
   let saveTimer = 0
   let loadTimer: ReturnType<typeof setTimeout> | null = null
 
-  bridge.set({ screen: 'title', hasLife: readSave() !== null })
+  /** the title's Continue card and button follow the save */
+  const savedState = () => {
+    const f = readSave()
+    return {
+      hasLife: f !== null,
+      saved: f ? { name: f.name, stage: f.stage, ageYears: f.age ?? STAGE_AGE[f.stage] } : null,
+    }
+  }
+  bridge.set({ screen: 'title', ...savedState() })
   rt.audio.music('title')
 
   const save = () => {
@@ -130,7 +149,9 @@ export function mount(el: HTMLElement): () => void {
       stage: g.sim.state.stage,
       seed: SEED,
       save: g.sim.serialize(),
+      age: Math.floor(g.player().look.ageYears * 10) / 10,
     })
+    bridge.set(savedState())
   }
 
   // every entry into a life comes from a click: the gesture that lets WebAudio start
@@ -263,7 +284,7 @@ export function mount(el: HTMLElement): () => void {
       host.setPaused(false)
       input.releaseLock()
       rt.audio.music('title')
-      bridge.set({ screen: 'title', hasLife: readSave() !== null, summary: null, chapter: null })
+      bridge.set({ screen: 'title', ...savedState(), summary: null, chapter: null })
     },
     choose(choiceId, optionId) {
       click()
@@ -283,7 +304,7 @@ export function mount(el: HTMLElement): () => void {
         save()
       } else {
         rt.endLife()
-        bridge.set({ screen: 'title', summary: null, hasLife: readSave() !== null })
+        bridge.set({ screen: 'title', summary: null, ...savedState() })
       }
     },
     setSettings(patch) {
