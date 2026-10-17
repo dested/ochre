@@ -160,6 +160,8 @@ const PRESETS: Record<string, () => Preset> = {
     screen: 'playing',
     hud: { stage: 'youth', ageYears: 14 },
     objective: { id: 'youth.share', text: 'Share the meat', done: null, total: null },
+    // a caption still running when the choice lands: the HUD hides it under the card
+    captions: [cap('narration', 'Gum, ochre, heat. The point holds.')],
     choice: {
       id: 'share',
       prompt: 'Who eats first?',

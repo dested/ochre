@@ -51,8 +51,11 @@ export function Hud({ dimmed = false, toasts }: { dimmed?: boolean; toasts: read
     typeof window !== 'undefined' &&
     shownTags(nameTags, { width: window.innerWidth, height: window.innerHeight }).has(target.id)
 
+  // a choice card owns the bottom of the frame: lines under it would read as a fourth option
   const lines = (
-    <div className="absolute bottom-[clamp(24px,5vh,56px)] left-1/2 -translate-x-1/2">
+    <div
+      className="absolute bottom-[clamp(24px,5vh,56px)] left-1/2 -translate-x-1/2"
+      style={{ opacity: choosing ? 0 : 1, transition: 'opacity 300ms ease' }}>
       <div className="ui-scale flex flex-col items-center gap-[clamp(14px,2.6vh,26px)]">
         {hud.visible && prompt && <Prompt prompt={prompt} />}
         <Captions captions={captions} large={largeCaptions} />
