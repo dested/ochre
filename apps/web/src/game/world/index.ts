@@ -94,6 +94,8 @@ export const createWorldView: CreateWorldView = (data: WorldData, pipeline: Rend
   root.add(hemi)
 
   const camPos = new Vector3()
+  // the eye opening up inside the cave by day (0 outside .. 1 deep in), eased like a real eye
+  let adapt = 0
   const focus = new Vector3()
   const lightView = new Matrix4()
   const lightInv = new Matrix4()
@@ -113,6 +115,22 @@ export const createWorldView: CreateWorldView = (data: WorldData, pipeline: Rend
       LIGHT.uFocus.value.copy(focus)
 
       const key = applyColourScript(clock, weather)
+      // inside the cave by day the eye adapts: the floor and walls read, the mouth burns gold
+      {
+        const dx = camPos.x - CAVE.x
+        const dz = camPos.z - CAVE.z
+        const a = dx * Math.sin(CAVE.heading) + dz * Math.cos(CAVE.heading)
+        const b = dx * Math.cos(CAVE.heading) - dz * Math.sin(CAVE.heading)
+        const ramp = (x: number, lo: number, hi: number) => Math.min(1, Math.max(0, (x - lo) / (hi - lo)))
+        const inside = ramp(-a, 1, 7) * (1 - ramp(Math.abs(b), CAVE.halfWidth, CAVE.halfWidth + 4)) * (1 - ramp(camPos.y, CAVE.floor + CAVE.ceiling + 1, CAVE.floor + CAVE.ceiling + 5))
+        // like an eye's metering: looking out at the bright mouth it stays as it is, looking in it opens
+        const e = camera.matrixWorld.elements
+        const out = -((e[8] ?? 0) * Math.sin(CAVE.heading) + (e[10] ?? 0) * Math.cos(CAVE.heading))
+        const want = inside * clock.daylight * (1 - ramp(out, -0.2, 0.75))
+        // (with time stopped there is no dt to ease over, so it settles at once)
+        adapt += (want - adapt) * (frame.dt > 0 ? Math.min(1, frame.dt * 1.5) : 1)
+        POST.exposure.value *= 1 + 1.1 * adapt
+      }
       sun.color.copy(key.color)
       sun.intensity = key.intensity * Math.PI
       hemi.color.copy(LIGHT.uSkyAmb.value)

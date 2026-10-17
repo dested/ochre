@@ -263,7 +263,7 @@ float ocCaveSky( vec3 wp ) {
 	inside *= 1.0 - smoothstep( uCave2.x + uCave2.w + 1.5, uCave2.x + uCave2.w + 4.5, wp.y );
 	inside *= smoothstep( - uCave2.y - 6.0, - uCave2.y + 2.0, a );
 	float deep = smoothstep( 2.0, - uCave2.y * 0.75, a );
-	return mix( 1.0, mix( 0.55, 0.07, deep ), inside );
+	return mix( 1.0, mix( 0.6, 0.16, deep ), inside );
 }
 // knife-laid rock: Voronoi blocks on the plane the surface mostly faces, wider than tall like bedding; each block
 // is a flat facet with its own tilt (xyz, world space, ±0.5) and tone (w)
@@ -308,6 +308,11 @@ vec3 ocFireFill( vec4 f, vec3 nw, vec3 wp ) {
 vec3 ocAmbient( vec3 nw, vec3 wp ) {
 	float up = nw.y * 0.5 + 0.5;
 	vec3 amb = mix( uGroundAmb, uSkyAmb, smoothstep( 0.0, 1.0, up ) );
-	return amb * ocCaveSky( wp ) + ocFireFill( uFireGlow, nw, wp ) + ocFireFill( uFireGlow2, nw, wp );
+	float cs = ocCaveSky( wp );
+	// what light reaches inside has come off warm rock and sand, not straight from the blue sky
+	amb = mix( amb, vec3( dot( amb, vec3( 0.3, 0.5, 0.2 ) ) ) * vec3( 1.15, 0.92, 0.7 ), ( 1.0 - cs ) * 0.85 );
+	// inside, the sunlit ground at the mouth bounces a warm light deep into the cave, most onto walls and roof
+	vec3 bounce = uKeyColor * vec3( 0.95, 0.72, 0.5 ) * ( 0.045 + 0.035 * ( 1.0 - up ) ) * ( 1.0 - cs );
+	return amb * cs + bounce + ocFireFill( uFireGlow, nw, wp ) + ocFireFill( uFireGlow2, nw, wp );
 }
 `
