@@ -218,10 +218,8 @@ export function mount(el: HTMLElement): () => void {
   })
   const onKey = (e: KeyboardEvent) => {
     if (e.code !== 'Escape') return
-    const s = bridge.get().screen
-    if (s === 'playing' && !bridge.get().choice && !bridge.get().minigame) pause()
-    else if (s === 'paused') resume()
-    else if (s === 'notes' || s === 'lineage') bridge.actions.closeOverlay()
+    // only pausing is ours: the UI's pause, notes and lineage screens handle their own Esc (settings, detail views)
+    if (bridge.get().screen === 'playing' && !bridge.get().choice && !bridge.get().minigame) pause()
   }
   window.addEventListener('keydown', onKey)
   const onHide = () => save()
