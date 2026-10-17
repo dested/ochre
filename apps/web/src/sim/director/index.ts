@@ -15,6 +15,7 @@ import {
   dist,
   emit,
   objectiveNow,
+  targetKey,
   player,
   restoreScale,
   type Beat,
@@ -92,7 +93,7 @@ export function createDirector(host: DirectorHost, stage: LifeStageId, saved: Di
     // and fills in whenever the beat sets none of its own
     const aside = ctx.moments.aside
     const o = (aside && hooks.free() ? aside : null) ?? objectiveNow(d) ?? aside
-    const key = o ? `${o.id}|${o.text}|${o.done ?? ''}` : ''
+    const key = o ? `${o.id}|${o.text}|${o.done ?? ''}|${targetKey(o.target)}` : ''
     if (key === d.objectiveKey) return
     d.objectiveKey = key
     ctx.state.chapter.objective = o

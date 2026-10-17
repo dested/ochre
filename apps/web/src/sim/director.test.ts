@@ -161,6 +161,10 @@ describe('director', () => {
     expect(sim.state.chapter.objective?.text.startsWith('Follow ')).toBe(true)
     // awake and standing, not in the sleep pose the grandchild had at the end of the last life
     expect(player(sim).anim).toBe('idle')
+    // relations are the heir's now: the old life's partner is a grandparent, not "Partner"
+    const oldPartner = sim.state.people.find((p) => p.id === 'partner')
+    if (oldPartner) expect(sim.relationOf(oldPartner.id)).toMatch(/^Grand(father|mother)$/)
+    expect(sim.state.people.some((p) => sim.relationOf(p.id) === 'Partner')).toBe(false)
     // the heir's life plays on
     for (let i = 0; i < 40 && sim.state.stage === 'small'; i++) {
       director(sim).completeBeat()
@@ -304,4 +308,67 @@ describe('director', () => {
     }
     expect(run()).toBe(run())
   })
+
+  test('every objective with somewhere to go points there (a person or a place)', () => {
+    const MOVE = /^(Follow|Walk|Go |Get back|Bring|Tell the others|Catch|Give|Teach|Collect|Gather)/
+    const seen: { text: string; target: unknown }[] = []
+    for (const stage of ['small', 'youth', 'provider', 'elder'] as const) {
+      const sim = newSim(stage)
+      const dir = director(sim)
+      for (let guard = 0; guard < 60 && sim.state.stage === stage && !sim.state.chapter.finished; guard++) {
+        // let the beat run until it shows its objective (past any fades), then finish it
+        for (let i = 0; i < 30 * 6; i++) {
+          for (const e of sim.step(1 / 30)) if (e.type === 'objective' && e.objective) seen.push({ text: e.objective.text, target: e.objective.target ?? null })
+          if (sim.state.chapter.objective) break
+        }
+        dir.completeBeat()
+      }
+    }
+    const moving = seen.filter((o) => MOVE.test(o.text))
+    expect(moving.length).toBeGreaterThanOrEqual(10)
+    for (const o of moving) expect({ text: o.text, has: o.target !== null }).toEqual({ text: o.text, has: true })
+  }, 120_000)
+
+  test('provider teaches in daylight, says how, and the band talks corms', () => {
+    const sim = newSim('provider')
+    const dir = director(sim)
+    for (let i = 0; i < 20 && sim.state.chapter.beatId !== 'provider.teach'; i++) {
+      dir.completeBeat()
+      steps(sim, 0.2)
+    }
+    const events = steps(sim, 0, [])
+    for (let i = 0; i < 30 * 12 && sim.state.chapter.objective?.text !== 'Teach your child to dig corms'; i++) events.push(...sim.step(1 / 30))
+    expect(sim.state.chapter.objective?.text).toBe('Teach your child to dig corms')
+    expect(sim.state.clock.daylight).toBeGreaterThan(0.5)
+    expect(sim.state.clock.hour).toBeLessThan(14)
+    const caps: string[] = []
+    for (let i = 0; i < 30 * 50; i++) for (const e of sim.step(1 / 30)) if (e.type === 'caption') caps.push(e.caption.id.startsWith('chat-') ? `chat:${e.caption.text}` : e.caption.text)
+    expect(caps.some((c) => c.startsWith('Dig where the dry leaves are'))).toBe(true)
+    expect(caps.some((c) => /corm|leaves|stick|dug|Roast/.test(c) && !c.startsWith('Dig where'))).toBe(true)
+    // the band's own chatter holds off over the lesson
+    expect(caps.filter((c) => c.startsWith('chat:'))).toEqual([])
+  }, 60_000)
+
+  test('the whale comes ashore by daylight: runners call out, then the band goes down', () => {
+    const sim = newSim('provider')
+    const dir = director(sim)
+    const events: SimEvent[] = []
+    for (let i = 0; i < 20 && sim.state.chapter.beatId !== 'provider.whale'; i++) {
+      dir.completeBeat()
+      events.length = 0
+      steps(sim, 0.2, events)
+    }
+    expect(sim.state.chapter.beatId).toBe('provider.whale')
+    steps(sim, 15, events)
+    const caps = events.flatMap((e) => (e.type === 'caption' ? [e.caption.text] : []))
+    expect(sim.state.clock.daylight).toBeGreaterThan(0.5)
+    expect(caps).toContain('A whale! A whale on the sand!')
+    expect(caps).toContain('Bring the knives! Bring everyone!')
+    expect(sim.state.chapter.objective?.text.startsWith('Tell the others')).toBe(true)
+    expect(sim.state.chapter.objective?.target?.kind).toBe('person')
+    // the runners are on their way to the shore
+    const beach = world.poi('whale-beach')
+    const running = sim.state.people.filter((p) => !p.isPlayer && Math.hypot(p.position.x - beach.x, p.position.z - beach.z) < 30)
+    expect(running.length).toBeGreaterThanOrEqual(1)
+  }, 60_000)
 })

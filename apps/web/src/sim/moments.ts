@@ -301,7 +301,13 @@ const MOMENTS: readonly Moment[] = [
           say(ctx, r, null, 'A small brown bird chatters at the men and flits from bush to bush.')
           call(ctx, r, r.cast.lead, 'Come. The bird is talking.')
           const lead = personById(ctx, r.cast.lead)
-          ctx.moments.aside = { id: 'moment-honeyguide', text: `Go with ${lead ? lead.name : 'the men'} after the honeyguide`, done: null, total: null }
+          ctx.moments.aside = {
+            id: 'moment-honeyguide',
+            text: `Go with ${lead ? lead.name : 'the men'} after the honeyguide`,
+            done: null,
+            total: null,
+            target: lead ? { kind: 'person', id: lead.id } : null,
+          }
           const bees = r.spots.bees ?? hearth(ctx)
           order(ctx, r, r.cast.lead, { kind: 'goto', dest: bees, near: 1.2, speed: 1.4, pose: CROUCH, face: bees })
           order(ctx, r, r.cast.second, { kind: 'goto', dest: { x: bees.x + 1.6, z: bees.z + 0.8 }, near: 1.2, speed: 1.4, pose: CROUCH, face: bees })

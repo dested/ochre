@@ -273,6 +273,11 @@ export function relationOf(ctx: SimCtx, personId: string): string | null {
     return s.people.filter((q) => q.id !== id && gp.some((g) => q.motherId === g || q.fatherId === g)).map((q) => q.id)
   })
   if (parentSiblings.includes(p.id)) return f ? 'Aunt' : 'Uncle'
+  if (pParents.some((id) => parentSiblings.includes(id))) return 'Cousin'
+  // a grandparent's brother or sister
+  const grandparents = parents.flatMap((id) => [byId(id)?.motherId, byId(id)?.fatherId]).filter((x): x is string => !!x)
+  const greatParents = grandparents.flatMap((id) => [byId(id)?.motherId, byId(id)?.fatherId]).filter((x): x is string => !!x)
+  if (!grandparents.includes(p.id) && pParents.some((id) => greatParents.includes(id))) return f ? 'Great-aunt' : 'Great-uncle'
   const siblings = s.people.filter((q) => q !== pl && [q.motherId, q.fatherId].some((id) => id !== null && parents.includes(id))).map((q) => q.id)
   if (pParents.some((id) => siblings.includes(id))) return f ? 'Niece' : 'Nephew'
   if (p.partnerId && siblings.includes(p.partnerId)) return f ? 'Sister-in-law' : 'Brother-in-law'

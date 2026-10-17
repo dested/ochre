@@ -3,7 +3,7 @@
  * and captions. Each beat is a list of steps (see runtime.ts); people are named by their part in the life
  * (mother, father, grandmother…), so an heir's life plays the same scenes with their own family.
  */
-import type { Choice, FieldNoteId, LifeStageId, Sex, SimPerson, SkillId, Vec2 } from '../../game/contracts'
+import type { Choice, FieldNoteId, LifeStageId, ObjectiveTarget, Sex, SimPerson, SkillId, Vec2 } from '../../game/contracts'
 import { addAnimal, removeAnimal } from '../animals'
 import type { Pose, SimCtx } from '../ctx'
 import { addBond } from '../life'
@@ -11,6 +11,7 @@ import { randomLook } from '../looks'
 import { makeName } from '../names'
 import { createAgent, seatPos } from '../ai'
 import { hurryWindow, openWindow, windowOver, type MomentId } from '../moments'
+import { quiet } from '../talk'
 import { hashString, mix32, Rng } from '../../core/rng'
 import { ageBand } from './history'
 import {
@@ -32,6 +33,7 @@ import {
   nameOf,
   note,
   obj,
+  objAt,
   order,
   person,
   place,
@@ -53,6 +55,7 @@ import {
   type Chapter,
   type D,
   type Role,
+  type Aim,
   type Step,
 } from './runtime'
 
@@ -176,6 +179,29 @@ function elandChild(d: D): SimPerson | undefined {
   const others = kids.filter((k) => k.motherId !== pl.motherId)
   const pool = others.length > 0 ? others : kids
   return pool.sort((a, b) => Math.abs(a.look.ageYears - pl.look.ageYears) - Math.abs(b.look.ageYears - pl.look.ageYears))[0]
+}
+
+// ─── where objectives point ──────────────────────────────────────────────────────────────────────────────
+
+/** an objective that follows someone (by role or id) */
+const toward = (who: Role | string): Aim => (d) => {
+  const p = person(d, who)
+  return p && p.alive ? { kind: 'person', id: p.id } : null
+}
+/** an objective at a place in the world */
+const at = (poiId: string): Aim => (d) => ({ kind: 'point', at: poi(d, poiId) })
+const atHearth: Aim = (d) => ({ kind: 'point', at: hearth(d) })
+/** the nearest eland, while there is one to follow */
+const toHerd: Aim = (d) => {
+  const e = herdNearest(d, player(d).position)
+  const a = e ? d.ctx.state.animals.find((x) => x.id === e.id) : undefined
+  return a ? { kind: 'point', at: { x: a.position.x, z: a.position.z } } : null
+}
+/** the nearest of these people to the player */
+function nearestOf(d: D, people: SimPerson[]): ObjectiveTarget | null {
+  const pl = player(d)
+  const p = people.sort((a, b) => dist(a.position, pl.position) - dist(b.position, pl.position))[0]
+  return p ? { kind: 'person', id: p.id } : null
 }
 
 function herdNearest(d: D, from: Vec2): { id: string; d: number; calm: boolean } | null {
@@ -441,7 +467,7 @@ const small: Chapter = {
         ...fadeIn(2),
         wait(0.8),
         say('Come. The moon was full. The sea is sleeping.', 'mother'),
-        obj((d) => `Follow ${nameOf(d, 'mother', 'Ama')} to the rocks`),
+        objAt((d) => `Follow ${nameOf(d, 'mother', 'Ama')} to the rocks`, toward('mother')),
         // three things on the way down, each where it belongs: the sea from the top, feet on the path, the tide on the shelf
         until((d) => walkedDown(d, 'shore-path-top', 4)),
         say('There. All of it, as far as you can see. It goes out, and it comes back.', 'mother'),
@@ -465,7 +491,7 @@ const small: Chapter = {
           const m = person(d, 'mother')
           if (m) order(d, 'mother', { kind: 'hold', pose: GATHER, face: poi(d, 'shore-mussels') })
         }),
-        obj((d) => `Watch ${nameOf(d, 'mother', 'Ama')} gather mussels`),
+        objAt((d) => `Watch ${nameOf(d, 'mother', 'Ama')} gather mussels`, toward('mother')),
         until((d) => player(d).skills.includes('shellfish')),
       ],
     },
@@ -473,7 +499,7 @@ const small: Chapter = {
       id: 'small.gather',
       scale: 20,
       steps: [
-        obj('Gather shellfish (0/12)', 12, (d) => counter(d, 'gather')),
+        objAt('Gather shellfish (0/12)', at('shore-mussels'), 12, (d) => counter(d, 'gather')),
         until((d) => counter(d, 'gather') >= 12),
         note('shellfish'),
         clearObj(),
@@ -484,7 +510,7 @@ const small: Chapter = {
       scale: 300,
       steps: [
         run((d) => order(d, 'mother', { kind: 'goto', dest: spot(d, poi(d, 'safe-sand'), 10), waitFor: player(d).id, waitDist: 14, near: 1.5 })),
-        obj('Get back to the sand before the sea wakes up'),
+        objAt('Get back to the sand before the sea wakes up', at('safe-sand')),
         until(
           (d) => {
             const sand = poi(d, 'safe-sand')
@@ -531,7 +557,7 @@ const small: Chapter = {
           const kid = person(d, 'eland')
           if (kid) caption(d, 'I am the eland! Catch me!', kid.id)
         }),
-        obj('Catch the eland'),
+        objAt('Catch the eland', toward('eland')),
         until((d) => counter(d, 'tag') > 0, { max: 60 }),
         run((d) => {
           const kid = person(d, 'eland')
@@ -565,9 +591,9 @@ const small: Chapter = {
           teleport(d, at, face(at, g))
         }),
         ...fadeIn(1.2),
-        obj((d) => `Watch ${relLabel(d, 'grandmother', 'Grandmother')} dig`),
+        objAt((d) => `Watch ${relLabel(d, 'grandmother', 'Grandmother')} dig`, toward('grandmother')),
         until((d) => player(d).skills.includes('corms'), { tick: adder }),
-        obj('Dig corms (0/3)', 3, (d) => counter(d, 'dig')),
+        objAt('Dig corms (0/3)', toward('grandmother'), 3, (d) => counter(d, 'dig')),
         until((d) => counter(d, 'dig') >= 3, { tick: adder }),
         note('corms'),
         note('danger'),
@@ -578,7 +604,7 @@ const small: Chapter = {
     {
       id: 'small.fire',
       steps: [
-        obj('Bring the food to the hearth'),
+        objAt('Bring the food to the hearth', atHearth),
         until((d) => counter(d, 'given') > 0 || d.ctx.state.inventory.shellfish + d.ctx.state.inventory.corms === 0),
         clearObj(),
         wait(1.5),
@@ -701,13 +727,13 @@ const youth: Chapter = {
         }),
         ...fadeIn(2),
         wait(0.5),
-        obj((d) => `Walk with ${nameOf(d, 'father', 'Tuk')} to the silcrete outcrop`),
+        objAt((d) => `Walk with ${nameOf(d, 'father', 'Tuk')} to the silcrete outcrop`, toward('father')),
         until((d) => {
           const ridge = poi(d, 'silcrete-ridge')
           return dist(player(d).position, ridge) < ridge.radius + 4
         }),
         run((d) => order(d, 'father', { kind: 'hold', pose: pose('knap', 'crouch', null, 'stone'), face: poi(d, 'silcrete-ridge') })),
-        obj('Collect silcrete (0/3)', 3, (d) => d.ctx.state.inventory.silcrete),
+        objAt('Collect silcrete (0/3)', at('silcrete-ridge'), 3, (d) => d.ctx.state.inventory.silcrete),
         until((d) => d.ctx.state.inventory.silcrete >= 3),
         note('silcrete'),
         clearObj(),
@@ -724,7 +750,7 @@ const youth: Chapter = {
           order(d, 'father', { kind: 'hold', pose: SIT, face: hearth(d) })
         }),
         ...fadeIn(1.4),
-        obj('Bury the stones under the hearth'),
+        objAt('Bury the stones under the hearth', atHearth),
         until((d) => counter(d, 'bury-stones') > 0),
         clearObj(),
         wait(1),
@@ -747,7 +773,7 @@ const youth: Chapter = {
     {
       id: 'youth.knap',
       steps: [
-        obj('Shape a spear point'),
+        objAt('Shape a spear point', atHearth),
         until((d) => counter(d, 'knap') > 0),
         minigame('knapping', (d, q) => {
           const quality = Math.max(0.05, Math.min(1, q))
@@ -778,7 +804,7 @@ const youth: Chapter = {
           emit(d, { type: 'item', item: 'gum', delta: 1 })
           order(d, 'father', { kind: 'hold', pose: pose('knap', 'knap', 'hafting', 'spear', 'ochre'), face: hearth(d) })
         }),
-        obj('Haft the point'),
+        objAt('Haft the point', atHearth),
         until((d) => counter(d, 'haft') > 0 || d.ctx.state.inventory.hafted),
         run((d) => {
           const inv = d.ctx.state.inventory
@@ -797,7 +823,7 @@ const youth: Chapter = {
       id: 'youth.track',
       steps: [
         run((d) => order(d, 'father', { kind: 'goto', dest: spot(d, poi(d, 'plateau-path-top'), 8), waitFor: player(d).id, waitDist: 12, near: 1.5 })),
-        obj((d) => `Follow ${nameOf(d, 'father', 'Tuk')} onto the plateau`),
+        objAt((d) => `Follow ${nameOf(d, 'father', 'Tuk')} onto the plateau`, toward('father')),
         until((d) => dist(player(d).position, poi(d, 'plateau-path-top')) < 10),
         ...fadeOut(1.4),
         run((d) => {
@@ -812,11 +838,11 @@ const youth: Chapter = {
           order(d, 'father', { kind: 'hold', pose: TRACK, face: c })
         }),
         ...fadeIn(1.4),
-        obj((d) => `Watch ${nameOf(d, 'father', 'Tuk')} read the ground`),
+        objAt((d) => `Watch ${nameOf(d, 'father', 'Tuk')} read the ground`, toward('father')),
         until((d) => player(d).skills.includes('tracking')),
         note('tracking'),
         run((d) => order(d, 'father', { kind: 'follow', targetId: player(d).id, near: 6, speed: 1.2 })),
-        obj("Follow the eland's trail"),
+        objAt("Follow the eland's trail", toHerd),
         until((d) => {
           const e = herdNearest(d, player(d).position)
           return e !== null && e.calm && e.d < 32
@@ -826,7 +852,7 @@ const youth: Chapter = {
     {
       id: 'youth.throw',
       steps: [
-        obj('Get close. Throw.'),
+        objAt('Get close. Throw.', toHerd),
         until((d) => counter(d, 'spear-hit') > 0),
         clearObj(),
         wait(2.5),
@@ -854,7 +880,7 @@ const youth: Chapter = {
     {
       id: 'youth.share',
       steps: [
-        obj('Share the meat'),
+        objAt('Share the meat', atHearth),
         until((d) => counter(d, 'give') > 0),
         choice(
           (d): Choice => {
@@ -915,12 +941,12 @@ const youth: Chapter = {
           teleport(d, at, face(at, camp))
         }),
         ...fadeIn(1.6),
-        obj('Go to the river mouth'),
+        objAt('Go to the river mouth', at('lagoon-camp')),
         until((d) => {
           const camp = poi(d, 'lagoon-camp')
           return dist(player(d).position, camp) < camp.radius + 8
         }),
-        obj('Give your beads to someone'),
+        objAt('Give your beads to someone', (d) => nearestOf(d, d.ctx.state.people.filter((p) => p.alive && p.familyId === 'lagoon'))),
         until((d) => d.life.beadsGivenTo !== null || d.ctx.state.inventory.beads === 0),
         run((d) => {
           // a skipped beat still leaves someone holding the beads
@@ -974,8 +1000,9 @@ const provider: Chapter = {
       steps: [
         run((d) => {
           d.ctx.noAiHunts = false
-          // the chapter opens on its first free afternoon, the little one still on your back
-          skipTo(d, 13.5)
+          // the chapter opens on its first free afternoon, the little one still on your back (early enough that the
+          // teaching after it has hours of winter daylight left)
+          skipTo(d, 12)
           seatPlayer(d, 0.5)
         }),
         ...fadeIn(2),
@@ -1010,11 +1037,14 @@ const provider: Chapter = {
         }),
         wait(3.5),
         ...fadeIn(1.5),
-        obj('Teach your child to dig corms'),
-        until((d) => {
-          const c = person(d, 'child')
-          return !c || c.skills.includes('corms')
-        }),
+        objAt('Teach your child to dig corms', at('corm-slope')),
+        until(
+          (d) => {
+            const c = person(d, 'child')
+            return !c || c.skills.includes('corms')
+          },
+          { tick: teachTalk },
+        ),
         run((d) => {
           d.ctx.pupil = null
           const c = person(d, 'child')
@@ -1032,6 +1062,16 @@ const provider: Chapter = {
     {
       id: 'provider.whale',
       steps: [
+        // the whale comes in by daylight, whatever brought the story here
+        ...when(
+          (d) => !hourNowGE(d, sun(d).rise + 0.5) || hourNowGE(d, sun(d).set - 3),
+          ...fadeOut(1.5),
+          run((d) => {
+            skipTo(d, sun(d).rise + 0.75, 0.5)
+            seatPlayer(d, 0.5)
+          }),
+          ...fadeIn(1.5),
+        ),
         run((d) => {
           const beach = poi(d, 'whale-beach')
           if (!d.ctx.state.animals.some((a) => a.kind === 'whale')) {
@@ -1040,9 +1080,21 @@ const provider: Chapter = {
             w.anim = 'dead'
             w.heading = 1.2
           }
+          // two who saw it run for the shore, shouting
+          const runners = whaleRunners(d)
+          runners.forEach((p, i) => {
+            d.st.cast[`runner${i + 1}`] = p.id
+            const lookout = spot(d, { x: beach.x + Math.sin(i * 2.1) * 14, z: beach.z + Math.cos(i * 2.1) * 10 }, 14)
+            order(d, p.id, { kind: 'goto', dest: lookout, speed: 3.4, face: beach, pose: pose('scripted', 'point') })
+          })
         }),
-        say('Shouts from the cliff top. A whale has come ashore in the cove!', null, 6),
-        obj('Tell the others', 3, (d) => talkedTo(d)),
+        say('Shouts from the cliff top. A whale has come ashore in the cove!', null, 5),
+        run((d) => caption(d, 'A whale! A whale on the sand!', person(d, 'runner1')?.id ?? null, undefined, 3)),
+        wait(3),
+        run((d) => caption(d, 'Bring the knives! Bring everyone!', person(d, 'runner2')?.id ?? null, undefined, 3)),
+        wait(3),
+        say('Gulls wheel over the cove, screaming, already fighting over it.', null, 4),
+        objAt('Tell the others', toUntold, 3, (d) => talkedTo(d)),
         until((d) => talkedTo(d) >= 3),
         clearObj(),
         run((d) => {
@@ -1055,8 +1107,22 @@ const provider: Chapter = {
             order(d, p.id, { kind: 'goto', dest: at, face: beach, pose: FEAST, speed: 1.6 })
           }
         }),
-        say('The whole band goes down to the cove, and the lagoon people come too. For a day, everyone eats.', null, 8),
-        wait(30),
+        say('The whole band goes down to the cove, running and calling to each other.', null, 5),
+        wait(6),
+        run((d) => {
+          const old = d.ctx.state.people.find((p) => p.alive && !p.isPlayer && p.look.ageYears >= 50)
+          caption(d, 'Twice in my life I have seen this. The sea has fed us.', old?.id ?? null, undefined, 5)
+        }),
+        wait(7),
+        say('The lagoon people come over the dunes with their knives, calling the news ahead of them.', null, 5),
+        wait(7),
+        run((d) => {
+          const kid = children(d, 4, 13)[0]
+          caption(d, 'It is bigger than the cave!', kid?.id ?? null, undefined, 3)
+        }),
+        wait(5),
+        say('For a day, everyone eats.', null, 4),
+        wait(6),
         ...fadeOut(2),
         run((d) => {
           releaseAll(d)
@@ -1084,7 +1150,7 @@ const provider: Chapter = {
           d.ctx.state.hearth.firewood = Math.min(d.ctx.state.hearth.firewood, 3)
         }),
         say('The wind turns cold. A storm is coming in from the sea.', null, 5),
-        obj('Bring firewood before dark (0/5)', 5, (d) => counter(d, 'wood')),
+        objAt('Bring firewood before dark (0/5)', (d) => (d.ctx.state.inventory.firewood > 0 ? atHearth(d) : at('firewood-gully')(d)), 5, (d) => counter(d, 'wood')),
         until((d) => counter(d, 'wood') >= 5 || hourNowGE(d, sun(d).set + 0.75)),
         run((d) => {
           // a fire fed well holds through the night; a starved one sinks to coals and the cold comes in
@@ -1168,6 +1234,53 @@ function hourNowGE(d: D, h: number): boolean {
   return d.ctx.state.clock.hour >= h
 }
 
+/** what is said while the player teaches: how to do it, now and again, and the band's talk turns to corms */
+const TEACH_HINT = (d: D) => `Dig where the dry leaves are, and let ${nameOf(d, 'child', 'the child')} watch your hands.`
+const CORM_TALK = [
+  'The corms are fat this year. The rain came at the right time.',
+  'Show the little one the leaves first. The leaves tell you where.',
+  'Not too deep. You break the stick, you break the corm.',
+  'My mother dug on that slope. Her mother too.',
+  'Roast them in the ashes tonight. The children like them soft.',
+]
+function teachTalk(d: D): void {
+  // nobody chatters about stone over the lesson
+  quiet(d.ctx, 3)
+  const n = counter(d, 'teach-talk')
+  const due = n === 0 ? 1.5 : 18 + n * 22
+  if (d.stepT < due) return
+  bump(d, 'teach-talk')
+  if (n % 2 === 0) {
+    caption(d, TEACH_HINT(d), null, undefined, 6)
+    return
+  }
+  const pl = player(d)
+  const near = d.ctx.state.people
+    .filter((p) => p.alive && !p.isPlayer && !p.carriedBy && p.look.ageYears >= 14 && dist(p.position, pl.position) < 30)
+    .sort((a, b) => dist(a.position, pl.position) - dist(b.position, pl.position))
+  const who = near[(n >> 1) % Math.max(1, near.length)]
+  const line = CORM_TALK[(n >> 1) % CORM_TALK.length]
+  if (who && line) caption(d, line, who.id, undefined, 5)
+}
+
+/** the two who saw the whale first: young and quick, not the player's own child */
+function whaleRunners(d: D): SimPerson[] {
+  const child = person(d, 'child')
+  return d.ctx.state.people
+    .filter((p) => p.alive && !p.isPlayer && !p.carriedBy && p !== child && p.look.ageYears >= 12 && p.look.ageYears < 40 && !d.ctx.agents.get(p.id)?.order)
+    .sort((a, b) => a.look.ageYears - b.look.ageYears)
+    .slice(0, 2)
+}
+
+/** the nearest grown-up not yet told about the whale */
+function toUntold(d: D): ObjectiveTarget | null {
+  const ran = [d.st.cast.runner1, d.st.cast.runner2]
+  const untold = d.ctx.state.people.filter(
+    (p) => p.alive && !p.isPlayer && !p.carriedBy && !ran.includes(p.id) && p.look.ageYears >= 8 && counter(d, `talk:${p.id}`) === 0,
+  )
+  return nearestOf(d, untold)
+}
+
 function talkedTo(d: D): number {
   return Object.keys(d.st.counters).filter((k) => k.startsWith('talk:')).length
 }
@@ -1223,7 +1336,7 @@ const elder: Chapter = {
         }),
         ...fadeIn(2),
         wait(1),
-        obj('Engrave the ochre'),
+        objAt('Engrave the ochre', atHearth),
         until((d) => counter(d, 'engrave') > 0),
         minigame('engraving', (d, q) => {
           d.life.engraving = Math.max(0, Math.min(1, q))
@@ -1252,7 +1365,7 @@ const elder: Chapter = {
           })
         }),
         ...fadeIn(2),
-        obj('Tell a story at the fire'),
+        objAt('Tell a story at the fire', atHearth),
         until((d) => counter(d, 'tell-story') > 0),
         choice(
           (d): Choice => {
@@ -1297,7 +1410,7 @@ const elder: Chapter = {
           teleport(d, top, face(top, poi(d, 'shore-path-bottom')))
         }),
         ...fadeIn(3),
-        obj('Walk down to the sea'),
+        objAt('Walk down to the sea', (d) => ({ kind: 'point', at: sitPoint(d) })),
         until((d) => counter(d, 'sit') > 0),
         clearObj(),
         wait(4),

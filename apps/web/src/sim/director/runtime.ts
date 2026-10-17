@@ -13,6 +13,7 @@ import type {
   LifeStageId,
   MinigameId,
   Objective,
+  ObjectiveTarget,
   Poi,
   SimEvent,
   SimPerson,
@@ -82,7 +83,7 @@ export type D = {
   forced: boolean
   /** completeBeat in QA's fast-forward mode: stop forcing at the beat's next free wait */
   toFree: boolean
-  objective: { id: string; text: (d: D) => string; total: number | null; done: ((d: D) => number) | null } | null
+  objective: { id: string; text: (d: D) => string; total: number | null; done: ((d: D) => number) | null; target: Aim | null } | null
   objectiveKey: string
   captionN: number
   beatId: string
@@ -294,11 +295,18 @@ export const minigame = (game: MinigameId, then: (d: D, quality: number) => void
 export const choice = (make: (d: D) => Choice, then: (d: D, optionId: string) => void): Step => ({ k: 'choice', make, then })
 export const when = (test: (d: D) => boolean, ...steps: Step[]): Step[] => [{ k: 'unless', test, n: steps.length }, ...steps]
 
+/** where an objective points, worked out each time it is read (a person moves, the next one to tell changes) */
+export type Aim = (d: D) => ObjectiveTarget | null
+
 /** set the objective line; with a total, `done` counts toward it and "(n/total)" in the text follows */
-export const obj = (text: Text, total: number | null = null, done: ((d: D) => number) | null = null): Step =>
+export const obj = (text: Text, total: number | null = null, done: ((d: D) => number) | null = null, target: Aim | null = null): Step =>
   run((d) => {
-    d.objective = { id: `${d.beatId}:${d.captionN++}`, text: (dd) => textOf(dd, text), total, done }
+    d.objective = { id: `${d.beatId}:${d.captionN++}`, text: (dd) => textOf(dd, text), total, done, target }
   })
+
+/** an objective with a place to go: `obj` with its target first */
+export const objAt = (text: Text, target: Aim, total: number | null = null, done: ((d: D) => number) | null = null): Step =>
+  obj(text, total, done, target)
 export const clearObj = (): Step =>
   run((d) => {
     d.objective = null
@@ -311,7 +319,13 @@ export function objectiveNow(d: D): Objective | null {
   const done = o.done ? Math.min(o.total ?? Infinity, Math.max(0, Math.floor(o.done(d)))) : null
   let text = o.text(d)
   if (o.total !== null && done !== null) text = text.replace(/\(\d+\/\d+\)\s*$/, `(${done}/${o.total})`)
-  return { id: o.id, text, done, total: o.total }
+  return { id: o.id, text, done, total: o.total, target: o.target ? o.target(d) : null }
+}
+
+/** a stable key for an objective target, so a target that moves a little doesn't re-send the objective */
+export function targetKey(t: ObjectiveTarget | null | undefined): string {
+  if (!t) return ''
+  return t.kind === 'person' ? `p:${t.id}` : `x:${Math.round(t.at.x / 4)},${Math.round(t.at.z / 4)}`
 }
 
 export function restoreScale(d: D): void {
