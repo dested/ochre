@@ -213,6 +213,8 @@ export function face(from: Vec2, to: Vec2): number {
 }
 
 export function caption(d: D, text: string, who: Role | string | null, kind?: Caption['kind'], seconds?: number): void {
+  // a QA skip runs the rest of the beat in one frame: its lines would only pile over the next beat's opening
+  if (d.forced) return
   const p = who ? person(d, who) : undefined
   const secs = seconds ?? Math.max(3, Math.min(9, text.split(/\s+/).length * 0.42 + 1.2))
   const k: Caption['kind'] = kind ?? (p ? 'speech' : 'narration')

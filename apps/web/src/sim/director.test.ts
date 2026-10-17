@@ -369,6 +369,8 @@ describe('director', () => {
     expect(sunDegrees(sim)).toBeGreaterThan(20)
     expect(caps).toContain('A whale! A whale on the sand!')
     expect(caps).toContain('Bring the knives! Bring everyone!')
+    // the skipped lesson's lines don't carry over the whale
+    expect(caps).not.toContain('Like this? I found one!')
     expect(sim.state.chapter.objective?.text.startsWith('Tell the others')).toBe(true)
     expect(sim.state.chapter.objective?.target?.kind).toBe('person')
     // the runners are on their way to the shore
