@@ -32,8 +32,8 @@ export type Director = {
   onMinigame(game: MinigameId, quality: number): void
   onChoose(choiceId: string, optionId: string): void
   continueAsHeir(): void
-  /** finish the current beat now (the lab's and QA's button) */
-  completeBeat(): void
+  /** finish the current beat now (the lab's and QA's button); `toFree` stops at the beat's next free wait instead */
+  completeBeat(opts?: { toFree?: boolean }): void
   readonly beatId: string
   readonly hooks: DirectorHooks
   save(): DirectorSave
@@ -58,6 +58,7 @@ export function createDirector(host: DirectorHost, stage: LifeStageId, saved: Di
     stepT: 0,
     answer: null,
     forced: false,
+    toFree: false,
     objective: null,
     objectiveKey: '',
     captionN: 0,
@@ -187,6 +188,7 @@ export function createDirector(host: DirectorHost, stage: LifeStageId, saved: Di
           done = d.forced || d.stepT >= step.s
           break
         case 'until':
+          if (d.forced && d.toFree && step.free) d.forced = false
           step.tick?.(d)
           done = d.forced || step.test(d) || (step.max !== undefined && d.stepT >= step.max)
           break
@@ -317,17 +319,19 @@ export function createDirector(host: DirectorHost, stage: LifeStageId, saved: Di
       advance(0)
       syncObjective()
     },
-    completeBeat() {
+    completeBeat(opts) {
       if (st.finished) return
       if (!st.begun) {
         beginChapter()
         advance(0)
       }
       d.forced = true
+      d.toFree = opts?.toFree === true
       const at = st.beat
       const stage = st.stage
       for (let i = 0; i < 64 && d.forced && st.beat === at && st.stage === stage && !st.finished; i++) advance(0)
       d.forced = false
+      d.toFree = false
       syncObjective()
     },
     get beatId() {

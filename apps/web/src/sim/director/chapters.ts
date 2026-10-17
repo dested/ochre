@@ -206,7 +206,7 @@ function walkedDown(d: D, mark: 'shore-path-top' | 'mid' | 'shelf', near: number
  * come. It ends on its own, or once the player has wandered off and comes back to the fire (after the moment);
  * `short` ends it as soon as the moment has played.
  */
-function freeHours(hours: number, pick: MomentId | ((d: D) => MomentId) | null, short = false): Step[] {
+function freeHours(pick: MomentId | ((d: D) => MomentId) | null, short = false, hours = FREE_HOURS): Step[] {
   return [
     run((d) => {
       releaseAll(d)
@@ -217,9 +217,28 @@ function freeHours(hours: number, pick: MomentId | ((d: D) => MomentId) | null, 
       const away = dist(player(d).position, hearth(d))
       if (away > 25) d.st.counters['free-away'] = 1
       else if (away < 6 && counter(d, 'free-away') > 0) hurryWindow(d.ctx)
-      return windowOver(d.ctx)
+      return windowOver(d.ctx) && !d.ctx.sleepSkip
     }),
     clearObj(),
+  ]
+}
+
+/** a free wait's length at most (game hours; about 75 s of real time at 72×) */
+const FREE_HOURS = 1.5
+
+/** after a free wait, a beat that belongs to a later day fades straight there: no sleep needed */
+function cutTo(day: number, hour: (d: D) => number): Step[] {
+  return [
+    ...when(
+      (d) => d.ctx.state.clock.day * 24 + d.ctx.state.clock.hour < day * 24 + hour(d),
+      ...fadeOut(1.5),
+      run((d) => {
+        const need = day * 24 + hour(d) - (d.ctx.state.clock.day * 24 + d.ctx.state.clock.hour)
+        skipTo(d, hour(d), Math.max(0.01, need - 0.5))
+        seatPlayer(d, 0.5)
+      }),
+      ...fadeIn(1.5),
+    ),
   ]
 }
 
@@ -238,7 +257,7 @@ function freeAfternoon(hour: number, pick: MomentId): Step[] {
       run((d) => skipTo(d, hour)),
       ...fadeIn(1.2),
     ),
-    ...freeHours(2, pick),
+    ...freeHours(pick),
   ]
 }
 
@@ -962,7 +981,7 @@ const provider: Chapter = {
         ...fadeIn(2),
         wait(3),
         // before the years go by: its first steps, toward you
-        ...freeHours(1.5, 'first-steps', true),
+        ...freeHours('first-steps', true),
       ],
     },
     {
@@ -1005,10 +1024,9 @@ const provider: Chapter = {
         clearObj(),
         wait(3),
         run((d) => order(d, 'child', null)),
-        // free days until the whale
-        obj(freeText),
-        freeUntil((d) => d.ctx.state.clock.day >= 1 && hourNowGE(d, sun(d).rise + 0.05) && !d.ctx.sleepSkip),
-        clearObj(),
+        // a free while, then on to the morning the whale comes
+        ...freeHours(null),
+        ...cutTo(1, (d) => sun(d).rise + 0.75),
       ],
     },
     {
@@ -1049,9 +1067,9 @@ const provider: Chapter = {
         }),
         ...fadeIn(2),
         note('whale'),
-        obj(freeText),
-        freeUntil((d) => d.ctx.state.clock.day >= 2 && hourNowGE(d, 13) && !d.ctx.sleepSkip),
-        clearObj(),
+        // a free evening (the full moon over the feast), then on to the day the storm comes in
+        ...freeHours('moon-dance'),
+        ...cutTo(2, () => 13),
       ],
       talk: (d, id) => {
         if (counter(d, `talk:${id}`) > 0 || talkedTo(d) >= 3) return null
@@ -1268,7 +1286,7 @@ const elder: Chapter = {
       extras: (d) => [extra('story', 'tell-story', 'Tell a story', hearth(d), () => {}, { targetId: 'hearth-main' })],
     },
     // the evening goes on after the story: the full moon is up, and someone starts to clap
-    { id: 'elder.evening', steps: freeHours(2, (d) => (hourNowGE(d, sun(d).set) || d.ctx.state.clock.hour < 5 ? 'moon-dance' : 'visitor')) },
+    { id: 'elder.evening', steps: freeHours((d) => (hourNowGE(d, sun(d).set) || d.ctx.state.clock.hour < 5 ? 'moon-dance' : 'visitor')) },
     {
       id: 'elder.walk',
       steps: [

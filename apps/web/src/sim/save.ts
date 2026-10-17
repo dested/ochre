@@ -201,7 +201,7 @@ export const payloadSchema = z.object({
   moments: z
     .object({
       window: z
-        .object({ from: z.number(), until: z.number(), pick: z.enum(MOMENT_IDS).nullable(), got: z.boolean(), short: z.boolean(), hurry: z.boolean() })
+        .object({ from: z.number(), until: z.number(), pick: z.enum(MOMENT_IDS).nullable(), got: z.boolean(), short: z.boolean(), hurry: z.boolean(), doneAt: z.number().optional() })
         .nullable(),
     })
     .optional(),

@@ -64,7 +64,7 @@ export type MomentState = {
  * game times; `pick` names the moment that should come (else any that can), `got` once one has begun; `short` ends
  * the wait as soon as its moment has played; `hurry` (the player went back to the beat) brings the moment on now
  */
-export type FreeWindow = { from: number; until: number; pick: MomentId | null; got: boolean; short: boolean; hurry: boolean }
+export type FreeWindow = { from: number; until: number; pick: MomentId | null; got: boolean; short: boolean; hurry: boolean; doneAt?: number }
 
 export function emptyMoments(): MomentState {
   return { active: null, lastAt: -1e9, slot: -1, fired: {}, rain: null, log: [], window: null, forcing: null, aside: null }
@@ -91,6 +91,8 @@ type Moment = {
 }
 
 const GAME_HOUR = 3600
+/** a free wait goes on this long after its moment (game seconds) */
+const AFTER_MOMENT = 20 * 60
 const SLOT = 600
 /** chance a free 10-minute slot starts a moment */
 const ROLL = 0.12
@@ -587,7 +589,7 @@ const MOMENTS: readonly Moment[] = [
       return h > set + 0.4 && h < set + 3 && Math.abs(phase - 0.5) < 0.06 && !wet(ctx)
     },
     cast(ctx) {
-      const near = ctx.state.people.filter((p) => free(ctx, p) && atHearth(ctx, p))
+      const near = ctx.state.people.filter((p) => free(ctx, p) && (atHearth(ctx, p) || (forcing(ctx, 'moon-dance') && dist(p.position, hearth(ctx)) < 200)))
       if (near.length < 8) return null
       const elder = near.find((p) => p.id === 'oro') ?? near.find((p) => roleOf(p) === 'elder')
       const dancers = near.filter((p) => p !== elder && roleOf(p) !== 'elder' && roleOf(p) !== 'toddler').slice(0, 12)
@@ -731,6 +733,8 @@ function finish(ctx: SimCtx): void {
   for (const id of r.animals) removeAnimal(ctx, id)
   if (r.id === 'rain-dash') ctx.moments.rain = null
   ctx.moments.aside = null
+  const w = ctx.moments.window
+  if (w && w.got && w.doneAt === undefined) w.doneAt = ctx.state.clock.t
   const child = personById(ctx, r.cast.child)
   const carrier = personById(ctx, r.carrier ?? undefined)
   if (r.id === 'first-steps' && child && carrier && !carrier.carrying && child.alive) {
@@ -804,12 +808,16 @@ function advance(ctx: SimCtx): void {
   // a free wait that has had no moment yet: past its middle (or soon, for a named one), one comes for sure
   const w = st.window
   if (w && !w.got && t >= w.from && t < w.until) {
-    // a named one twenty minutes in; else from the middle one the player can see; in the last quarter any at all
-    const dueAt = w.hurry ? t : w.pick ? w.from + 2 * SLOT : w.from + (w.until - w.from) / 2
+    // twenty game minutes in (inside the first half minute of real time), the named one or one the player can see;
+    // in the last quarter any at all
+    const dueAt = w.hurry ? t : w.from + 2 * SLOT
     const lastAt = w.hurry ? t : w.until - (w.until - w.from) / 4
     if (t >= dueAt) {
       // a named one is waited for until the last quarter, then any will do
-      st.forcing = t >= lastAt ? w.pick : null
+      // the named one comes now if the player is by the fire to see it, else in the last quarter wherever they are
+      const pl = playerOf(ctx)
+      const byFire = !!pl && dist(pl.position, hearth(ctx)) < 30
+      st.forcing = t >= lastAt || byFire ? w.pick : null
       const named = w.pick ? readyNow(ctx, [w.pick], false) : []
       st.forcing = null
       const seen = !w.pick || t >= lastAt ? readyNow(ctx, MOMENT_IDS, true) : []
@@ -860,6 +868,7 @@ function syncAside(ctx: SimCtx): void {
 export function openWindow(ctx: SimCtx, hours: number, pick: MomentId | null = null, short = false): void {
   const t = ctx.state.clock.t
   ctx.moments.window = { from: t, until: t + hours * GAME_HOUR, pick, got: false, short, hurry: false }
+  ctx.moments.slot = -1
 }
 
 /** the player is done with the free time: its moment comes now if it hasn't, and the wait ends after it */
@@ -875,11 +884,18 @@ export function hurryWindow(ctx: SimCtx): void {
 export function windowOver(ctx: SimCtx): boolean {
   const w = ctx.moments.window
   if (!w) return true
-  if (ctx.moments.active) return false
-  // a short wait, or one the player is done with, ends once its moment has played
-  if (ctx.state.clock.t < w.until && !((w.short || w.hurry) && w.got)) return false
+  const t = ctx.state.clock.t
+  // never much past its hours: a moment still playing then gets a little longer, no more
+  const over = t >= w.until + AFTER_MOMENT || (!ctx.moments.active && (t >= w.until || endsNow(w, t)))
+  if (!over) return false
   ctx.moments.window = null
   return true
+}
+
+/** a short wait, or one the player is done with, ends when its moment has played; any other twenty minutes after */
+function endsNow(w: FreeWindow, t: number): boolean {
+  if (!w.got || w.doneAt === undefined) return false
+  return w.short || w.hurry || t >= w.doneAt + AFTER_MOMENT
 }
 
 /** what a save should leave out: the people and animals a half-played moment put into the world */
@@ -895,6 +911,7 @@ export function afterLoad(ctx: SimCtx, window: FreeWindow | null): void {
   ctx.moments = emptyMoments()
   // a moment cut short by the save counts as had, so a wait that was waiting on it ends
   ctx.moments.window = window ? { ...window, hurry: false } : null
+  if (ctx.moments.window?.got && ctx.moments.window.doneAt === undefined) ctx.moments.window.doneAt = ctx.state.clock.t
   // a visit cut short by the save still counts as today's visit
   if (visitors.length > 0) ctx.moments.fired.visitor = dayKey(ctx)
 }

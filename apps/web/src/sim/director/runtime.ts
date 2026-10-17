@@ -80,6 +80,8 @@ export type D = {
   /** a minigame result or a choice, waiting for its step */
   answer: { game: MinigameId; quality: number } | { choiceId: string; optionId: string } | null
   forced: boolean
+  /** completeBeat in QA's fast-forward mode: stop forcing at the beat's next free wait */
+  toFree: boolean
   objective: { id: string; text: (d: D) => string; total: number | null; done: ((d: D) => number) | null } | null
   objectiveKey: string
   captionN: number

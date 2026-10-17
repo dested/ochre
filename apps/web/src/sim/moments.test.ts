@@ -129,7 +129,8 @@ describe('days worth living', () => {
     }
     expect(over).toBe(true)
     expect(ctx.moments.log.length).toBeGreaterThan(before)
-    expect(sim.state.clock.t).toBeGreaterThanOrEqual(from + 2 * 3600)
+    // twenty minutes after its moment, or at its hours, whichever is first
+    expect(sim.state.clock.t).toBeLessThanOrEqual(from + 2 * 3600 + 20 * 60 + 60)
   }, 30_000)
 
   test("provider opens on the child's first steps, toward the player, before the years skip", () => {
@@ -169,8 +170,46 @@ describe('days worth living', () => {
       for (let i = 0; i < 20_000 && sim.state.chapter.beatId === beat; i++) sim.step(10 / sim.state.timeScale)
       expect(sim.state.chapter.beatId).not.toBe(beat)
       expect(ctx.moments.log.map((l) => l.replace(/^D\d+ \d\d:\d\d /, ''))).toContain(label)
-      expect(sim.state.clock.t - from).toBeGreaterThanOrEqual(2 * 3600 - 60)
+      // at most an hour and a half, and a little more if its moment is still playing then
+      expect(sim.state.clock.t - from).toBeLessThanOrEqual(1.5 * 3600 + 20 * 60 + 600)
     }, 60_000)
+  }
+
+  // play measured 213–400+ s of real time in the free waits; none may run past 100 s now
+  for (const stage of ['small', 'youth', 'provider', 'elder'] as const) {
+    test(`every free wait in ${stage} is over within 100 s of real time, with a moment in it`, () => {
+      const sim = createSim({ seed: 1, world, stage, playerName: 'Teni' })
+      const ctx = ctxOf(sim)
+      const dir = debugDirector(sim)
+      if (!dir) throw new Error('no director')
+      const at = world.poi('hearth-main')
+      const waits: { secs: number; moments: number; storm: boolean }[] = []
+      const free = () => ctx.director?.free() === true
+      for (let guard = 0; guard < 400 && sim.state.stage === stage && !sim.state.chapter.finished; guard++) {
+        if (!free()) {
+          dir.completeBeat({ toFree: true })
+          for (let k = 0; k < 15 && !free(); k++) sim.step(1 / 30)
+          continue
+        }
+        // the player waits by the fire
+        const before = ctx.moments.log.length
+        const storm = sim.state.weather.storm
+        let frames = 0
+        while (free() && frames < 30 * 200) {
+          sim.command({ type: 'move', position: at, heading: 0, speed: 0, anim: 'idle' })
+          sim.step(1 / 30)
+          frames++
+        }
+        waits.push({ secs: frames / 30, moments: ctx.moments.log.length - before, storm })
+        expect(sim.state.chapter.objective?.text ?? '').not.toMatch(/^Spend the /)
+      }
+      expect(waits.length).toBeGreaterThanOrEqual(stage === 'provider' ? 3 : 1)
+      for (const w of waits) {
+        expect(w.secs).toBeLessThanOrEqual(100)
+        // (no moment suits a storm: everyone huddles by the fire)
+        if (!w.storm) expect(w.moments).toBeGreaterThanOrEqual(1)
+      }
+    }, 120_000)
   }
 
   test("in a free wait the honeyguide's aside stands in for the wait's objective, then gives it back", () => {
