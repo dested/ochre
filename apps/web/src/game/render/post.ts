@@ -72,9 +72,11 @@ void main() {
 		od += ocHeightFog( dist, yc - 0.5, yp - 0.5, uHaze.w * lk * 0.02, 3.5 );
 	}
 	float T = exp( - od );
-	// the air takes the colour of the sky a little above the horizon: blue by day, so distance goes blue
-	vec3 sd = normalize( vec3( dir.x, max( dir.y, 0.0 ) * 0.6 + 0.1, dir.z ) );
-	vec3 inscatter = ocSkyBase( sd );
+	// the air takes the colour of the sky: a thin veil is the deep blue overhead (dark land goes blue, as a painter
+	// lays distant hills), a thick one the pale horizon
+	vec3 sdBlue = normalize( vec3( dir.x * 0.6, 0.62, dir.z * 0.6 ) );
+	vec3 sdLow = normalize( vec3( dir.x, max( dir.y, 0.0 ) * 0.6 + 0.06, dir.z ) );
+	vec3 inscatter = mix( ocSkyBase( sdBlue ) * 0.9, ocSkyBase( sdLow ), smoothstep( 0.3, 1.0, 1.0 - T ) );
 	gl_FragColor = vec4( sc.rgb * T + inscatter * ( 1.0 - T ), 1.0 );
 }
 `

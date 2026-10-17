@@ -1,7 +1,8 @@
 /**
  * /lab/world: the coast with nobody in it. A free-fly camera (WASD + drag, Shift fast, Q/E down/up, wheel for
  * speed), sliders for the hour, the day of the year and the moon (the tide follows), weather, quality, and five
- * preset views. URL: ?view=cave&hour=17.5&day=70&moon=0&quality=high. DEV handles on window.__lab for bx.
+ * preset views. URL: ?view=cave&hour=17.5&day=70&moon=0&quality=high&cam=x,y,z,yaw,pitch,fov&rain=0&wind=0.25&fog=0&storm=0.
+ * DEV handles on window.__lab for bx.
  */
 import { PerspectiveCamera, Scene, Vector3 } from 'three'
 import { clockAt, type ClockEpoch } from '../../core/clock'
@@ -52,16 +53,23 @@ export function mount(el: HTMLElement): () => void {
     return Number.isFinite(n) ? n : d
   }
   const epoch: ClockEpoch = { dayOfYear: num('day', 70), hour: num('hour', 17.5), moonPhase: num('moon', 0), year: 0 }
-  const weather: WeatherState = { cloud: num('cloud', 0.3), rain: 0, wind: 0.25, windDir: 0.6, fog: 0, storm: false }
+  const weather: WeatherState = {
+    cloud: num('cloud', 0.3),
+    rain: num('rain', 0),
+    wind: num('wind', 0.25),
+    windDir: num('windDir', 0.6),
+    fog: num('fog', 0),
+    storm: q.get('storm') === '1',
+  }
   const qp = q.get('quality')
   if (isQuality(qp)) pipeline.setQuality(qp)
 
   // the preset views
   const ground = (x: number, z: number) => world.heightAt(x, z)
-  // up on the ledge at the back-left of the cave, looking out across the mouth to the west
-  const caveEye = caveWorld(-10, -6)
+  // standing behind the main hearth, looking out over the shelf and the cove into the sun (the concept painting)
+  const caveEye = caveWorld(-7.5, -1)
   const views: Record<(typeof VIEW_NAMES)[number], ViewDef> = {
-    cave: { x: caveEye.x, y: CAVE.floor + 5.1, z: caveEye.z, yaw: -1.3, pitch: -0.22, fov: 70 },
+    cave: { x: caveEye.x, y: CAVE.floor + 5.2, z: caveEye.z, yaw: -1.0, pitch: -0.44, fov: 82 },
     shore: { x: 6, y: ground(6, 168) + 1.6, z: 168, yaw: -0.9, pitch: 0.02, fov: 55 },
     cove: { x: -150, y: ground(-150, 112) + 1.7, z: 112, yaw: -1.75, pitch: 0.0, fov: 55 },
     plateau: { x: -40, y: ground(-40, -420) + 1.7, z: -420, yaw: Math.PI, pitch: 0.03, fov: 50 },
@@ -84,6 +92,15 @@ export function mount(el: HTMLElement): () => void {
     camera.updateProjectionMatrix()
   }
   setView(q.get('view') ?? 'cave')
+  // ?cam=x,y,z,yaw,pitch[,fov] overrides the preset
+  const cam = (q.get('cam') ?? '').split(',').map(Number)
+  if (cam.length >= 5 && cam.every((v) => Number.isFinite(v))) {
+    place(cam[0] ?? 0, cam[1] ?? 0, cam[2] ?? 0, cam[3] ?? 0, cam[4] ?? 0)
+    if (cam[5] !== undefined) {
+      camera.fov = cam[5]
+      camera.updateProjectionMatrix()
+    }
+  }
 
   // the panel
   const panel = document.createElement('div')
@@ -120,6 +137,7 @@ export function mount(el: HTMLElement): () => void {
   slider('cloud', 0, 1, 0.01, weather.cloud, (v) => (weather.cloud = v))
   slider('fog', 0, 1, 0.01, weather.fog, (v) => (weather.fog = v))
   slider('wind', 0, 1, 0.01, weather.wind, (v) => (weather.wind = v))
+  slider('rain', 0, 1, 0.01, weather.rain, (v) => (weather.rain = v))
   const btnRow = document.createElement('div')
   btnRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;margin-top:6px'
   panel.appendChild(btnRow)
@@ -136,6 +154,10 @@ export function mount(el: HTMLElement): () => void {
   const fireBtn = button('fire: on', () => {
     firesOn = !firesOn
     fireBtn.textContent = firesOn ? 'fire: on' : 'fire: off'
+  })
+  const stormBtn = button(weather.storm ? 'storm: on' : 'storm: off', () => {
+    weather.storm = !weather.storm
+    stormBtn.textContent = weather.storm ? 'storm: on' : 'storm: off'
   })
   let running = false
   const runBtn = button('time: paused', () => {

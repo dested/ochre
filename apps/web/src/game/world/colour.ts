@@ -168,7 +168,7 @@ export function applyColourScript(clock: ClockState, weather: WeatherState): Key
   LIGHT.uStarSpin.value = (clock.hour / 24 + clock.dayOfYear / 365.25) * Math.PI * 2
   // the dawn mist on the lagoon, 04:30–09:00, thinned by wind
   const mist = Math.max(0, 1 - Math.abs(clock.hour - 6.6) / 2.4) * (1 - weather.wind * 0.8)
-  LIGHT.uHaze.value.set(0.000105 * M.haze * (1 + overcast * 0.8), 300, 0.00045 * M.haze, mist)
+  LIGHT.uHaze.value.set(0.0003 * M.haze * (1 + overcast * 0.8), 1100, 0.00045 * M.haze, mist)
 
   // the key light: the sun while it is up, the moon after dark, never both
   const sunK = Math.max(0, Math.min(1, (e + 3.5) / 4.5))

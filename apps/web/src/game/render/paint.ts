@@ -18,6 +18,8 @@ export type PaintExtra = {
   key: string
   /** GLSL declared in the vertex shader before main (attributes, varyings) */
   vertexHead?: string
+  /** GLSL run after `begin_vertex`: may move `transformed` (object space, before the instance matrix) */
+  vertexPre?: string
   /** GLSL run at the end of the vertex main (has `ocWorld`, the world position) */
   vertexMain?: string
   /** GLSL declared in the fragment shader before main */
@@ -146,6 +148,7 @@ export function patchPaint(material: MeshStandardMaterial, opts: PaintOptions = 
     if (extra?.uniforms) for (const [k, v] of Object.entries(extra.uniforms)) u[k] = v
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\n${VERT_HEAD}\nuniform float uTime;\nuniform vec3 uWind;\n${extra?.vertexHead ?? ''}`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>\n${extra?.vertexPre ?? ''}`)
       .replace('#include <project_vertex>', `#include <project_vertex>\n${VERT_MAIN}\n${extra?.vertexMain ?? ''}`)
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${FRAG_HEAD}\nuniform float uTime;\nuniform vec3 uWind;\n${extra?.fragmentHead ?? ''}`)

@@ -218,6 +218,22 @@ vec4 ocBushLayer( vec2 p, float cs, float seed ) {
 	float side = clamp( dot( - rel / max( dist, 1e-3 ), sd ) * ( dist / size ), - 1.0, 1.0 );
 	return vec4( bush, side, ocHash( id + 3.7 + seed ), ocHash( id + 21.0 + seed ) );
 }
+// the shelf's bedding: rows across the strike, blocks along it (joints warped a little so they aren't ruled);
+// x = distance to the nearest joint in metres, yzw = the block's hashes
+vec4 ocBlocks( vec2 p ) {
+	vec2 q = vec2( dot( p, vec2( 0.91, 0.42 ) ), dot( p, vec2( - 0.42, 0.91 ) ) );
+	q += vec2( ocNoise( p * 0.11 ), ocNoise( p * 0.11 + 5.0 ) ) * 2.2 + vec2( ocNoise( p * 0.5 + 2.0 ), ocNoise( p * 0.5 + 9.0 ) ) * 0.35;
+	float rowW = 1.7;
+	float row = floor( q.y / rowW );
+	float fy = fract( q.y / rowW );
+	float len = 1.8 + 3.4 * ocHash( vec2( row, 3.1 ) );
+	float qx = q.x / len + ocHash( vec2( row, 7.7 ) );
+	float col = floor( qx );
+	float fx = fract( qx );
+	float dj = min( min( fy, 1.0 - fy ) * rowW, min( fx, 1.0 - fx ) * len );
+	vec2 id = vec2( col, row );
+	return vec4( dj, ocHash( id + 1.3 ), ocHash( id + 8.9 ), ocHash( id + 4.2 ) );
+}
 vec3 ocBushTone( float h ) {
 	if ( h < 0.3 ) return ocLin( vec3( 0.44, 0.5, 0.31 ) );
 	if ( h < 0.5 ) return ocLin( vec3( 0.36, 0.41, 0.25 ) );
@@ -276,8 +292,9 @@ const TERRAIN_ALBEDO = /* glsl */ `
 		dune = mix( dune, ocLin( vec3( 0.6, 0.6, 0.36 ) ), tuft * 0.8 );
 		vec3 soil = mix( ocLin( vec3( 0.44, 0.36, 0.25 ) ), ocLin( vec3( 0.55, 0.43, 0.29 ) ), drift );
 		vec3 fyn = ocBushes( p, px, soil );
-		vec3 grass = mix( ocLin( vec3( 0.71, 0.65, 0.40 ) ), ocLin( vec3( 0.56, 0.6, 0.32 ) ), ocNoise( p * 0.05 + 2.0 ) );
-		grass = mix( grass, ocLin( vec3( 0.78, 0.69, 0.46 ) ), smoothstep( 0.55, 0.8, ocNoise( p * 0.18 + 9.0 ) ) * 0.7 );
+		vec3 grass = mix( ocLin( vec3( 0.66, 0.6, 0.42 ) ), ocLin( vec3( 0.5, 0.53, 0.37 ) ), ocNoise( p * 0.05 + 2.0 ) );
+		grass = mix( grass, ocLin( vec3( 0.74, 0.66, 0.47 ) ), smoothstep( 0.55, 0.8, ocNoise( p * 0.18 + 9.0 ) ) * 0.7 );
+		grass = mix( grass, ocLin( vec3( 0.52, 0.54, 0.47 ) ), smoothstep( 0.6, 0.85, ocNoise( p * 0.09 + 4.0 ) ) * 0.6 );
 		grass *= 0.9 + 0.18 * ocNoise( vec2( p.x * 3.0, p.y * 0.8 ) + 5.0 );
 		// rock: limestone in blocky facets, ledges along the strata, orange lichen
 		ocFacetT = ocFacet( vOcWorld, nW, 2.1 );
@@ -291,18 +308,29 @@ const TERRAIN_ALBEDO = /* glsl */ `
 		float seaRock = smoothstep( 14.0, 1.5, y ) * 0.8 + smoothstep( 4.0, 1.2, y ) * 0.2;
 		rock = mix( rock, rock * vec3( 0.55, 0.52, 0.5 ), seaRock );
 		cliff = mix( cliff, cliff * vec3( 0.55, 0.52, 0.5 ), seaRock );
-		// the intertidal shelf: small dark blocks split by cracks along the bedding, mussel clusters, olive weed,
-		// pink coralline low down, and pools left in the hollows when the tide is out
-		vec4 sf = ocFacet( vOcWorld + 13.0, nW, 0.8 );
-		vec3 shelf = mix( ocLin( vec3( 0.27, 0.24, 0.2 ) ), ocLin( vec3( 0.43, 0.38, 0.31 ) ), sf.w * 0.7 + facet * 0.3 );
-		float crackN = fract( dot( p, vec2( 0.42, 0.91 ) ) * 0.55 + ocNoise( p * 0.21 ) * 1.6 );
-		shelf *= 1.0 - 0.45 * ( 1.0 - ocEdge( 0.04, abs( crackN - 0.5 ) ) );
-		float mussel = ocEdge( 0.73, ocNoise( p * 2.3 + 1.0 ) * 0.6 + ocNoise( p * 0.4 ) * 0.4 ) * smoothstep( 0.6, -1.0, y ) * 0.8;
-		shelf = mix( shelf, ocLin( vec3( 0.1, 0.11, 0.12 ) ), mussel * 0.85 );
-		shelf = mix( shelf, ocLin( vec3( 0.3, 0.33, 0.18 ) ), ocEdge( 0.64, ocNoise( p * 0.9 + 7.0 ) * 0.7 + ocNoise( p * 3.1 ) * 0.3 ) * smoothstep( 1.4, -0.2, y ) * 0.6 );
-		shelf = mix( shelf, ocLin( vec3( 0.58, 0.42, 0.44 ) ), smoothstep( -0.9, -1.5, y ) * 0.5 );
-		float poolN = ocNoise( p * 0.16 + 11.0 ) * 0.65 + ocNoise( p * 0.55 + 3.0 ) * 0.35;
-		float pool = ocEdge( 0.69, poolN ) * step( uSeaLevel + 0.12, y ) * smoothstep( 1.8, 0.8, y ) * wb.z;
+		// the intertidal shelf: bedded blocks split by joints, each block its own tone and tilt; mussels crowd the
+		// joints low down, olive weed and pink coralline cover the lower blocks, and some blocks hold pools
+		vec4 bk = ocBlocks( p );
+		vec4 sf = ocFacet( vOcWorld + 13.0, nW, 0.7 );
+		float near = smoothstep( 0.2, 0.05, px );
+		vec3 shelf = mix( ocLin( vec3( 0.26, 0.23, 0.2 ) ), ocLin( vec3( 0.46, 0.41, 0.34 ) ), bk.y * 0.7 + sf.w * 0.3 );
+		shelf = mix( shelf, ocLin( vec3( 0.42, 0.42, 0.4 ) ), step( 0.86, bk.y ) * 0.5 );
+		float joint = 1.0 - ocEdge( 0.07 + 0.05 * bk.z, bk.x + ( ocNoise( p * 3.0 ) - 0.5 ) * 0.05 );
+		float lowY = smoothstep( 1.0, -0.6, y );
+		// mussels along the joints and on the seaward blocks
+		float mus = ocEdge( 0.6, ocNoise( p * 2.6 + 1.0 ) * 0.7 + ( 1.0 - smoothstep( 0.0, 0.22, bk.x ) ) * 0.4 ) * lowY;
+		shelf = mix( shelf, ocLin( vec3( 0.09, 0.1, 0.12 ) ), mus * 0.85 );
+		// weed and coralline on whole blocks, ragged inside
+		float wcov = smoothstep( 1.0, -0.8, y ) * 0.6;
+		float weed = step( bk.w, wcov ) * ocEdge( 0.5, ocNoise( p * 1.9 + bk.zw * 9.0 ) * 0.7 + smoothstep( 0.0, 0.6, bk.x ) * 0.3 );
+		shelf = mix( shelf, mix( ocLin( vec3( 0.27, 0.27, 0.15 ) ), ocLin( vec3( 0.36, 0.3, 0.17 ) ), bk.z ), weed * 0.8 );
+		shelf = mix( shelf, ocLin( vec3( 0.66, 0.46, 0.48 ) ), smoothstep( -0.7, -1.4, y ) * step( 0.5, bk.z ) * 0.55 );
+		shelf *= 1.0 - 0.4 * joint * near;
+		// pools: whole blocks of water (only out of the sea), with ragged rims
+		float poolEdge = bk.x + ( ocNoise( p * 2.2 ) - 0.5 ) * 0.35;
+		float pool = ocEdge( 0.28, poolEdge ) * step( bk.z, 0.13 ) * step( uSeaLevel + 0.12, y ) * smoothstep( 1.9, 1.0, y ) * wb.z;
+		// each block tilts a little, for the knife
+		ocFacetT.xz += ( vec2( bk.w, bk.z ) - 0.5 ) * 0.7 * wb.z * ( 1.0 - pool );
 		// earth, trodden floors and the cave: dust over rubble, each stone its own tone, darker in the cracks
 		vec3 earth = mix( ocLin( vec3( 0.54, 0.43, 0.31 ) ), ocLin( vec3( 0.44, 0.34, 0.25 ) ), drift );
 		if ( wb.w > 0.02 ) {
@@ -315,6 +343,9 @@ const TERRAIN_ALBEDO = /* glsl */ `
 			earth *= 0.92 + 0.16 * fine;
 		}
 		vec3 col = sand * wa.x + dune * wa.y + fyn * wa.z + grass * wa.w + rock * wb.x + cliff * wb.y + shelf * wb.z + earth * wb.w;
+		// the far ranges: Table Mountain sandstone, grey and cool under dark fynbos
+		float mtn = smoothstep( 1100.0, 2600.0, - p.y ) + smoothstep( 1500.0, 4000.0, abs( p.x ) ) * smoothstep( 300.0, 900.0, - p.y );
+		col = mix( col, mix( ocLin( vec3( 0.36, 0.38, 0.33 ) ), ocLin( vec3( 0.55, 0.54, 0.5 ) ), wb.x + wb.y ), clamp( mtn, 0.0, 1.0 ) * 0.75 );
 		// the red ochre seam in the gully
 		float od = length( p - uOchre.xy );
 		if ( od < uOchre.z ) {
@@ -483,11 +514,13 @@ export function createTerrainView(world: WorldData, grid: TerrainGrid | null): T
         nor[k * 3 + 1] = 1 / len
         nor[k * 3 + 2] = nz / len
         const slope = Math.hypot(nx, nz)
+        // the ranges: grey sandstone in the steeps, dark fynbos over the rest, grass only in the low valleys
         if (hv < 2.5) sa[k * 4] = 255
         else if (slope > 0.75) sb[k * 4 + 1] = 255
-        else if (slope > 0.45 || hv > 250) sb[k * 4] = 200
-        else sa[k * 4 + (hv > 90 ? 3 : 2)] = 255
-        if (sb[k * 4] === 200) sa[k * 4 + 2] = 55
+        else if (slope > 0.45 || hv > 420) {
+          sb[k * 4] = 150
+          sa[k * 4 + 2] = 105
+        } else sa[k * 4 + (hv > 40 && hv < 120 && slope < 0.15 ? 3 : 2)] = 255
       }
     }
     const idx: number[] = []
