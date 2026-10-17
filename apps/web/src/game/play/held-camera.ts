@@ -15,6 +15,11 @@ const ATTRACT_RATE = 1.2
 /** on the back the view sits beside the carrier's head, over the shoulder the infant is looking past */
 const SHOULDER_SIDE = 0.25
 const SHOULDER_UP = 0.1
+/** on the back, a resting mouse lets the gaze drift back to forward past her head after this long, and how fast */
+const FORWARD_IDLE = 2
+const FORWARD_RATE = 0.8
+/** forward on the back: just outside her head, on the infant's side */
+const FORWARD_YAW = 0.12
 
 export type HeldCamera = {
   /** relative to the carrier's heading */
@@ -68,7 +73,7 @@ export function createHeldCamera(): HeldCamera {
       const pitchMin = slot === 'arms' ? -1.45 : -0.9
       if (slot !== lastSlot) {
         // on the back: peek over the shoulder; in the arms: looking up into the carrier's face
-        cam.yaw = slot === 'back' ? 0.6 : 0
+        cam.yaw = slot === 'back' ? FORWARD_YAW : 0
         cam.pitch = 0.08
         if (slot === 'arms' && face) {
           const dx = face.x - eye.x
@@ -96,6 +101,11 @@ export function createHeldCamera(): HeldCamera {
         const step = Math.min(1, dt * ATTRACT_RATE)
         cam.yaw += (ty - cam.yaw) * step
         cam.pitch += (tp - cam.pitch) * step
+      } else if (slot === 'back' && idle > FORWARD_IDLE) {
+        // carried on the back the infant looks where she is going
+        const step = Math.min(1, dt * FORWARD_RATE)
+        cam.yaw += (side * FORWARD_YAW - cam.yaw) * step
+        cam.pitch += (0.08 - cam.pitch) * step
       }
       const k = 0.0019 * settings.sensitivity
       cam.yaw = MathUtils.clamp(cam.yaw - input.mouse.dx * k, -cam.cone, cam.cone)

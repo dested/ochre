@@ -245,7 +245,13 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   const tmp2 = new Vector3()
   const fwd = new Vector3()
 
+  let relationsFor = ''
   const relationOf = (id: string): string | null => {
+    // relations are the player's: a new player (the heir) starts a fresh cache
+    if (relationsFor !== sim.state.playerId) {
+      relationsFor = sim.state.playerId
+      relationCache.clear()
+    }
     if (!relationCache.has(id)) relationCache.set(id, sim.relationOf(id))
     return relationCache.get(id) ?? null
   }
