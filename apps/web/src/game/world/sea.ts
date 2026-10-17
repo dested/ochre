@@ -148,6 +148,30 @@ ${SKY_UNIFORMS_GLSL}
 ${NOISE_GLSL}
 ${SKY_GLSL}
 vec2 ocUv( vec2 xz ) { return ( xz + uHalf ) / ( 2.0 * uHalf ); }
+// foam lace: the walls between irregular bubble cells (the gap between the nearest and second-nearest cell
+// centres), so the lines meet in a net of Y-junctions; .x the wall distance in cell units, .y a per-cell random
+vec2 ocLaceNet( vec2 p ) {
+	vec2 i = floor( p );
+	vec2 f = fract( p );
+	float d1 = 9.0;
+	float d2 = 9.0;
+	float id = 0.0;
+	for ( int y = - 1; y <= 1; y ++ ) {
+		for ( int x = - 1; x <= 1; x ++ ) {
+			vec2 o = vec2( float( x ), float( y ) );
+			vec2 r = o + 0.1 + 0.8 * ocHash2( i + o ) - f;
+			float d = dot( r, r );
+			if ( d < d1 ) {
+				d2 = d1;
+				d1 = d;
+				id = ocHash( i + o + 3.7 );
+			} else if ( d < d2 ) {
+				d2 = d;
+			}
+		}
+	}
+	return vec2( sqrt( d2 ) - sqrt( d1 ), id );
+}
 void main() {
 	vec2 uv = ocUv( vWorld.xz );
 	vec2 sh = texture2D( tShore, uv ).rg;
@@ -218,16 +242,30 @@ void main() {
 	float foam = 0.0;
 	if ( uFoamK > 0.0 ) {
 		float lace = ocNoise( vWorld.xz * 0.8 + uTime * 0.2 ) * 0.6 + ocNoise( vWorld.xz * 2.4 - uTime * 0.3 ) * 0.4;
-		// the web a spent wave leaves on thin water: two drifting sets of contour lines, thin and broken, never a sheet
+		// the web a spent wave leaves on thin water: a net of bubble walls round cells of clear water, the walls
+		// fat and thin by turns and torn open in places, a finer net of small bubbles where the big one breaks
 		vec2 lp = vWorld.xz;
-		float n1 = ocNoise( lp * 1.1 + uTime * vec2( 0.09, 0.05 ) ) + 0.5 * ocNoise( lp * 2.9 - uTime * vec2( 0.04, 0.11 ) );
-		float n2 = ocNoise( lp * 0.7 - uTime * vec2( 0.05, 0.02 ) + 7.3 ) + 0.5 * ocNoise( lp * 2.1 + uTime * 0.08 + 3.1 );
-		float web = min( abs( n1 - 0.75 ), abs( n2 - 0.75 ) * 1.3 );
-		float wfw = fwidth( web );
-		// a churned surge draws the lines thicker
-		float wid = 0.008 + 0.03 * vRush;
-		float lines = 1.0 - smoothstep( wid, wid + wfw * 1.5 + 0.01, web );
-		lines *= smoothstep( 0.3, 0.6, ocNoise( lp * 0.45 + uTime * 0.03 + 11.0 ) ) * smoothstep( 0.2, 0.5, ocNoise( lp * 1.7 - uTime * 0.05 + 5.0 ) );
+		float lines = 0.0;
+		float film = 0.0;
+		if ( depth < 3.4 ) {
+			// bent twice over, so the walls curve like bubble skins rather than run straight like cracks
+			vec2 wp = lp + ( vec2( ocNoise( lp * 0.6 + uTime * 0.05 ), ocNoise( lp * 0.6 - uTime * 0.04 + 9.0 ) ) - 0.5 ) * 1.4;
+			wp += ( vec2( ocNoise( lp * 2.1 + 3.0 ), ocNoise( lp * 2.1 - 6.0 ) ) - 0.5 ) * 0.3;
+			vec2 big = ocLaceNet( wp * 1.5 + uTime * vec2( 0.03, 0.02 ) );
+			vec2 small = ocLaceNet( wp * 3.4 - uTime * vec2( 0.02, 0.05 ) + 5.0 );
+			// a churned surge draws the walls thicker
+			float girth = ocNoise( lp * 2.3 + 4.0 );
+			float wid = ( 0.03 + 0.09 * girth * girth ) * ( 1.0 + 1.6 * vRush );
+			float bfw = fwidth( big.x );
+			float wall = 1.0 - smoothstep( wid, wid + bfw * 1.5 + 0.05, big.x );
+			// torn: whole runs of wall gone, so it reads as lace and never as a tiled net
+			float torn = smoothstep( 0.32, 0.55, ocNoise( lp * 0.5 + uTime * 0.03 + 11.0 ) ) * smoothstep( 0.18, 0.42, ocNoise( lp * 1.6 - uTime * 0.05 + 5.0 ) );
+			float sfw = fwidth( small.x );
+			float fine = 1.0 - smoothstep( 0.04, 0.04 + sfw * 1.5 + 0.06, small.x );
+			lines = max( wall * torn * ( 0.75 + 0.25 * girth ), fine * 0.45 * smoothstep( 0.25, 0.6, torn ) * ( 1.0 - torn * 0.6 ) );
+			// a thin milky film over some cells
+			film = smoothstep( 0.55, 0.9, big.y ) * torn * 0.22;
+		}
 		// at the waterline, breathing with the swash: one crisp, broken line at the very edge
 		float swash = 0.18 + 0.16 * sin( uTime * 0.9 + vWorld.x * 0.05 + vWorld.z * 0.03 );
 		float edge = smoothstep( 0.0, 0.025, depth ) * ( 1.0 - smoothstep( 0.03, 0.03 + swash * 0.25, depth ) );
@@ -241,7 +279,7 @@ void main() {
 		// the wash left behind a breaker, and all over the thin water: lace
 		float thin = smoothstep( 1.2, 0.1, depth ) * ( 0.45 + 0.55 * smoothstep( 0.5, 0.05, depth ) );
 		float trail = smoothstep( 0.45, 0.95, fract( phase ) ) * zone;
-		foam = max( foam, lines * max( thin * 0.8, trail * 0.55 ) );
+		foam = max( foam, max( lines, film ) * max( thin * 0.85, trail * 0.55 ) );
 		// the surge's churned uprush: a few torn patches inside the web
 		foam = max( foam, vRush * smoothstep( 0.5, 0.05, depth ) * smoothstep( 0.62, 0.8, lace ) * 0.8 );
 		// whitecaps on open water when it blows
