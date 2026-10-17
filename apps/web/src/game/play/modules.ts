@@ -17,7 +17,7 @@ import type {
 import { paint } from '../render/paint'
 import { createAudio } from '../audio'
 import { createStubSpoor } from './stubs/spoor'
-import { createStubAnimal, createStubPerson } from './stubs/actors'
+import { createAnimal, createPerson } from '../actors'
 import { createRenderPipeline } from '../render'
 import { createSim } from '../../sim'
 import { createWorldData } from '../../world-gen'
@@ -44,8 +44,8 @@ export const modules: Modules = {
   createWorldView,
   createRenderPipeline,
   createSim,
-  createPerson: createStubPerson,
-  createAnimal: createStubAnimal,
+  createPerson,
+  createAnimal,
   createAudio,
   createSpoor: createStubSpoor,
   paint,

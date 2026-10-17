@@ -58,6 +58,7 @@ export function createController(world: WorldData): Controller {
   let swayT = 0
   const camTarget = { x: 0, y: 0, z: 0 }
   let snapCamera = true
+  let lastSea = -Infinity
 
   const ctl: Controller = {
     position,
@@ -85,6 +86,7 @@ export function createController(world: WorldData): Controller {
       pushT = 0.7
     },
     update(dt, input, feel, seaLevel, settings, frozen, aim) {
+      lastSea = seaLevel
       const k = 0.0023 * settings.sensitivity * (1 - aim * 0.45)
       if (input.mouse.dx !== 0 || input.mouse.dy !== 0) idleMouse = 0
       else idleMouse += dt
@@ -204,7 +206,8 @@ export function createController(world: WorldData): Controller {
       let cx = px - fx * camDist * cp
       let cz = pz - fz * camDist * cp
       let cy = py + sp * camDist
-      cy = Math.max(cy, world.heightAt(cx, cz) + 0.3)
+      // never under the ground, and never under the sea's surface (waves ride ~0.4 m above sea level)
+      cy = Math.max(cy, world.heightAt(cx, cz) + 0.3, lastSea + 0.45)
       if (inCave) cy = Math.min(cy, ground + 3.2)
 
       swayT += dt
