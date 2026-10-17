@@ -89,6 +89,13 @@ export type LineageEntry = {
   alive: boolean
   bond: number
   skills: SkillId[]
+  /** links within the band (null when unknown or outside the band); the family tree draws from these */
+  motherId: string | null
+  fatherId: string | null
+  partnerId: string | null
+  /** relative to the player: 0 the player's generation, −1 parents, −2 grandparents, +1 children */
+  generation: number
+  isPlayer: boolean
 }
 
 export type Settings = {

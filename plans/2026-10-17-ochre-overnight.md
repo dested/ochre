@@ -382,6 +382,9 @@ controller, cameras and verbs that make each stage of life feel different; and t
   cradled at chest height so the child's `headPosition` sits 35–45 cm in front of the carrier's face (stage 1 opens
   on the mother's face from there). `'back'`: the child faces the same way as the carrier, head above the carrier's
   shoulder. Applies to: people, play.
+- (2026-10-17 01:35, lead) `LineageEntry` (bridge.ts) gained `motherId`, `fatherId`, `partnerId`, `generation`
+  (0 = the player's generation, −1 parents, +1 children) and `isPlayer`. play fills them from `SimPerson`; ui's
+  family tree draws from them instead of parsing relation strings. Applies to: play, ui.
 
 ## Ledger (lead, updated 2026-10-17 00:40)
 
