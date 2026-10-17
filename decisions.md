@@ -38,6 +38,38 @@ under React), a sim that reads three objects (untestable).
 deploy failed on it). Only the lead installs dependencies, with `/w/junk/sim-80k/bun13/bun-linux-x64/bun`.
 **Rejected:** hand-editing Drydock's managed Dockerfile (it overwrites it), upgrading Drydock tonight (Sal's call).
 
+## 2026-10-17 — After death you go on as your grandchild, not your child
+
+**Why:** the player dies as an elder (about 62), when their own children are adults in their 30s. Restarting as an
+adult skips the stages that carry the game (Held, Small). The heir is the grandchild nearest 6, starting stage 2,
+with the band aged to match, so the second life begins where the first one learned to see. Supersedes "continues as
+your child" in the first entry.
+**Rejected:** continue as your adult child (starts mid-life at Provider), a fresh unrelated life (loses the lineage).
+
+## 2026-10-17 — Chapters run in summer, except Provider in winter; the cave faces SW
+
+**Why:** on the southern Cape the sun sets over the sea only from December to February. Held, Small and Coming of age
+open in summer (day ~10–40) and Elder in late summer, for sunsets over the water. Provider runs late autumn into
+winter so the storm and the lean months are real. The cave mouth faces SW (heading −0.85) so the hearth looks at the
+sunset.
+**Rejected:** one fixed season for every chapter (loses the hardship of winter), a north-facing cave (no sea sunset).
+
+## 2026-10-17 — Under three 0.185's reversed depth, sort by renderOrder against the reversed lists
+
+**Why:** `reversedDepthBuffer: true` (needed for 0.1 m to 20 km in one frustum) makes three 0.185 reverse its sort
+lists unless rendering goes through `createRenderPipeline`. The sky drew last and washed out the world lab. Modules
+that need an order (sky, water, transparent foliage, decals) set compensating renderOrder values; cameras use near 0.1,
+far ≥ 30000.
+**Rejected:** dropping reversed depth (waterline z-fighting at distance), logarithmic depth (breaks the post chain's
+depth reads).
+
+## 2026-10-17 — Frozen QA server on :4090 alongside the shared dev server on :4080
+
+**Why:** five agents commit to one tree, so :4080 hot-reloads under whoever is testing. QA runs on a production build
+of a fixed sha (`/w/junk/sim-80k/qa-server`, rebuilt by the lead on request) with `?qa` handles, so a play-through
+sees one consistent build.
+**Rejected:** QA on the dev server (moves under the tester), per-agent dev servers (port and memory sprawl).
+
 ## 2026-10-07 — Optional Electron desktop surface (`apps/desktop`), first fork sal-git
 
 **Why:** desktop tools (sal-git first, later sal-agent's app) should start from the same template as everything else: same tokens, same tRPC, same scripts. Electron because its main process is Node, so the whole app stays TypeScript. electron-vite 5 (Vite 6, like web) builds main/preload/renderer; electron-builder `--dir` only (no installer, no auto-update). `project.json` `surfaces` now says what a fork has, instead of inferring it from the filesystem; `--desktop-only` forks drop web, mobile and Drydock.
