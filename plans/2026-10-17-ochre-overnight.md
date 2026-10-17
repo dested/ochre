@@ -709,6 +709,17 @@ controller, cameras and verbs that make each stage of life feel different; and t
   commit it on their behalf. people leaves its changes uncommitted (actors files only, typecheck clean) and lists the paths in
   each ready line; Sal decides in the morning (needs-sal Check 4). Gates and pushes cover committed work only.
 
+- (2026-10-17 06:12, lead) **Last round L1** from play's look-only run on :4091 (`/w/junk/sim-80k/play/f4-*.png`) and the
+  lead's look at ui's late shots. Finish by 07:00, commit, ready line. **play:** (1) small.follow opens facing the sea with
+  Ama ~110° behind: at a chapter start, set the camera yaw toward the objective's target. (2) held.faces: ease the look
+  pitch back toward level as the view leaves Ama's face, so turning away shows the family ring, not the ceiling. (3) held
+  gaze cone 6° → 9°. (4) Check on :4091: the life summary renders after the elder's last beat (ui's
+  `youth-summary.png` is pure black, maybe just the fade); and in `youth-16-elder.evening.png` the elder seen from
+  behind seems to show a lit face, as if the head looks back at the camera. Fix it if it's real. **sim:** (5) in held,
+  Ama says "There is a hole in my bag. Hold this for me." to the infant she's cradling: no errand/request lines aimed at
+  an infant (held stage, or a target under ~2 years). (6) held.sea runs ~40 s with no objective text: give it one, e.g.
+  "Listen to the sea" (sim owns the objective copy).
+
 ## Ledger (lead, updated 2026-10-17 01:05)
 
 Board: down · Last pushed: 3c7e962 (main, 05:48) · Gate: install 0, typecheck 0, test 0 (73), build 0 at 3c7e962 · Deploy: 3c7e962 live (CI 39033965156 green, /healthz ok)
