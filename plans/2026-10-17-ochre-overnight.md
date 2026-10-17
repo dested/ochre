@@ -413,11 +413,11 @@ Board: down · Last pushed: 2078087 (main, 01:15) · Gate: install 0, typecheck 
 
 | Agent | Model | Owns | Item now | Last sha / artifact | Status |
 | --- | --- | --- | --- | --- | --- |
-| world | opus-xhigh | world-gen, game/world, game/render | W1 | — | working (spawned 00:38) |
+| world | opus-xhigh | world-gen, game/world, game/render | W1 | 2edee96 wip (lab washed out at 01:20, not yet ready) | working |
 | people | opus-xhigh | game/actors | P1 | — | working (spawned 00:39) |
 | sim | opus-high | sim | S2 | S1 854d192 passed (spacing, hearth ring, child hysteresis, meal mix, hunt label → S2) | working |
 | ui | opus-high | ui, content, public/art, index.html, ui.md (audio → play 01:08) | U3 | U2 8965c7c passed; lineage links fix pending | working |
-| play | opus-high | game/play, game/audio, app/play.tsx | PLA (audio), then PL3 | PL2 a8b0786 passed; 01970f3 lineage, 0e3a774 tag declutter done; waiting on modules | working |
+| play | opus-high | game/play, game/audio, app/play.tsx | PL3 (swapping in world modules) | PLA 95f5512 passed (audio unheard: Sal judges by ear); PL2 a8b0786 passed | working |
 
 Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); Drydock portal :4400 (Windows bun, log in
 scratchpad drydock-portal.log)
