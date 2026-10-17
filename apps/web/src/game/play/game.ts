@@ -3,7 +3,7 @@
  * the bridge feed, drawn through the shared world view and pipeline. The session creates one per life; the
  * lab drives one directly.
  */
-import { PerspectiveCamera, Scene, Vector3 } from 'three'
+import { Mesh, PerspectiveCamera, Scene, Vector3 } from 'three'
 import type { Bridge, NameTag, PromptState } from '../bridge'
 import type {
   CameraCue,
@@ -31,6 +31,7 @@ import type { Modules } from './modules'
 import { STAGE_FEEL, shownAge } from './stages'
 import { createSteps } from './steps'
 import { createTracks } from './tracks'
+import { createTriGrid, type TriGrid } from './tri-grid'
 
 export type GameDeps = {
   scene: Scene
@@ -456,6 +457,11 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
   }
 
   const caveMouth = world.pois.find((p) => p.id === 'cave-mouth') ?? null
+  let caveRock: TriGrid | null = null
+  const findCaveRock = (): TriGrid | null => {
+    const o = view.root.getObjectByName('cave-rock')
+    return o instanceof Mesh ? createTriGrid(o) : null
+  }
   const head = new Vector3()
   /** terrain, the cave's rock (crossing its footprint anywhere but the mouth) and lit flames block the line */
   const occluded = (from: Vector3, to: Vector3, body: Vector3 | null): boolean => {
@@ -470,6 +476,9 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
         if (off < 0.22 && from.y + (to.y - from.y) * t < body.y + 0.1) return true
       }
     }
+    // the cave's rock (its overhang and side walls aren't in the height field)
+    caveRock ??= findCaveRock()
+    if (caveRock?.blocked(from, to)) return true
     let wasIn = world.inCave(from.x, from.z)
     for (let i = 1; i < OCC_STEPS; i++) {
       const t = i / OCC_STEPS
@@ -479,7 +488,7 @@ export function createGame(deps: GameDeps, opts: GameOptions): Game {
       const ground = world.heightAt(x, z)
       if (ground > y) return true
       const isIn = world.inCave(x, z)
-      if (isIn !== wasIn) {
+      if (!caveRock && isIn !== wasIn) {
         if (!caveMouth || Math.hypot(x - caveMouth.x, z - caveMouth.z) > caveMouth.radius * 1.2 + 4)
           return true
         wasIn = isIn
