@@ -392,12 +392,12 @@ Board: down · Last pushed: 60add27 (main) · Gate: typecheck green at 60add27 �
 | world | opus-xhigh | world-gen, game/world, game/render | W1 | — | working (spawned 00:38) |
 | people | opus-xhigh | game/actors | P1 | — | working (spawned 00:39) |
 | sim | opus-high | sim | S1 | — | working (spawned 00:38) |
-| ui | opus-high | ui, content, audio, public/art, index.html, ui.md | U1 | — | working (spawned 00:38) |
+| ui | opus-high | ui, content, audio, public/art, index.html, ui.md | U2 | U1 2c6307f passed (tag halo, subtitle periods → U2) | working |
 | play | opus-high | game/play, app/play.tsx | PL2 | PL1 8214411 passed | working |
 
 Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); Drydock portal :4400 (Windows bun, log in
 scratchpad drydock-portal.log)
-Images used: 2 / 200 (lead: concept env + people)
+Images used: 11 / 200 (lead 2, ui 9)
 Waiting on Sal: none (needs-sal file: plans/2026-10-17-needs-sal.md)
 Escalations: none
 Next: watch commits; review each sample (W1, P1, S1, U1, PL1) as ready lines arrive; write the kit (cliffnotes, decisions).
