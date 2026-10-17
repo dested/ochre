@@ -325,14 +325,14 @@ const TERRAIN_ALBEDO = /* glsl */ `
 		float joint = 1.0 - ocEdge( 0.07 + 0.05 * bk.z, bk.x + ( ocNoise( p * 3.0 ) - 0.5 ) * 0.05 );
 		float lowY = smoothstep( 1.0, -0.6, y );
 		// mussels along the joints and on the seaward blocks
-		float mus = ocEdge( 0.6, ocNoise( p * 2.6 + 1.0 ) * 0.7 + ( 1.0 - smoothstep( 0.0, 0.22, bk.x ) ) * 0.4 ) * lowY;
-		shelf = mix( shelf, ocLin( vec3( 0.09, 0.1, 0.12 ) ), mus * 0.85 );
+		float mus = ocEdge( 0.66, ocNoise( p * 2.6 + 1.0 ) * 0.75 + ( 1.0 - smoothstep( 0.0, 0.1, bk.x ) ) * 0.3 ) * lowY;
+		shelf = mix( shelf, ocLin( vec3( 0.1, 0.11, 0.13 ) ), mus * 0.75 );
 		// weed and coralline on whole blocks, ragged inside
 		float wcov = smoothstep( 1.0, -0.8, y ) * 0.6;
 		float weed = step( bk.w, wcov ) * ocEdge( 0.5, ocNoise( p * 1.9 + bk.zw * 9.0 ) * 0.7 + smoothstep( 0.0, 0.6, bk.x ) * 0.3 );
 		shelf = mix( shelf, mix( ocLin( vec3( 0.27, 0.27, 0.15 ) ), ocLin( vec3( 0.36, 0.3, 0.17 ) ), bk.z ), weed * 0.8 );
 		shelf = mix( shelf, ocLin( vec3( 0.66, 0.46, 0.48 ) ), smoothstep( -0.7, -1.4, y ) * step( 0.5, bk.z ) * 0.55 );
-		shelf *= 1.0 - 0.4 * joint * near;
+		shelf *= 1.0 - 0.3 * joint * near;
 		// pools: whole blocks of water (only out of the sea), with ragged rims
 		float poolEdge = bk.x + ( ocNoise( p * 2.2 ) - 0.5 ) * 0.35;
 		float pool = ocEdge( 0.28, poolEdge ) * step( bk.z, 0.13 ) * step( uSeaLevel + 0.12, y ) * smoothstep( 1.9, 1.0, y ) * wb.z;
@@ -394,9 +394,9 @@ const TERRAIN_ALBEDO = /* glsl */ `
 			float pud = smoothstep( 0.6, 0.7, ocNoise( p * 0.28 ) * 0.75 + ocNoise( p * 1.3 ) * 0.25 ) * flatK * smoothstep( 0.15, 0.6, uWeather.y );
 			pool = max( pool, pud * 0.85 );
 		}
-		// the pools hold the sky
-		col = mix( col, ocLin( vec3( 0.08, 0.16, 0.18 ) ), pool );
-		totalEmissiveRadiance += ( uSkyAmb * 0.75 + uKeyColor * 0.05 ) * pool * ( 0.15 + 0.5 * grazing );
+		// the pools: clear water over the dark, weedy floor of the block, holding the sky only at a grazing look
+		col = mix( col, col * vec3( 0.42, 0.52, 0.55 ) + ocLin( vec3( 0.03, 0.07, 0.08 ) ), pool );
+		totalEmissiveRadiance += ( uSkyAmb * 0.75 + uKeyColor * 0.05 ) * pool * ( 0.06 + 0.55 * grazing * grazing );
 		diffuseColor.rgb = col;
 	}
 `
