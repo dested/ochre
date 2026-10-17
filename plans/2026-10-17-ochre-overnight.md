@@ -376,21 +376,21 @@ controller, cameras and verbs that make each stage of life feel different; and t
   `/w/junk/sim-80k/bun13/bun-linux-x64/bun`. Applies to: all.
 - (2026-10-17, lead) Sal pre-approved self-review: the lead's `pass` on your sample is the approval. Applies to: all.
 
-## Ledger (lead, updated 2026-10-17 00:35)
+## Ledger (lead, updated 2026-10-17 00:40)
 
-Board: down · Last pushed: c61a551 (main) · Gate: n/a · Deploy: CI run 39013246567 in progress, ochre.dested.com
+Board: down · Last pushed: 60add27 (main) · Gate: typecheck green at 60add27 · Deploy: c61a551 live at https://ochre.dested.com (CI green)
 
 | Agent | Model | Owns | Item now | Last sha / artifact | Status |
 | --- | --- | --- | --- | --- | --- |
-| world | opus-xhigh | world-gen, game/world, game/render | — | — | not spawned |
-| people | opus-xhigh | game/actors | — | — | not spawned |
-| sim | opus-high | sim | — | — | not spawned |
-| ui | opus-high | ui, content, audio, public/art, index.html, ui.md | — | — | not spawned |
-| play | opus-high | game/play, app/play.tsx | — | — | not spawned |
+| world | opus-xhigh | world-gen, game/world, game/render | W1 | — | working (spawned 00:38) |
+| people | opus-xhigh | game/actors | P1 | — | working (spawned 00:39) |
+| sim | opus-high | sim | S1 | — | working (spawned 00:38) |
+| ui | opus-high | ui, content, audio, public/art, index.html, ui.md | U1 | — | working (spawned 00:38) |
+| play | opus-high | game/play, app/play.tsx | PL1 | — | working (spawned 00:38) |
 
 Background jobs: lead dev server :4080 (log /w/junk/sim-80k/dev.log); Drydock portal :4400 (Windows bun, log in
 scratchpad drydock-portal.log)
 Images used: 2 / 200 (lead: concept env + people)
-Waiting on Sal: none (needs-sal file to come)
+Waiting on Sal: none (needs-sal file: plans/2026-10-17-needs-sal.md)
 Escalations: none
-Next: commit phase 0, push, spawn all five.
+Next: watch commits; review each sample (W1, P1, S1, U1, PL1) as ready lines arrive; write the kit (cliffnotes, decisions).

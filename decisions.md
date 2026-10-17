@@ -1,6 +1,42 @@
 # ochre — Decisions
 
 > Append-only log of choices with rejected alternatives. Never reverse one silently — add a superseding entry.
+> Entries dated 2026-10-07 and earlier are inherited from sal-starter (plumbing); OCHRE's own start 2026-10-17.
+
+## 2026-10-17 — OCHRE: one life, by stage, on the Cape coast 80,000 years ago
+
+**Why:** Sal asked for a life simulator of someone 80k years ago ("same biologically as us… how do they navigate
+it", Spore came to mind), open ended, decided overnight. The game lives one human life in five stages (Held, Small,
+Coming of age, Provider, Elder), each with its own body, camera and verbs, then continues as your child. The setting
+is the southern Cape coast in the Blombos era because it has the richest real evidence for modern minds at that
+date (shell beads, engraved ochre, heat-treated silcrete, spring-tide shellfishing), so every mechanic can be backed
+by a Field Note. Watching-to-learn replaces XP: cumulative culture made playable. Sal picked "one life by stage"
+from the options on 2026-10-17.
+**Rejected:** a band manager (RimWorld-like; less "I lived their life"), a hybrid (thinner demo), a generic
+"caveman survival" game (wrong era, wrong dignity).
+
+## 2026-10-17 — Custom three.js "painted light" renderer, not celworld's engine
+
+**Why:** Sal chose stylized painterly 3D. celworld's characters are chibi with modern clothes and its default look
+is cel with ink; its engine is a large source-consumed monorepo package with a Postgres library, awkward to vendor
+into a Drydock-deployed repo. Agents may read and adapt celworld code (MeshBuilder skinning, walk IK, ground GLSL,
+look post chains) with a credit comment, never import it.
+**Rejected:** celworld engine as a dependency, celworld's cel look, photoreal/PBR (uncanny with procedural humans).
+
+## 2026-10-17 — Three-free world-gen and sim behind one contracts file
+
+**Why:** five agents build in parallel overnight. `src/game/contracts.ts` fixes every cross-module type; world-gen
+and the sim import nothing from three or the DOM so they test in `bun:test`; the UI talks to the game only through
+`src/game/bridge.ts` (a useSyncExternalStore store + an action set). The sim owns NPC movement on the world's
+walkability grid; the play layer owns the player's movement and reports it.
+**Rejected:** React Three Fiber (imperative systems fight the React tree; celworld also runs imperative three
+under React), a sim that reads three objects (untestable).
+
+## 2026-10-17 — Lockfile v1, installs with bun 1.3.14
+
+**Why:** Drydock builds with `oven/bun:1.3-alpine`, which can't parse the v2 lockfile bun 1.4 writes (the first
+deploy failed on it). Only the lead installs dependencies, with `/w/junk/sim-80k/bun13/bun-linux-x64/bun`.
+**Rejected:** hand-editing Drydock's managed Dockerfile (it overwrites it), upgrading Drydock tonight (Sal's call).
 
 ## 2026-10-07 — Optional Electron desktop surface (`apps/desktop`), first fork sal-git
 
