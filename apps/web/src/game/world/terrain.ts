@@ -571,6 +571,12 @@ const TERRAIN_ALBEDO = /* glsl */ `
 		wet = max( wet, wb.z * smoothstep( uSeaLevel + 2.0, uSeaLevel + 1.0, y ) );
 		wet = max( wet, wb.z * smoothstep( 1.4, - 0.6, y ) * ( 0.4 + 0.35 * weed + 0.25 * mus ) );
 		col = mix( col, col * vec3( 0.5, 0.52, 0.55 ), wet * 0.85 );
+		// by moonlight the pale washes (beach sand, dunes, the light sandstone) read as snow: once the sun is well down
+		// they sink to a lower, blue-grey value and take less of the moon, so the beach stays a beach
+		float lumN = dot( col, vec3( 0.3, 0.55, 0.15 ) );
+		float paleN = smoothstep( 0.25, 0.55, lumN ) * smoothstep( - 0.07, - 0.2, uSunDir.y ) * ( 1.0 - wet * 0.6 );
+		col = mix( col, lumN * vec3( 0.54, 0.58, 0.68 ), paleN * 0.8 );
+		ocKeyOcc *= 1.0 - 0.55 * paleN;
 		vec3 vv = normalize( uCamPos - vOcWorld );
 		// wet ground mirrors the sky, blurred, most at a grazing look; wet rock glints in each light
 		vec3 nB = normalize( nW + ocBumpT );
