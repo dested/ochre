@@ -125,7 +125,9 @@ canvases or full-screen backdrops; an offset that must clear a zoomed block mult
 - **Gaze mark**: a dashed bone ring at the centre during `held.faces`, so a baby who can only look knows where it is
   looking.
 - **Toasts**: "Rebal learned Tides" slips for the same skill fold into one ("Rebal, Wume and 2 others learned
-  Tides").
+  Tides"). Toasts that arrive while play isn't on screen (chapter card, pause, notes, a choice, a minigame) are held by
+  `hud/toast-queue.ts` (in `GameUI`) and released one at a time, 1.4 s apart, 0.8 s after play is back; the UI times
+  those copies itself (4.5 s) because the session has already expired them.
 - **Control hints** (`hud/Hints.tsx`): first-use lines above the dial, small keycaps and low-contrast words, one at
   a time: watch ring > aiming > move/look/run (the elder walks and has no Shift) > look (while held: Mouse only) > an
   enabled E prompt > Esc. Each shows once per life (`ochre:hints`, cleared by "Begin a life" and by picking a

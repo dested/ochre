@@ -5,6 +5,7 @@
 import { useBridge } from '~/game/bridge'
 import { UiDefs } from './defs'
 import { Hud } from './hud/Hud'
+import { useToastQueue } from './hud/toast-queue'
 import { MinigameHost } from './minigames/MinigameHost'
 import { ChapterCardScreen } from './screens/ChapterCard'
 import { ChoiceDialog } from './screens/Choice'
@@ -20,13 +21,21 @@ export function GameUI() {
   const screen = useBridge((s) => s.screen)
   const choice = useBridge((s) => s.choice)
   const minigame = useBridge((s) => s.minigame)
+  // toasts that land under a card, pause, notes, a choice or a minigame wait here and come one by one afterwards
+  const bridgeToasts = useBridge((s) => s.toasts)
+  const toasts = useToastQueue(
+    bridgeToasts,
+    screen === 'playing' && choice === null && minigame === null
+  )
   return (
     <>
       <UiDefs />
       {screen === 'title' && <TitleScreen />}
       {screen === 'intro' && <IntroScreen />}
       {screen === 'loading' && <LoadingScreen />}
-      {(screen === 'playing' || screen === 'paused') && <Hud dimmed={screen === 'paused' || minigame !== null} />}
+      {(screen === 'playing' || screen === 'paused') && (
+        <Hud dimmed={screen === 'paused' || minigame !== null} toasts={toasts} />
+      )}
       {screen === 'playing' && choice && !minigame && <ChoiceDialog choice={choice} />}
       {screen === 'playing' && minigame && <MinigameHost game={minigame} />}
       {screen === 'paused' && <PauseScreen />}

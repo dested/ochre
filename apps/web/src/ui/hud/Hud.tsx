@@ -5,7 +5,7 @@
  *   top left: objective          top centre: watch ring          top right: toasts
  *   bottom left: dial + needs, first-use control hints above them    bottom centre: prompt, captions
  */
-import { useBridge } from '~/game/bridge'
+import { useBridge, type Toast } from '~/game/bridge'
 import { useRecent, useRevealKey } from '../hooks'
 import { Dial } from './Dial'
 import { ControlHints } from './Hints'
@@ -16,12 +16,11 @@ import { Toasts } from './Toasts'
 
 const q = (v: number, steps = 10) => Math.round(v * steps)
 
-export function Hud({ dimmed = false }: { dimmed?: boolean }) {
+export function Hud({ dimmed = false, toasts }: { dimmed?: boolean; toasts: readonly Toast[] }) {
   const hud = useBridge((s) => s.hud)
   const captions = useBridge((s) => s.captions)
   const objective = useBridge((s) => s.objective)
   const prompt = useBridge((s) => s.prompt)
-  const toasts = useBridge((s) => s.toasts)
   const nameTags = useBridge((s) => s.nameTags)
   const choosing = useBridge((s) => s.choice !== null)
   const objectiveMark = useBridge((s) => s.objectiveMark)
