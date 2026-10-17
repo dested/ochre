@@ -28,7 +28,7 @@ export const SFX_NAMES = [
 ] as const satisfies readonly SfxName[]
 
 export type SfxKit = {
-  ctx: AudioContext
+  ctx: BaseAudioContext
   noise: Noise
   /** cached plucks by rounded frequency */
   pluck(freq: number): AudioBuffer
@@ -36,7 +36,7 @@ export type SfxKit = {
 
 type Recipe = (k: SfxKit, out: AudioNode, t: number) => void
 
-export function pluckCache(ctx: AudioContext): (freq: number) => AudioBuffer {
+export function pluckCache(ctx: BaseAudioContext): (freq: number) => AudioBuffer {
   const cache = new Map<number, AudioBuffer>()
   return (freq) => {
     const key = Math.round(freq * 10)

@@ -39,7 +39,7 @@ export type Music = {
   dispose(): void
 }
 
-export function createMusic(ctx: AudioContext, out: AudioNode, pluck: (f: number) => AudioBuffer): Music {
+export function createMusic(ctx: BaseAudioContext, out: AudioNode, pluck: (f: number) => AudioBuffer): Music {
   const droneGain = ctx.createGain()
   droneGain.gain.value = 0
   const droneLp = ctx.createBiquadFilter()

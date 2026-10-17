@@ -2,7 +2,7 @@
  * The procedural sound of OCHRE: WebAudio only, no samples. One graph per page:
  *   world bus (ambience + sfx) → muffle lowpass → master;  world bus → room reverb (bigger in the cave) → muffle
  *   music bus (drone + plucks) → master;  heartbeat → master (under the stage-1 muffle)
- *   master → gentle compressor → speakers
+ *   master → gentle compressor → limiter → speakers
  * The AudioContext is created on the first `resume()` (a user gesture), so nothing warns before that; calls made
  * earlier only record the music cue, volumes and the latest frame. SSR-safe: no DOM access at import time.
  */
@@ -14,8 +14,8 @@ import { makeImpulse, makeNoise } from './synth'
 
 export { SFX_NAMES }
 
-type Engine = {
-  ctx: AudioContext
+export type Engine = {
+  ctx: BaseAudioContext
   kit: SfxKit
   master: GainNode
   musicBus: GainNode
@@ -31,16 +31,45 @@ const LOOKAHEAD = 0.25
 const TICK_MS = 60
 /** a frame older than this means the game is paused: the bed ducks */
 const STALE_MS = 400
+/** music bus trim under the settings slider */
+const MUSIC_LEVEL = 0.35
 
-function createEngine(): Engine {
-  const ctx = new AudioContext({ latencyHint: 'interactive' })
+/** per-tick graph update from a frame; shared by the live scheduler and offline renders */
+export function driveEngine(e: Engine, f: AudioFrame | null, presence: number, horizon: number): void {
+  e.ambience.apply(f, presence)
+  const m = f?.muffle ?? 0
+  // 18 kHz open, ~1 kHz at the stage-1 muffle of 0.7
+  e.muffle.frequency.setTargetAtTime(Math.min(e.ctx.sampleRate * 0.45, 18000) * Math.pow(300 / 18000, m), e.ctx.currentTime, 0.3)
+  e.reverbSend.gain.setTargetAtTime(f?.inCave ? 0.5 : 0.06, e.ctx.currentTime, 0.5)
+  e.ambience.schedule(horizon)
+  e.music.schedule(horizon)
+}
+
+export function setEngineVolume(e: Engine, master: number, music: number): void {
+  const t = e.ctx.currentTime
+  e.master.gain.setTargetAtTime(master, t, 0.05)
+  e.musicBus.gain.setTargetAtTime(music * MUSIC_LEVEL, t, 0.05)
+}
+
+/** the whole graph on any context: the live AudioContext, or an OfflineAudioContext for level checks */
+export function buildEngine(ctx: BaseAudioContext): Engine {
   const kit: SfxKit = { ctx, noise: makeNoise(ctx), pluck: pluckCache(ctx) }
   const comp = ctx.createDynamicsCompressor()
   comp.threshold.value = -16
   comp.ratio.value = 3
   comp.attack.value = 0.01
   comp.release.value = 0.25
-  comp.connect(ctx.destination)
+  // a brick-wall-ish limiter keeps stacked crashes and hits under -1 dBFS
+  const limit = ctx.createDynamicsCompressor()
+  limit.threshold.value = -4
+  limit.knee.value = 0
+  limit.ratio.value = 20
+  limit.attack.value = 0.001
+  limit.release.value = 0.1
+  // both compressors add automatic make-up gain; trim it back so the ceiling sits near -3 dBFS
+  const trim = ctx.createGain()
+  trim.gain.value = 0.8
+  comp.connect(limit).connect(trim).connect(ctx.destination)
   const master = ctx.createGain()
   master.connect(comp)
 
@@ -81,6 +110,7 @@ function createEngine(): Engine {
 
 export const createAudio: CreateAudio = (): GameAudio => {
   let eng: Engine | null = null
+  let live: AudioContext | null = null
   let disposed = false
   let master = 0.8
   let music = 0.6
@@ -89,32 +119,21 @@ export const createAudio: CreateAudio = (): GameAudio => {
   let frameAt = 0
   let timer: ReturnType<typeof setInterval> | null = null
 
-  const applyVolume = (e: Engine) => {
-    const t = e.ctx.currentTime
-    e.master.gain.setTargetAtTime(master, t, 0.05)
-    e.musicBus.gain.setTargetAtTime(music * 0.55, t, 0.05)
-  }
+  const applyVolume = (e: Engine) => setEngineVolume(e, master, music)
 
   const tick = () => {
     const e = eng
     if (!e || e.ctx.state !== 'running') return
     const fresh = frame !== null && performance.now() - frameAt < STALE_MS
     const f = frame
-    const presence = f === null ? 0 : fresh ? 1 : 0.3
-    e.ambience.apply(f, presence)
-    const m = f?.muffle ?? 0
-    // 18 kHz open, ~1 kHz at the stage-1 muffle of 0.7
-    e.muffle.frequency.setTargetAtTime(Math.min(e.ctx.sampleRate * 0.45, 18000) * Math.pow(300 / 18000, m), e.ctx.currentTime, 0.3)
-    e.reverbSend.gain.setTargetAtTime(f?.inCave ? 0.5 : 0.06, e.ctx.currentTime, 0.5)
-    const horizon = e.ctx.currentTime + LOOKAHEAD
-    e.ambience.schedule(horizon)
-    e.music.schedule(horizon)
+    driveEngine(e, f, f === null ? 0 : fresh ? 1 : 0.3, e.ctx.currentTime + LOOKAHEAD)
   }
 
   const ensure = (): Engine | null => {
     if (eng || disposed) return eng
     if (typeof window === 'undefined' || typeof AudioContext === 'undefined') return null
-    eng = createEngine()
+    live = new AudioContext({ latencyHint: 'interactive' })
+    eng = buildEngine(live)
     applyVolume(eng)
     eng.music.cue(cue)
     timer = setInterval(tick, TICK_MS)
@@ -142,8 +161,8 @@ export const createAudio: CreateAudio = (): GameAudio => {
 
   return {
     async resume() {
-      const e = ensure()
-      if (e && e.ctx.state !== 'running') await e.ctx.resume()
+      ensure()
+      if (live && live.state !== 'running') await live.resume()
     },
     update(f) {
       frame = f
@@ -174,7 +193,8 @@ export const createAudio: CreateAudio = (): GameAudio => {
       if (!e) return
       e.ambience.dispose()
       e.music.dispose()
-      void e.ctx.close().catch(() => {})
+      void live?.close().catch(() => {})
+      live = null
     },
   }
 }

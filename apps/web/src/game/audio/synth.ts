@@ -5,7 +5,7 @@
 
 export type Noise = { white: AudioBuffer; pink: AudioBuffer; brown: AudioBuffer }
 
-export function makeNoise(ctx: AudioContext, seconds = 3): Noise {
+export function makeNoise(ctx: BaseAudioContext, seconds = 3): Noise {
   const n = Math.floor(ctx.sampleRate * seconds)
   const white = ctx.createBuffer(1, n, ctx.sampleRate)
   const pink = ctx.createBuffer(1, n, ctx.sampleRate)
@@ -33,7 +33,7 @@ export function makeNoise(ctx: AudioContext, seconds = 3): Noise {
 }
 
 /** a plucked string at `freq`, normalised, `seconds` long */
-export function makePluck(ctx: AudioContext, freq: number, seconds = 3, brightness = 0.45): AudioBuffer {
+export function makePluck(ctx: BaseAudioContext, freq: number, seconds = 3, brightness = 0.45): AudioBuffer {
   const sr = ctx.sampleRate
   const n = Math.floor(sr * seconds)
   const buf = ctx.createBuffer(1, n, sr)
@@ -68,7 +68,7 @@ export function makePluck(ctx: AudioContext, freq: number, seconds = 3, brightne
 }
 
 /** a soft stereo room: decaying noise with a darkening tail */
-export function makeImpulse(ctx: AudioContext, seconds: number, decay: number): AudioBuffer {
+export function makeImpulse(ctx: BaseAudioContext, seconds: number, decay: number): AudioBuffer {
   const sr = ctx.sampleRate
   const n = Math.floor(sr * seconds)
   const buf = ctx.createBuffer(2, n, sr)
@@ -104,7 +104,7 @@ export type BurstOpts = {
 }
 
 /** a filtered slice of a noise buffer */
-export function burst(ctx: AudioContext, dest: AudioNode, t: number, o: BurstOpts): void {
+export function burst(ctx: BaseAudioContext, dest: AudioNode, t: number, o: BurstOpts): void {
   const src = ctx.createBufferSource()
   src.buffer = o.buffer
   src.playbackRate.value = o.rate ?? 1
@@ -135,7 +135,7 @@ export type ToneOpts = {
   lowpass?: number
 }
 
-export function tone(ctx: AudioContext, dest: AudioNode, t: number, o: ToneOpts): void {
+export function tone(ctx: BaseAudioContext, dest: AudioNode, t: number, o: ToneOpts): void {
   const osc = ctx.createOscillator()
   osc.type = o.type
   osc.frequency.setValueAtTime(o.freq, t)
@@ -155,7 +155,7 @@ export function tone(ctx: AudioContext, dest: AudioNode, t: number, o: ToneOpts)
 }
 
 /** play a prepared buffer (a pluck) once */
-export function play(ctx: AudioContext, dest: AudioNode, t: number, buffer: AudioBuffer, gain: number, rate = 1): void {
+export function play(ctx: BaseAudioContext, dest: AudioNode, t: number, buffer: AudioBuffer, gain: number, rate = 1): void {
   const src = ctx.createBufferSource()
   src.buffer = buffer
   src.playbackRate.value = rate
