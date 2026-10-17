@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { useBridge } from '~/game/bridge'
+import type { Sex } from '~/game/contracts'
 
 /** true for `ms` after `key` last changed (and after mount); drives the HUD's fade-when-idle */
 export function useRecent(key: string, ms: number): boolean {
@@ -44,4 +46,9 @@ export function useAfter(ms: number): boolean {
     return () => clearTimeout(t)
   }, [ms])
   return done
+}
+
+/** the player's sex, for the paintings that show one person; null while play hasn't said */
+export function usePlayerSex(): Sex | null {
+  return useBridge((s) => s.hud.sex ?? null)
 }

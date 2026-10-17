@@ -6,9 +6,11 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { bridge, useBridge } from '~/game/bridge'
 import { FIELD_NOTE_IDS, type LifeSummary, type SkillId } from '~/game/contracts'
 import { SKILL_LABELS } from '~/content/skills'
+import { stagePainting } from '~/content/stages'
 import { CrossHatch, HatchRule } from '../motifs'
 import { ENGRAVING_KEY, type SavedEngraving } from '../minigames/Engraving'
 import { MenuButton } from '../widgets'
+import { usePlayerSex } from '../hooks'
 
 function isEngraving(v: unknown): v is SavedEngraving {
   if (typeof v !== 'object' || v === null || !('name' in v) || !('aspect' in v) || !('strokes' in v)) return false
@@ -71,13 +73,16 @@ function Section({ title, children, delay }: { title: string; children: ReactNod
 export function SummaryScreen() {
   const s = useBridge((st) => st.summary)
   const mark = useEngraving()
+  const painting = stagePainting('elder', usePlayerSex())
   if (!s) return null
   return (
     <div className="fixed inset-0 animate-ui-fade overflow-hidden bg-soot ui-grain" style={{ animationDuration: '2400ms' }}>
-      <div
-        className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: 'url(/art/chapters/elder.webp)', animation: 'ui-sum-push 40s linear both' }}
-      />
+      <div className="absolute inset-0" style={{ transform: painting.mirror ? 'scaleX(-1)' : undefined }}>
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${painting.src})`, animation: 'ui-sum-push 40s linear both' }}
+        />
+      </div>
       <div
         className="absolute inset-0"
         style={{

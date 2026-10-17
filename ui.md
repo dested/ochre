@@ -176,6 +176,9 @@ italic line, Continue (Enter).
 - Idle fades: 1.2–1.6 s opacity transitions. Low states: `animate-ui-breathe` (2.4 s).
 - Paintings: a slow push-in (chapter cards 1.02 → 1.09 over 9 s; intro cards 1.03 → 1.1). The title drifts in
   two-layer parallax and follows the pointer gently.
+- A painting with one person in focus follows the life: `stagePainting(stage, hud.sex)` (`content/stages.ts`). A
+  man's elder card and summary use `intro/3.webp` mirrored (the grandfather at the fire, right of the text); an
+  unknown sex keeps the stage default.
 - Nothing bounces, nothing spins.
 
 ## Copy

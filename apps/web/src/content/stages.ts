@@ -1,4 +1,4 @@
-import type { LifeStageId } from '~/game/contracts'
+import type { LifeStageId, Sex } from '~/game/contracts'
 
 export type StageInfo = {
   id: LifeStageId
@@ -8,7 +8,12 @@ export type StageInfo = {
   /** one line under the title: the feeling of the stage */
   line: string
   painting: string
+  /** a man's life, where `painting` puts a woman in focus */
+  paintingMale?: Painting
 }
+
+/** a painting and whether to flip it, so its subject sits clear of the text */
+export type Painting = { src: string; mirror: boolean }
 
 /** the five stages of a life (design doc: Structure) */
 export const STAGES: Record<LifeStageId, StageInfo> = {
@@ -46,5 +51,14 @@ export const STAGES: Record<LifeStageId, StageInfo> = {
     ageYears: 58,
     line: 'Passing it on, and letting go',
     painting: '/art/chapters/elder.webp',
+    // elder.webp is a grandmother; intro/3 is a grandfather teaching a child at the fire, flipped to the right
+    paintingMale: { src: '/art/intro/3.webp', mirror: true },
   },
+}
+
+/** the stage's painting for this life (sex null: not known yet, the stage default) */
+export function stagePainting(stage: LifeStageId, sex: Sex | null): Painting {
+  const info = STAGES[stage]
+  if (sex === 'male' && info.paintingMale) return info.paintingMale
+  return { src: info.painting, mirror: false }
 }

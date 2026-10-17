@@ -4,9 +4,9 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { bridge, useBridge } from '~/game/bridge'
-import { STAGES } from '~/content/stages'
+import { STAGES, stagePainting } from '~/content/stages'
 import { isInfant } from '../format'
-import { useAfter } from '../hooks'
+import { useAfter, usePlayerSex } from '../hooks'
 import { CrossHatch } from '../motifs'
 
 const AUTO_MS = 7000
@@ -14,6 +14,7 @@ const LEAVE_MS = 700
 
 export function ChapterCardScreen() {
   const card = useBridge((s) => s.chapter)
+  const sex = usePlayerSex()
   const hint = useAfter(2200)
   const [leaving, setLeaving] = useState(false)
   const leaveTimer = useRef<number | null>(null)
@@ -43,17 +44,20 @@ export function ChapterCardScreen() {
 
   if (!card) return null
   const stage = STAGES[card.stage]
+  const painting = stagePainting(card.stage, sex)
   const age = card.ageYears === 0 ? 'Born at the end of winter' : isInfant(card.ageYears) ? 'A few months old' : `Age ${Math.floor(card.ageYears)}`
   return (
     <div
       className="fixed inset-0 animate-ui-fade cursor-pointer overflow-hidden bg-soot ui-grain"
       style={{ animationDuration: '1400ms', opacity: leaving ? 0 : 1, transition: `opacity ${LEAVE_MS}ms ease` }}
       onClick={leave}>
-      <div
-        key={card.stage}
-        className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: `url(${stage.painting})`, animation: `ui-push ${AUTO_MS + 2000}ms linear both` }}
-      />
+      <div className="absolute inset-0" style={{ transform: painting.mirror ? 'scaleX(-1)' : undefined }}>
+        <div
+          key={card.stage}
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${painting.src})`, animation: `ui-push ${AUTO_MS + 2000}ms linear both` }}
+        />
+      </div>
       <div
         className="absolute inset-0"
         style={{
