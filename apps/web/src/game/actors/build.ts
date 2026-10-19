@@ -36,6 +36,8 @@ export type BuiltPerson = {
   levelTriangles: number[]
   /** rebuild the detail mesh with these items and an optional back sling for a child of these dims */
   setProps(left: PropItem, right: PropItem, sling: { child: BodyDims; slot: CarrySlot } | null): void
+  /** the hide's pose morphs at every detail level: `lie` 1 lying dead on the back, `tuck` 1 drawn in for a squat or seat */
+  setDrape(lie: number, tuck: number): void
   dispose(): void
 }
 
@@ -152,6 +154,14 @@ export function buildPerson(look: PersonLook): BuiltPerson {
         // same skeleton and bind matrix: swapping the geometry is enough
         m.detail.geometry = mb.build()
         old.dispose()
+      }
+    },
+    setDrape(lie, tuck) {
+      for (const m of meshes) {
+        const inf = m.gear.morphTargetInfluences
+        if (!inf || inf.length < 2) continue
+        inf[0] = lie
+        inf[1] = tuck
       }
     },
     dispose() {

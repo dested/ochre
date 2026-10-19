@@ -1,13 +1,15 @@
 /**
  * Hide clothing: wrap dresses, chest bands, aprons, karosses (a back cape, or a drape over one shoulder). Each
  * is a grid offset from the body's envelope with soft folds, ragged edges and mottled hide colour. Skirts and
- * flaps blend toward the thighs so they follow the legs; capes hang off the chest with a lagging "cape" bone.
+ * flaps blend toward the thighs so they follow the legs; capes hang off the chest with a lagging "cape" bone. Two
+ * pose morphs on the gear mesh do what skinning can't: the hide settling flat on a body lying dead, and a skirt drawn
+ * in snug when both thighs come up.
  */
 import { Color, Matrix4, Vector3 } from 'three'
 import type { BuildCtx } from './ctx'
 import type { TorsoShape } from './figure'
 import { B } from './rig'
-import { bump, clamp, fbm3, lerp, noise3, smax, smooth, type GridPoint, type SkinFn, type SkinW } from './geo'
+import { bump, clamp, fbm3, lerp, noise3, smax, smooth, type DrapeFn, type GridPoint, type Morphs, type SkinFn, type SkinW } from './geo'
 import { CORD, OCHRE, hideColor, tone } from './looks'
 
 type Plan = {
@@ -136,6 +138,96 @@ function skirtRadius(ctx: BuildCtx, ts: TorsoShape, th: number, y: number, hemY:
   return r * (1 + flare * t ** 1.3)
 }
 
+/**
+ * The lying drape (the gear's morph target): where hide settles when its wearer lies dead on the back. In bind space
+ * the body's up is then +Z and the ground a plane behind the back (poseLieDead's numbers: buttocks and shoulder blades
+ * on it, the legs running down to the heels). The hide flattens like a tube lain on: over the body's top it settles
+ * onto the body (`hull`, the radius the garment was cut around) with a little slack left as folds; from the top's
+ * shoulder it runs straight down to an edge on the ground and back in under the body, the edge as far out as the
+ * hide's round allows, so a flared hem splays on the ground instead of standing beside the body like a wall. `off` is
+ * the garment's own stand-off, so the layers keep their order; above `top` the body holds the hide where it is
+ */
+function lieDrape(ctx: BuildCtx, hull: (th: number, y: number) => number, off: number, top = Infinity): DrapeFn {
+  const { d } = ctx
+  const H = d.stature
+  const lift = d.hipDepth * 1.22 + 0.002 * H
+  const tilt = Math.atan2(Math.max(0, d.chestDepth * 1.26 - d.hipDepth * 1.22), (d.shoulderJointY - d.hipY) * 0.8)
+  const slope = Math.max(0, lift - d.footH * 0.9) / ((d.thigh + d.shin) * 0.96)
+  // where the hide leaves the body's top for the ground, in radians from the front
+  const turn = 1.05
+  return (x, y, z, out) => {
+    out.set(x, y, z)
+    const k = Number.isFinite(top) ? smooth(top, top - 0.08 * H, y) : 1
+    const r = Math.hypot(x, z)
+    if (k <= 0 || r < 1e-6) return
+    const ground = (y >= d.hipY ? -(lift + (y - d.hipY) * Math.sin(tilt)) / Math.cos(tilt) : -(lift - (d.hipY - y) * slope)) + off * 0.7
+    const th = Math.atan2(x, z)
+    const sd = x >= 0 ? 1 : -1
+    const a = Math.abs(th)
+    const slack = (h: number): number => (r > h ? h + (r - h) * 0.18 : r)
+    const ht = slack(hull(sd * turn, y) + off)
+    const px = ht * Math.sin(turn)
+    const pz = ht * Math.cos(turn)
+    // the flattened tube: from the shoulder down to the edge, then back in to the middle under the body
+    const around = r * (Math.PI - turn)
+    const drop = pz - ground
+    const edge = around - px > drop ? (around * around - px * px - drop * drop) / (2 * (around - px)) : -1
+    let nx: number
+    let nz: number
+    if (a <= turn || edge < 0) {
+      // over the body (or hide too tight to flatten): settles onto it
+      const nr = slack(hull(th, y) + off)
+      nx = (x / r) * nr
+      nz = (z / r) * nr
+    } else {
+      const along = r * (a - turn)
+      const run = Math.hypot(edge - px, drop)
+      if (along <= run) {
+        const f = along / run
+        nx = sd * (px + (edge - px) * f)
+        nz = pz - drop * f
+      } else {
+        nx = sd * Math.max(0, edge - (along - run))
+        nz = ground
+      }
+      // never inside the body (a steep run can cut across the bulge of the hips or a thigh)
+      const nr = Math.hypot(nx, nz)
+      const hb = hull(Math.atan2(nx, nz), y) + off
+      if (nz > ground + 1e-4 && nr < hb && nr > 1e-6) {
+        nx *= hb / nr
+        nz *= hb / nr
+      }
+    }
+    nz = Math.max(nz, ground)
+    out.set(lerp(x, nx, k), y, lerp(z, nz, k))
+  }
+}
+
+/**
+ * The tuck (the gear's second morph): faded in as both thighs come up (a squat, a seat). The hide rides up the thighs
+ * (what hangs below the hips draws up by a quarter) and its flare and folds pull in snug onto the body, so a thigh
+ * raised high carries it round the leg instead of fanning it into a disc at the knees
+ */
+function tuckIn(ctx: BuildCtx, hull: (th: number, y: number) => number, off: number, top = Infinity): DrapeFn {
+  const { d } = ctx
+  const H = d.stature
+  return (x, y, z, out) => {
+    out.set(x, y, z)
+    const k = Number.isFinite(top) ? smooth(top, top - 0.08 * H, y) : 1
+    const r = Math.hypot(x, z)
+    if (k <= 0 || r < 1e-6) return
+    const ny = y < d.hipY ? lerp(y, d.hipY - (d.hipY - y) * 0.75, k) : y
+    const hr = hull(Math.atan2(x, z), ny) + off
+    const nr = r > hr ? lerp(r, hr + (r - hr) * 0.12, k) : r
+    out.set((x / r) * nr, ny, (z / r) * nr)
+  }
+}
+
+/** both pose morphs round one hull */
+function morphs(ctx: BuildCtx, hull: (th: number, y: number) => number, off: number, top = Infinity): Morphs {
+  return { lie: lieDrape(ctx, hull, off, top), tuck: tuckIn(ctx, hull, off, top) }
+}
+
 /* ─── garments ─────────────────────────────────────────────────────────────────────────────────────────── */
 
 export function buildGarments(ctx: BuildCtx, ts: TorsoShape): void {
@@ -170,7 +262,8 @@ function buildSkirt(ctx: BuildCtx, ts: TorsoShape, kind: 'full' | 'side'): void 
   const centre = kind === 'side' ? side * Math.PI * 0.55 : 0
   const half = kind === 'side' ? Math.PI * rng.range(0.55, 0.68) : Math.PI * 1.06
   const P = new Vector3()
-  ctx.gear.at(new Matrix4(), skirtSkin(ctx, ts, hemLo, 0.98)).grid(kind === 'full' ? 60 : 40, 18, (u, v, out) => {
+  const drape = morphs(ctx, (th, y) => (y > d.hipY ? ts.radius(th, y) : skirtRadius(ctx, ts, th, y, hemLo, 0)), kind === 'side' ? 0.011 * (H / 1.6) : off)
+  ctx.gear.at(new Matrix4(), skirtSkin(ctx, ts, hemLo, 0.98), drape).grid(kind === 'full' ? 60 : 40, 18, (u, v, out) => {
     const th = centre + (u * 2 - 1) * half
     // the long diagonal: low on one side, high on the other, plus ragged tabs
     const k = 0.5 + 0.5 * Math.sin(th * side - 0.4)
@@ -266,7 +359,8 @@ function buildWrap(ctx: BuildCtx, ts: TorsoShape): void {
     return lerp(topFront, topBack, 0.5 - 0.5 * Math.cos(th)) + span * diagK + ragged(th / (Math.PI * 2) + 3.1, seed, 0.006 * H)
   }
   const vHip = 0.42
-  ctx.gear.at(new Matrix4(), skirtSkin(ctx, ts, hemBase, 0.98)).grid(
+  const drape = morphs(ctx, (th, y) => (y > d.hipY ? ts.radius(th, y) : skirtRadius(ctx, ts, th, y, hemBase, 0)), off, d.hipY + 0.01 * H)
+  ctx.gear.at(new Matrix4(), skirtSkin(ctx, ts, hemBase, 0.98), drape).grid(
     56,
     22,
     (u, v, out: GridPoint) => {
@@ -361,7 +455,8 @@ function buildApron(ctx: BuildCtx, ts: TorsoShape): void {
       const wl = clamp(0.5 + (0.5 * s) / rim, 0, 1)
       return { b: [B.hips, B.thighL, B.thighR], w: [1 - g, g * wl, g * (1 - wl)] }
     }
-    ctx.gear.at(new Matrix4(), skin).grid(18, 14, (u, v, out) => {
+    const drape = morphs(ctx, (th, y) => (y > d.hipY ? ts.radius(th, y) : Math.max(ts.radius(th, d.hipY), d.hipX * Math.abs(Math.sin(th)) + d.legR) * 1.04), off)
+    ctx.gear.at(new Matrix4(), skin, drape).grid(18, 14, (u, v, out) => {
       const half = lerp(f.half0, f.half1, v)
       const th = f.c + (u * 2 - 1) * half
       const yEnd = hem - ragged(u + f.k * 5, seed, 0.03 * H)
@@ -412,7 +507,8 @@ function buildCape(ctx: BuildCtx, ts: TorsoShape): void {
     const rest = Math.max(0, 1 - wCape - wArm)
     return { b: [B.chest, B.cape, arm], w: [rest, wCape, wArm] }
   }
-  ctx.gear.at(new Matrix4(), capeSkin).grid(40, 26, (u, v, out) => {
+  const drape: Morphs = { lie: lieDrape(ctx, (th, y) => Math.max(env(th, y), y < d.hipY ? skirtRadius(ctx, ts, th, y, hemBase, 0) : 0), off, d.shoulderY) }
+  ctx.gear.at(new Matrix4(), capeSkin, drape).grid(40, 26, (u, v, out) => {
     const open = lerp(open0, open1, v)
     const th = open + u * (Math.PI * 2 - 2 * open)
     const hem = hemBase - ragged(u, seed, 0.04 * H) + 0.03 * H * Math.cos(th)

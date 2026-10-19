@@ -595,8 +595,18 @@ function buildEyes(ctx: BuildCtx, hs: HeadShape, ex: number, eyeYn: number): voi
       out.y = r * Math.sin(lam)
       out.z = r * Math.cos(phi) * Math.cos(lam)
     }
-    // upper lid (on the lid bone: blinks)
-    ctx.skin.at(centre, rigid(lidBone)).grid(26, 9, (u, v, out) => {
+    // upper lid (on the lid bone: blinks). Its margin goes all the way with the bone, but the skin eases back onto the
+    // head toward the top of the shell, so a lid held shut stretches down over the eye instead of swinging away
+    // from the brow and baring the white above it
+    const eyeAt = new Vector3().setFromMatrixPosition(centre)
+    const eyeUp = new Vector3(0, 1, 0).transformDirection(centre)
+    const rel = new Vector3()
+    const lidSkin: SkinFn = (x, y, z) => {
+      rel.set(x, y, z).sub(eyeAt)
+      const lam = Math.asin(clamp(rel.dot(eyeUp) / Math.max(1e-6, rel.length()), -1, 1))
+      return blend2(B.head, lidBone, 1 - smooth(0.5, 1.3, lam))
+    }
+    ctx.skin.at(centre, lidSkin).grid(26, 9, (u, v, out) => {
       const phi = (u * 2 - 1) * 1.75
       const lm = margin(phi, true)
       const lam = lerp(lm, 1.35, v ** 1.3)

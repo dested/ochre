@@ -13,6 +13,16 @@ import { BufferAttribute, BufferGeometry, Color, Float32BufferAttribute, Matrix4
 export type SkinW = { b: readonly number[]; w: readonly number[] }
 export type SkinFn = (x: number, y: number, z: number) => SkinW
 
+/** where a bind-space vertex goes under a pose morph (written into `out`) */
+export type DrapeFn = (x: number, y: number, z: number, out: Vector3) => void
+
+/**
+ * the hide's two pose morphs: `lie` where it settles when its wearer lies dead on the back, `tuck` drawn in snug over
+ * the body for a squat or a seat. A mesh with any morphed part gets both as relative morph targets (positions and
+ * normals), in this order, that the actor fades in
+ */
+export type Morphs = { lie?: DrapeFn; tuck?: DrapeFn }
+
 export function rigid(bone: number): SkinFn {
   const s: SkinW = { b: [bone], w: [1] }
   return () => s
@@ -69,18 +79,24 @@ export class MeshBuilder {
   private rgh: number[] = []
   private sIdx: number[] = []
   private sW: number[] = []
+  private lieD: number[] = []
+  private tuckD: number[] = []
+  private morphed = false
   private idx: number[] = []
   private m = new Matrix4()
   private flip = false
   private skin: SkinFn = rigid(0)
+  private morphs: Morphs | null = null
   private roughK = 0
   private tmp = new Vector3()
+  private tmpD = new Vector3()
 
-  /** transform + skin for every part added until the next `at` */
-  at(m: Matrix4, skin: SkinFn): this {
+  /** transform + skin (and the pose morphs, if any) for every part added until the next `at` */
+  at(m: Matrix4, skin: SkinFn, morphs: Morphs | null = null): this {
     this.m.copy(m)
     this.flip = m.determinant() < 0
     this.skin = skin
+    this.morphs = morphs
     this.roughK = 0
     return this
   }
@@ -109,6 +125,8 @@ export class MeshBuilder {
     this.pos.push(p.x, p.y, p.z)
     this.col.push(c.r, c.g, c.b)
     this.rgh.push(rough)
+    this.morphPush(this.morphs?.lie, this.lieD, p)
+    this.morphPush(this.morphs?.tuck, this.tuckD, p)
     const s = this.skin(p.x, p.y, p.z)
     let total = 0
     for (let k = 0; k < 4; k++) total += s.w[k] ?? 0
@@ -118,6 +136,16 @@ export class MeshBuilder {
       this.sW.push((s.w[k] ?? 0) / total)
     }
     return i
+  }
+
+  private morphPush(fn: DrapeFn | undefined, out: number[], p: Vector3): void {
+    if (!fn) {
+      out.push(0, 0, 0)
+      return
+    }
+    fn(p.x, p.y, p.z, this.tmpD)
+    out.push(this.tmpD.x - p.x, this.tmpD.y - p.y, this.tmpD.z - p.z)
+    this.morphed = true
   }
 
   tri(a: number, b: number, c: number): void {
@@ -411,6 +439,9 @@ export class MeshBuilder {
     for (const v of o.rgh) this.rgh.push(v)
     for (const v of o.sIdx) this.sIdx.push(v)
     for (const v of o.sW) this.sW.push(v)
+    for (const v of o.lieD) this.lieD.push(v)
+    for (const v of o.tuckD) this.tuckD.push(v)
+    this.morphed ||= o.morphed
     for (const i of o.idx) this.idx.push(i + base)
     return this
   }
@@ -418,37 +449,7 @@ export class MeshBuilder {
   /** merge everything into one geometry; normals from the final triangles */
   build(): BufferGeometry {
     const pos = new Float32Array(this.pos)
-    const nrm = new Float32Array(pos.length)
-    const idx = this.idx
-    for (let t = 0; t < idx.length; t += 3) {
-      const a = (idx[t] ?? 0) * 3
-      const b = (idx[t + 1] ?? 0) * 3
-      const c = (idx[t + 2] ?? 0) * 3
-      const e1x = (pos[b] ?? 0) - (pos[a] ?? 0)
-      const e1y = (pos[b + 1] ?? 0) - (pos[a + 1] ?? 0)
-      const e1z = (pos[b + 2] ?? 0) - (pos[a + 2] ?? 0)
-      const e2x = (pos[c] ?? 0) - (pos[a] ?? 0)
-      const e2y = (pos[c + 1] ?? 0) - (pos[a + 1] ?? 0)
-      const e2z = (pos[c + 2] ?? 0) - (pos[a + 2] ?? 0)
-      const nx = e1y * e2z - e1z * e2y
-      const ny = e1z * e2x - e1x * e2z
-      const nz = e1x * e2y - e1y * e2x
-      for (const v of [a, b, c]) {
-        nrm[v] = (nrm[v] ?? 0) + nx
-        nrm[v + 1] = (nrm[v + 1] ?? 0) + ny
-        nrm[v + 2] = (nrm[v + 2] ?? 0) + nz
-      }
-    }
-    for (let v = 0; v < nrm.length; v += 3) {
-      const l = Math.hypot(nrm[v] ?? 0, nrm[v + 1] ?? 0, nrm[v + 2] ?? 0)
-      if (l > 1e-12) {
-        nrm[v] = (nrm[v] ?? 0) / l
-        nrm[v + 1] = (nrm[v + 1] ?? 0) / l
-        nrm[v + 2] = (nrm[v + 2] ?? 0) / l
-      } else {
-        nrm[v + 1] = 1
-      }
-    }
+    const nrm = faceNormals(pos, this.idx)
     const g = new BufferGeometry()
     g.setAttribute('position', new BufferAttribute(pos, 3))
     g.setAttribute('normal', new BufferAttribute(nrm, 3))
@@ -456,9 +457,58 @@ export class MeshBuilder {
     g.setAttribute('aRough', new BufferAttribute(new Float32Array(this.rgh), 1))
     g.setAttribute('skinIndex', new Uint16BufferAttribute(this.sIdx, 4))
     g.setAttribute('skinWeight', new Float32BufferAttribute(this.sW, 4))
-    g.setIndex(pos.length / 3 > 65535 ? new Uint32BufferAttribute(idx, 1) : new Uint16BufferAttribute(idx, 1))
+    g.setIndex(pos.length / 3 > 65535 ? new Uint32BufferAttribute(this.idx, 1) : new Uint16BufferAttribute(this.idx, 1))
+    if (this.morphed) {
+      // the pose morphs: offsets, and the normals of the moved surface less the rest normals
+      const targets = [this.lieD, this.tuckD].map((d) => {
+        const dp = new Float32Array(d)
+        const moved = new Float32Array(pos.length)
+        for (let i = 0; i < pos.length; i++) moved[i] = (pos[i] ?? 0) + (dp[i] ?? 0)
+        const dn = faceNormals(moved, this.idx)
+        for (let i = 0; i < dn.length; i++) dn[i] = (dn[i] ?? 0) - (nrm[i] ?? 0)
+        return { p: new BufferAttribute(dp, 3), n: new BufferAttribute(dn, 3) }
+      })
+      g.morphAttributes.position = targets.map((t) => t.p)
+      g.morphAttributes.normal = targets.map((t) => t.n)
+      g.morphTargetsRelative = true
+    }
     return g
   }
+}
+
+/** area-weighted vertex normals from the triangles */
+function faceNormals(pos: Float32Array, idx: readonly number[]): Float32Array {
+  const nrm = new Float32Array(pos.length)
+  for (let t = 0; t < idx.length; t += 3) {
+    const a = (idx[t] ?? 0) * 3
+    const b = (idx[t + 1] ?? 0) * 3
+    const c = (idx[t + 2] ?? 0) * 3
+    const e1x = (pos[b] ?? 0) - (pos[a] ?? 0)
+    const e1y = (pos[b + 1] ?? 0) - (pos[a + 1] ?? 0)
+    const e1z = (pos[b + 2] ?? 0) - (pos[a + 2] ?? 0)
+    const e2x = (pos[c] ?? 0) - (pos[a] ?? 0)
+    const e2y = (pos[c + 1] ?? 0) - (pos[a + 1] ?? 0)
+    const e2z = (pos[c + 2] ?? 0) - (pos[a + 2] ?? 0)
+    const nx = e1y * e2z - e1z * e2y
+    const ny = e1z * e2x - e1x * e2z
+    const nz = e1x * e2y - e1y * e2x
+    for (const v of [a, b, c]) {
+      nrm[v] = (nrm[v] ?? 0) + nx
+      nrm[v + 1] = (nrm[v + 1] ?? 0) + ny
+      nrm[v + 2] = (nrm[v + 2] ?? 0) + nz
+    }
+  }
+  for (let v = 0; v < nrm.length; v += 3) {
+    const l = Math.hypot(nrm[v] ?? 0, nrm[v + 1] ?? 0, nrm[v + 2] ?? 0)
+    if (l > 1e-12) {
+      nrm[v] = (nrm[v] ?? 0) / l
+      nrm[v + 1] = (nrm[v + 1] ?? 0) / l
+      nrm[v + 2] = (nrm[v + 2] ?? 0) / l
+    } else {
+      nrm[v + 1] = 1
+    }
+  }
+  return nrm
 }
 
 const WHITE = new Color(1, 1, 1)

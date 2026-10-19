@@ -10,8 +10,8 @@ import { Rng, mix32 } from '~/core/rng'
 import { gaitFor, poseAnim, type AnimCtx, type CarrySeat } from './anims'
 import type { BodyDims } from './body'
 import { buildPerson, type BuiltPerson } from './build'
-import { clamp, smooth } from './geo'
-import { Solver, blendPose, copyPose, makePose, makeSpec, type PoseSpec, type RigInfo } from './pose'
+import { clamp, lerp, smooth } from './geo'
+import { Solver, blendPose, copyPose, makePose, makeSpec, type Pose, type PoseSpec, type RigInfo } from './pose'
 import { backSeat, gripPoint, shownItems } from './props'
 import { B } from './rig'
 
@@ -23,6 +23,17 @@ const _q = new Quaternion()
 const _e = new Euler()
 const AX = new Vector3(1, 0, 0)
 const AY = new Vector3(0, 1, 0)
+const _fq = new Quaternion()
+const _fp = new Vector3()
+const _fo = new Vector3()
+/** knee, heel and toe heights of both legs: the fade's two poses and their blend */
+const _hA = [0, 0, 0, 0, 0, 0]
+const _hB = [0, 0, 0, 0, 0, 0]
+const _hC = [0, 0, 0, 0, 0, 0]
+const LEGS = [
+  [B.thighL, B.shinL, B.footL],
+  [B.thighR, B.shinR, B.footR],
+] as const
 
 /** the cradled child's eyes from the carrier's, metres (scaled with her height), and her head's tilt toward it */
 const CRADLE_GAP = 0.28
@@ -141,6 +152,10 @@ class PersonImpl implements PersonActor {
   private rebuildWait = 0
   private cape = 0
   private capeV = 0
+  /** 0 standing, 1 lying dead on the back: the hide settled onto the body and the ground (the gear's drape morph) */
+  private drapeW = 0
+  /** 0 standing, 1 both thighs raised (a squat, a seat): skirts drawn in snug (the gear's tuck morph) */
+  private tuckW = 0
   private eyeMid = new Vector3()
   private lookBody = new Vector3()
   /** this frame's gaze: the set target, or the face of the child in our arms (or of the one holding us) */
@@ -421,10 +436,43 @@ class PersonImpl implements PersonActor {
       this.fade = Math.min(1, this.fade + dt / this.fadeDur)
       const w = this.fade * this.fade * (3 - 2 * this.fade)
       blendPose(this.prev, this.live, w, this.out)
+      // slerped joints under a lerped hip don't keep to the ground: mid-fade a knee or a foot can sink well into it (a
+      // child going down to a crawl, about 12 cm). Lift the hips by the worst sink below the ground, or below where the
+      // two poses between them put that point when it is under the ground already
+      this.soleHeights(this.prev, _hA)
+      this.soleHeights(this.live, _hB)
+      this.soleHeights(this.out, _hC)
+      let sink = 0
+      for (let i = 0; i < 6; i++) sink = Math.max(sink, Math.min(0, lerp(_hA[i] ?? 0, _hB[i] ?? 0, w)) - (_hC[i] ?? 0))
+      this.out.hip.y += sink
     } else {
       copyPose(this.live, this.out)
     }
     this.apply(dt)
+  }
+
+  /** each leg's knee, heel and toe height above the root in a pose (forward kinematics from the bind) */
+  private soleHeights(p: Pose, out: number[]): void {
+    const bind = this.built.rig.bind
+    const d = this.built.dims
+    let k = 0
+    for (const chain of LEGS) {
+      _fq.copy(p.q[B.hips] ?? _q.identity())
+      _fp.copy(p.hip)
+      let parent: number = B.hips
+      for (const b of chain) {
+        const at = bind[b]
+        const from = bind[parent]
+        const q = p.q[b]
+        if (!at || !from || !q) return
+        _fp.add(_fo.subVectors(at, from).applyQuaternion(_fq))
+        _fq.multiply(q)
+        parent = b
+        if (b === chain[1]) out[k++] = _fp.y
+      }
+      out[k++] = _fp.y + _fo.set(0, -d.ankleY, -0.2 * d.footLen).applyQuaternion(_fq).y
+      out[k++] = _fp.y + _fo.set(0, -0.8 * d.ankleY, 0.75 * d.footLen).applyQuaternion(_fq).y
+    }
   }
 
   /** head turn and talking, added onto the anim's spec (not while lying down) */
@@ -524,7 +572,9 @@ class PersonImpl implements PersonActor {
     if (head && headBind) {
       let haveTarget = false
       const cradled = this.cradleWatch() !== null
-      if (this.gaze) {
+      // asleep or dead the lids stay shut over eyes looking straight ahead (no saccades, no look target)
+      const shut = this.anim === 'sleep' || this.anim === 'lie-dead'
+      if (this.gaze && !shut) {
         head.updateWorldMatrix(true, false)
         _m.copy(head.matrixWorld).invert()
         _v2.copy(this.gaze).applyMatrix4(_m)
@@ -532,8 +582,8 @@ class PersonImpl implements PersonActor {
       }
       for (const side of [1, -1] as const) {
         const st = side > 0 ? this.eyeL : this.eyeR
-        let yaw = this.saccade.yaw
-        let pitch = this.saccade.pitch
+        let yaw = shut ? 0 : this.saccade.yaw
+        let pitch = shut ? 0 : this.saccade.pitch
         if (haveTarget) {
           _v.set(side * d.eyeX, d.headCy + d.eyeY, d.eyeZ).sub(headBind)
           _v.subVectors(_v2, _v)
@@ -547,8 +597,7 @@ class PersonImpl implements PersonActor {
         // upper lids follow the gaze down and close in a blink
         const lid = bones[side > 0 ? B.lidL : B.lidR]
         const blink = this.blinkT >= 0 ? Math.sin(Math.PI * Math.min(1, this.blinkT / 0.16)) : 0
-        const sleepy = this.anim === 'sleep' || this.anim === 'lie-dead' ? 1 : 0
-        const close = Math.max(blink, sleepy)
+        const close = shut ? 1 : blink
         const follow = clamp(st.pitch * 0.7, -0.12, 0.3)
         if (lid) lid.quaternion.setFromAxisAngle(AX, follow + close * (0.82 - follow))
       }
@@ -571,6 +620,18 @@ class PersonImpl implements PersonActor {
       }
       cape.quaternion.setFromAxisAngle(AX, this.cape - 0.75 * lean)
     }
+    // lying dead on the back, skirts, flaps and the kaross settle onto the body and the ground instead of keeping the
+    // standing flare (a flap tented over the thighs, panels standing up beside the body like walls)
+    this.drapeW = damp(this.drapeW, this.anim === 'lie-dead' ? 1 : 0, 6, dt)
+    // squatting or seated, a flared skirt carried up on both thighs would fan into a disc round the knees: drawn in
+    // snug as the lesser thigh lift (a stride lifts only one) goes from about 35 to 75 degrees off the hips' down
+    let lift = Math.PI
+    for (const b of [B.thighL, B.thighR]) {
+      const q = bones[b]?.quaternion
+      if (q) lift = Math.min(lift, Math.acos(clamp(-_v.set(0, -1, 0).applyQuaternion(q).y, -1, 1)))
+    }
+    this.tuckW = damp(this.tuckW, this.anim === 'lie-dead' ? 0 : smooth(0.6, 1.3, lift), 5, dt)
+    this.built.setDrape(this.drapeW, this.tuckW)
   }
 }
 

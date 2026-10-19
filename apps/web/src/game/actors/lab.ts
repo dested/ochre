@@ -538,6 +538,15 @@ export function mount(el: HTMLElement): () => void {
     },
     /** a hand's world position, for aiming close-up cameras */
     handAt: (i: number, side: 'left' | 'right') => people[i]?.handPosition(side, new Vector3()).toArray() ?? null,
+    /** person i's eye midpoint and the point `dist` metres in front of the face, in world metres */
+    headAt: (i: number, dist = 0.4) => {
+      const p = people[i]
+      const head = p?.object.getObjectByName('head')
+      if (!p || !head) return null
+      const eye = p.headPosition(new Vector3())
+      const ahead = new Vector3(0, 0, 1).transformDirection(head.matrixWorld).multiplyScalar(dist).add(eye)
+      return [...eye.toArray(), ...ahead.toArray()]
+    },
     count: () => people.length + crowd.length,
     /** show or hide the panel (clean contact sheets) */
     ui: (on: boolean) => {

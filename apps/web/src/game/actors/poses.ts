@@ -371,15 +371,25 @@ export function poseTendFire(c: AnimCtx, s: PoseSpec): void {
 
 /* ─── lying down ───────────────────────────────────────────────────────────────────────────────────────── */
 
-/** asleep on the right side, knees drawn up, the hands by the face */
+/** asleep on the right side, knees drawn up, the top hand resting on the ground before the chest, the other by the face */
 export function poseSleep(c: AnimCtx, s: PoseSpec): void {
   const { rig, d, t } = c
   const legL = rig.thigh + rig.shin
   const breath = Math.sin(t * TAU * 0.2)
-  // rolled onto the right side: the body's up runs along −X
-  s.hip.set(0, d.hipW * 0.95, 0)
-  s.hipRot.set(0, 0, Math.PI / 2)
-  s.spine.set(0.25 + 0.01 * breath, 0, 0)
+  const hipH = d.hipW * 0.95
+  const torso = d.shoulderJointY - d.hipY
+  const curl = 0.25 + 0.01 * breath
+  // the under shoulder in the trunk's frame: up the curled trunk and out to the side
+  const bend = 0.31
+  const along = torso * Math.cos(bend)
+  const ahead = torso * Math.sin(bend)
+  // rolled onto the right side (the body's up runs along −X), the trunk tipped up toward the head until that
+  // shoulder joint sits an arm's thickness up: the shoulder, wider than the hip, lies on the ground, not in it
+  const reach = Math.hypot(along, d.shoulderX)
+  const tip = Math.max(0, Math.atan2(d.shoulderX, along) + Math.asin(clamp((d.armR * 1.1 - hipH) / reach, -1, 1)))
+  s.hip.set(0, hipH, 0)
+  s.hipRot.set(0, 0, Math.PI / 2 - tip)
+  s.spine.set(curl, 0, 0)
   s.chest.set(0.12 - 0.015 * breath, 0, 0)
   s.neck.set(0.15, 0, 0.1)
   s.head.set(0.15, 0, 0.12)
@@ -389,22 +399,36 @@ export function poseSleep(c: AnimCtx, s: PoseSpec): void {
     if (!leg) continue
     // knees drawn forward; the upper (left) leg a touch further
     const up = side > 0 ? 1 : 0
-    leg.ankle.set(legL * 0.55, d.hipW * 0.95 + side * rig.hipX * 0.9 - 0.02, legL * (0.32 + 0.06 * up))
+    // the under foot lies on its outer edge, its ankle three quarters of a foot's width up
+    leg.ankle.set(legL * 0.55, Math.max(d.footW * 0.75, hipH + side * rig.hipX * 0.9 - 0.02), legL * (0.32 + 0.06 * up))
     leg.pitch = 0.25
     leg.yaw = 0
     leg.pole.set(0.1, 0, 1)
   }
+  const armL = d.upperArm + d.foreArm
   for (let i = 0; i < 2; i++) {
+    const side = i === 0 ? 1 : -1
     const a = s.arms[i]
     if (!a) continue
-    a.ik = false
-    a.flex = 1.25 + (i === 0 ? 0.2 : 0)
-    a.abduct = i === 0 ? 0.05 : 0.15
-    a.twist = 0.4
-    a.elbow = 1.6
-    a.hand.set(0.4, 0, 0)
-    a.curl = 0.45
-    a.thumb = 0.3
+    // this shoulder along the body's length (root X): up the curled trunk, then rolled and tipped like the hips
+    const sx = -along * Math.cos(tip) + side * d.shoulderX * Math.sin(tip)
+    a.ik = true
+    if (side > 0) {
+      // the top arm falls forward off the shoulder, the palm on the ground before the chest
+      a.wrist.set(sx + 0.12 * armL, d.handW * 0.55, ahead + 0.62 * armL)
+      a.pole.set(1, 0.3, 0.3)
+    } else {
+      // the under arm lies along the ground, bent, the hand up by the face
+      a.wrist.set(sx - 0.28 * armL, d.handW * 0.55, ahead + 0.5 * armL)
+      a.pole.set(0.3, 0, 1)
+    }
+    // limp: the heel of the palm on the ground, the knuckles tipped up and the fingers half closed so their tips
+    // just reach the ground
+    a.aim = true
+    a.aimAxis.set(-side, 0.45, 0)
+    a.aimPalm.set(0, -1, 0)
+    a.curl = 0.5
+    a.thumb = 0.2
   }
 }
 
@@ -441,7 +465,7 @@ export function poseLieDead(c: AnimCtx, s: PoseSpec): void {
     a.twist = 0.3
     a.elbow = 0.12
     a.hand.set(0.1, 0, 0)
-    a.curl = 0.35
+    a.curl = 0.65
     a.thumb = 0.2
   }
 }
