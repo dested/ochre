@@ -2,7 +2,8 @@
  * The southern right whale, stranded: 14 m of rotund black body with no dorsal fin, the arched upper jaw and bowed lower
  * lips, cream callosities on the head and chin, white belly blotches, broad paddle flippers and wide notched flukes
  * lying on the sand. Mostly still: it breathes every few seconds (the back heaves), lifts and drops its flukes now and
- * then, stirs a flipper; alert is the same in distress; it rolls onto its side to fall and die, and swims if refloated.
+ * then, stirs a flipper; alert is the same in distress; it settles a little onto its side to fall and die, and swims if
+ * refloated.
  */
 import { Color, Quaternion, Sphere, Vector3 } from 'three'
 import type { AnimalAnim } from '../contracts'
@@ -86,8 +87,8 @@ const FLIP = profile([
 const SKIN = new Color('#26282d')
 const DRY = new Color('#5a5753')
 const SEAM = new Color('#09090b')
-const CALLUS = new Color('#c8bb9a')
-const BELLY = new Color('#d6d2ca')
+const CALLUS = new Color('#cdbf9c')
+const BELLY = new Color('#8f8a82')
 
 const _off = new Vector3()
 const _bq = new Quaternion()
@@ -113,6 +114,18 @@ export function whalePlan(seed: number): Plan {
     // the belly sags and spreads under the whale's own weight
     const y = c >= 0 ? m0 + (topY(t) - m0) * c : m0 - (m0 - botY(t)) * (0.45 * -c + 0.55 * Math.sqrt(-c))
     return out.set(R * WID(t) * s * (1 + 0.08 * Math.max(0, -c)), y, z(t))
+  }
+  /** the finished hull at station t, section angle th (0 on top, + toward its left): the rostrum narrowed between the
+   *  bowed lower lips, which roll out just under the lip line */
+  const surf = (t: number, th: number, out: Vector3): Vector3 => {
+    const c = Math.cos(th)
+    hull(t, Math.sin(th), c, out)
+    const mt = mouth(t)
+    const head = smooth(0.7, 0.86, t)
+    const above = smooth(mt, mt + 0.14, c)
+    const lip = Math.exp(-(((c - mt + 0.07) / 0.08) ** 2))
+    out.x *= 1 - 0.45 * head * above + 0.1 * head * lip
+    return out
   }
   const at = (t: number): Vector3 => v(0, mid(t), z(t))
   const flipBase = (s: number): Vector3 => {
@@ -165,45 +178,23 @@ export function whalePlan(seed: number): Plan {
         const uu = u < 0.5 ? u : 1 - u
         const a = uu < uK ? (uu / uK) * thK : thK + ((uu - uK) / (0.5 - uK)) * (Math.PI - thK)
         const th = u < 0.5 ? -a : a - Math.PI * 2
-        const s = Math.sin(th)
         const c = Math.cos(th)
-        hull(t, s, c, p)
-        const head = smooth(0.7, 0.86, t)
-        // the narrow arched rostrum sits between the bowed lower lips, which roll out just under the lip line
-        const above = smooth(mt, mt + 0.14, c)
-        const lip = Math.exp(-(((c - mt + 0.07) / 0.08) ** 2))
-        let x = p.x * (1 - 0.45 * head * above + 0.1 * head * lip)
-        let y = p.y
+        surf(t, th, p)
+        const x = p.x
+        const y = p.y
+        // dark grey-black all over: a slate mottle, drying grey along the back out of the water
         const o = out.c.copy(SKIN).multiplyScalar(0.85 + 0.3 * fbm3(x * 0.8, y * 0.8, p.z * 0.8, seed))
-        // out of the water the skin dries grey along the back
         o.lerp(DRY, 0.32 * smooth(0.2, 0.85, c) * smooth(0.45, 0.68, fbm3(x * 0.45, y * 0.45, p.z * 0.45, seed ^ 0x51)))
         if (t > 0.69) {
           const ang = Math.abs(Math.acos(clamp(c, -1, 1)) - Math.acos(clamp(mt, -1, 1)))
           if (ang < 0.07) o.copy(SEAM)
-          // callosities, lumpy cream clusters: the bonnet on the rostrum tip, a row along the rostrum, the brows over the
-          // eyes, along the lower lips and on the chin
-          const n = fbm3(x * 1.8, y * 1.8, p.z * 1.8, seed ^ 0xca11)
-          const bonnet = t > 0.92 && t < 0.99 && c > 0.7 ? 0.45 : 2
-          const row = t > 0.8 && t < 0.92 && c > 0.88 ? 0.55 : 2
-          const brow = t > 0.705 && t < 0.74 && c > mt + 0.14 && c < mt + 0.34 ? 0.56 : 2
-          const lips = t > 0.82 && t < 0.98 && c < mt - 0.08 && c > mt - 0.24 ? 0.63 : 2
-          const chin = t > 0.95 && c < mt - 0.3 ? 0.58 : 2
-          const th0 = Math.min(bonnet, row, brow, lips, chin)
-          const cal = smooth(th0, th0 + 0.1, n)
-          if (cal > 0) {
-            const grain = 0.82 + 0.36 * fbm3(x * 9, y * 9, p.z * 9, seed ^ 0x77)
-            o.lerp(tone.copy(CALLUS).multiplyScalar(grain), cal)
-            // raised and rough
-            const lift = 0.035 * m * cal * grain
-            x += s * lift
-            y += c * lift
-          }
           // the blowholes: a dark V on top behind the bonnet
           if (Math.abs(t - 0.79) < 0.006 && c > 0.97) o.copy(SEAM)
         }
-        if (t > 0.36 && t < 0.7 && c < -0.55) {
+        // the belly's pale blotches stay underneath, a muted grey where the sand hides them
+        if (t > 0.4 && t < 0.66 && c < -0.8) {
           const n = fbm3(x * 0.7, y * 0.7, p.z * 0.7, seed ^ 0xbe11)
-          if (n > 0.6) o.lerp(BELLY, smooth(0.6, 0.65, n))
+          if (n > 0.64) o.lerp(BELLY, 0.7 * smooth(0.64, 0.7, n))
         }
         out.x = x
         out.y = y
@@ -211,6 +202,47 @@ export function whalePlan(seed: number): Plan {
       },
       { wrapU: true },
     )
+    // callosities: raised cream knobs in clusters, as on every right whale's head: the bonnet on the rostrum tip, a
+    // broken row back along the rostrum, the brows over the eyes, along the bowed lower lips and on the chin
+    const crng = new Rng(mix32(seed, 0xca11))
+    const n0 = new Vector3()
+    const h0 = new Vector3()
+    const knob = (t: number, th: number, size: number): void => {
+      surf(t, th, p)
+      // the section's normal, as an ellipse's (sin/a, cos/b) with the head's narrowing in a: finite differences across
+      // the lip roll turned some knobs on edge into blades
+      const hx = hull(t, Math.sin(th), Math.cos(th), h0).x
+      const a = R * WID(t) * (Math.abs(hx) > 1e-4 ? p.x / hx : 1)
+      const b = Math.cos(th) >= 0 ? topY(t) - mid(t) : mid(t) - botY(t)
+      n0.set(Math.sin(th) / Math.max(0.05, a), Math.cos(th) / Math.max(0.05, b), 0).normalize()
+      const r = size * m * crng.range(0.6, 1.25)
+      const g = crng.range(0.82, 1.1)
+      const o = p.clone().addScaledVector(n0, r * 0.08)
+      // the whole knob rides the bone under its centre (split across the lip line, the jaw stretched it into a blade)
+      const w = skin(o.x, o.y, o.z)
+      detail.at(frame(o, n0, v(0, 0, 1)), () => w).ellipsoid(r, r * 0.34, r * crng.range(0.55, 1), (_y, _th, q) => tone.copy(CALLUS).multiplyScalar(g * (0.88 + 0.24 * fbm3(q.x * 30, q.y * 30, q.z * 30, seed ^ 0x77))), 6, 4)
+    }
+    const cluster = (t0: number, t1: number, c0: number, c1: number, count: number, size: number, sides: readonly number[]): void => {
+      for (const sd of sides) {
+        for (let i = 0; i < count; i++) {
+          const t = crng.range(t0, t1)
+          const c = clamp(crng.range(c0, c1), -1, 1)
+          knob(t, sd * Math.acos(c), size)
+        }
+      }
+    }
+    // the bonnet straddles the top of the tip; the row runs back along the crown in ones and twos
+    cluster(0.935, 0.982, 0.8, 1, 9, 0.14, [1, -1])
+    for (let t = 0.82; t < 0.92; t += 0.021) if (crng.next() < 0.75) knob(t + crng.range(-0.004, 0.004), crng.range(-0.25, 0.25), 0.1)
+    for (const sd of [1, -1]) {
+      const mtB = mouth(0.722)
+      cluster(0.712, 0.734, mtB + 0.16, mtB + 0.3, 3, 0.09, [sd])
+      // the lower lips: knobs strung just under the lip line
+      for (let t = 0.84; t < 0.975; t += 0.016) if (crng.next() < 0.7) knob(t, sd * Math.acos(clamp(mouth(t) - crng.range(0.1, 0.2), -1, 1)), 0.09)
+    }
+    // the chin: under the front of the lower jaw
+    cluster(0.952, 0.99, -0.95, -0.55, 4, 0.11, [1, -1])
+
     // the eyes: small, just above the corner of the mouth
     for (const s of [1, -1]) {
       const te = 0.715
@@ -272,13 +304,15 @@ export function whalePlan(seed: number): Plan {
     const lift = alive ? Math.sin(Math.PI * smooth(0, 0.14, q2)) ** 2 * (1 - f) : 0
     const q3 = frac(t / (alert ? 4 : 13) + c.jit * 5)
     const stir = alive ? Math.sin(Math.PI * smooth(0, 0.2, q3)) * (1 - f) : 0
-    _off.set(0.05 * R * f, 0.04 * m * breath + 0.15 * R * f, 0)
-    k.begin(_off, eq(0, 0, 0.55 * f, _bq))
+    // dying it settles onto its right side a little, sinking that flank into the sand; the flippers fall slack on the
+    // sand (raised, the upper one stood up off the flank like an orca's fin)
+    _off.set(0.02 * R * f, 0.04 * m * breath + 0.04 * R * f, 0)
+    k.begin(_off, eq(0, 0, 0.17 * f, _bq))
     k.rot(CHEST, -0.012 * breath, 0, 0)
     k.rot(HEAD, 0.004 * breath - 0.03 * f, 0, 0)
     k.rot(JAW, 0.09 * f, 0, 0)
-    k.rot(FL_L, 0, 0, 0.3 * stir + 0.45 * f)
-    k.rot(FL_R, 0, 0, -0.15 * stir)
+    k.rot(FL_L, 0, 0, 0.3 * stir - 0.12 * f)
+    k.rot(FL_R, 0, 0, -0.15 * stir + 0.1 * f)
     k.rot(TAIL1, 0.1 * lift, 0, -0.35 * f)
     k.rot(TAIL2, 0.14 * lift, 0, -0.1 * f)
     k.rot(FLUKE, 0.1 * lift, 0, 0)
