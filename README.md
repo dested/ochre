@@ -1,158 +1,276 @@
-# ochre
+# OCHRE
 
-An SSR React starter wired with a current, type-safe stack, plus an optional Expo iOS app that talks to the same server. Clone it, init it, ship.
+**One life, eighty thousand years ago.**
 
-> Already have a project cloned from an older ochre? See [`MIGRATION.md`](./MIGRATION.md) to bring it up to date (it fixes some app-breaking bugs, and covers the move to this monorepo layout).
+<p align="center">
+  <img src="docs/screenshots/title.jpg" alt="The OCHRE title screen: a painted view of the southern Cape coast at sunset, a band walking the cliff path" width="100%">
+</p>
 
-| layer              | choice                                                                                |
-| ------------------ | ------------------------------------------------------------------------------------- |
-| runtime / pkg mgr  | **Bun** ≥ 1.3 workspaces (one `bun.lock`, shared versions in the root `catalog`)      |
-| server             | **Express 5** + **Vite** SSR (vite middleware in dev, static + SSR bundle in prod)    |
-| routing            | **React Router 7** (`createBrowserRouter` client, `createStaticHandler` server)       |
-| data               | **tRPC v11** + **TanStack Query** (`.queryOptions()` API) + **superjson**             |
-| validation         | **zod 4**                                                                             |
-| db                 | **Postgres** + **Prisma 7** (pg driver adapter, `prisma-client` generator, `migrate`) |
-| auth               | **better-auth** (email + password, autoSignIn; Expo plugin for the app)               |
-| styles             | **Tailwind v4** + **shadcn/ui** (new-york, oklch tokens shared with mobile)           |
-| mobile (optional)  | **Expo SDK 57** dev client + **Expo Router** + **NativeWind 5**, iOS/iPad             |
-| desktop (optional) | **Electron 44** + **electron-vite 5**, tRPC over IPC, unpacked Windows builds         |
-| types              | **TypeScript 7** `tsc`, `strict` + `noUncheckedIndexedAccess` in every workspace      |
-| tests              | **Playwright** e2e with committed screenshot baselines + **bun:test** units           |
-| deploy             | **Drydock** (`drydock.yaml`, web only) · **EAS** for the app                          |
+You are born in a cave above the sea at the southern tip of Africa, about 80,000 years before today. Your body and
+mind are the same as the player's: the same hands, the same fear of the dark. The world around you is nothing like
+ours. You live one whole life, from riding on your mother's back to being the old one who tells the stories at the
+fire. Each stage of life plays differently, the way Spore turns a species into a series of games, here applied to
+one human life. When you die, you carry on as your grandchild.
 
-## Quickstart
+The game is about understanding: why these people did what they did, and how anyone got through a winter. Every
+skill is learned the way it was then, by watching someone who already knows.
 
-Requires [Bun](https://bun.sh) ≥ 1.3 and a reachable Postgres.
+**Play it in the browser: [ochre.dested.com](https://ochre.dested.com)**
 
-**Start a new project from this template:**
+OCHRE is a playable prototype. It was built from scratch overnight by a team of AI agents. You can play from
+birth to death, and the five chapters, the living band, the world and the codex are all in. It is not a finished
+game. Notes on what's missing are in [Status](#status).
+
+<p align="center">
+  <img src="docs/screenshots/intro-whale.jpg" alt="A painted intro card: the band walks down to a whale stranded on the beach. Caption: You are born at the end of winter, in the year the whale came ashore." width="100%">
+</p>
+
+## Contents
+
+- [A life in five chapters](#a-life-in-five-chapters)
+- [The coast](#the-coast)
+- [The band](#the-band)
+- [Learning by watching](#learning-by-watching)
+- [Field Notes](#field-notes)
+- [When you die](#when-you-die)
+- [Controls](#controls)
+- [Run it locally](#run-it-locally)
+- [How it's built](#how-its-built)
+- [Status](#status)
+- [Credits](#credits)
+- [License](#license)
+
+## A life in five chapters
+
+The game is one life, told in five chapters. A director runs 29 beats across them, while the band carries on with
+its own day around you. The Chapters screen lets you jump to any stage.
+
+<p align="center">
+  <img src="docs/screenshots/chapters.jpg" alt="The Chapters of a life screen: five painted cards for Held, Small, Coming of age, Provider and Elder" width="100%">
+</p>
+
+### Held
+
+**Birth.** Everything is faces, warmth and the breath of the sea. You can't walk or talk. You look. The camera is
+your eyes in your mother's arms. Who you look at, and how long you look, is the whole game.
+
+<p>
+  <img src="docs/screenshots/held-faces.jpg" alt="Held: looking up at Ama, your mother, under the cave roof at sunset; the objective reads Look at the faces around you" width="49%">
+  <img src="docs/screenshots/held-sea.jpg" alt="Held: from the cave mouth, the sea at sunset below the cliff" width="49%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/held-night.jpg" alt="Held: night at the hearth; caption: Your grandmother sings the song about the moon and the tide" width="70%">
+</p>
+
+### Small
+
+**Age 6.** You learn by watching, on a shore that is wide and full of wonders. You follow Ama to the rocks, gather
+mussels, beat the spring tide back to the sand, dig corms with your grandmother, and play on the dunes.
+
+<p>
+  <img src="docs/screenshots/chapter-small.jpg" alt="The Small chapter card: painted children running through the fynbos above the sea" width="49%">
+  <img src="docs/screenshots/small-corms.jpg" alt="Small: digging corms in the fynbos with the band; a card reads You learned Corms, from watching Oro" width="49%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/small-fire.jpg" alt="Small: the whole band round the fire inside the cave at dusk; caption: The corms roast in the coals. Everyone eats from the same fire." width="100%">
+</p>
+
+### Coming of age
+
+**Age 14.** Stone, fire and the first hunt, and becoming someone people need. Walk to the silcrete outcrop with your
+father, bury stones under the hearth to change them, shape a spear point, haft it with glue, track eland onto the
+plateau and get close enough to throw.
+
+<p>
+  <img src="docs/screenshots/chapter-youth.jpg" alt="The Coming of age chapter card: a painted young man studying stone with his elders" width="49%">
+  <img src="docs/screenshots/youth-spear-point.jpg" alt="Coming of age: the band works round the fire in the cave; you are watching Sabo work hides, and the prompt reads Shape a spear point" width="49%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/youth-hunt.jpg" alt="Coming of age: two hunters with spears in the long grass of the plateau; objective: Get close. Throw." width="100%">
+</p>
+
+### Provider
+
+**Age 26.** Keeping the people you love alive through the seasons. Teach your own child to dig, bring in firewood
+before a winter storm, and run to tell the band when a whale comes ashore.
+
+<p>
+  <img src="docs/screenshots/chapter-provider.jpg" alt="The Provider chapter card: a painted eland bull above the sea, hunters crouched in the bush" width="49%">
+  <img src="docs/screenshots/provider-whale.jpg" alt="Provider: a southern right whale stranded on the cove beach; caption: Gulls wheel over the cove, screaming, already fighting over it." width="49%">
+</p>
+
+### Elder
+
+**Age 58.** Passing it on, and letting go. Engrave a piece of ochre the way it was done at Blombos Cave, tell a
+story at the fire, spend a last evening with the band and walk down to the sea.
+
+<p>
+  <img src="docs/screenshots/chapter-elder.jpg" alt="The Elder chapter card: a painted old man teaching children to work stone at the cave mouth" width="49%">
+  <img src="docs/screenshots/elder-story.jpg" alt="Elder: the band gathered in a ring round the fire in the cave; the prompt reads Tell a story" width="49%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/elder-walk.jpg" alt="Elder: an old woman stands on the rocks at the water's edge at sunset; objective: Walk down to the sea" width="100%">
+</p>
+
+## The coast
+
+The world is generated from code: a cliff cave above a rocky shore, a sandy cove, dunes, and a plateau of grass and
+fynbos behind the cliffs. The tide rises and falls with the moon. Spring and neap tides come from the real lunar
+cycle, and the sun and moon move as they do at 34° south. Weather rolls in, and day turns to night. A custom
+"painted light" renderer turns all of it into something like an oil sketch.
+
+<p align="center">
+  <img src="docs/screenshots/world-aerial.jpg" alt="Aerial view of the generated coastline: cliffs, a long beach, dunes and the plateau beyond, in late afternoon light" width="100%">
+</p>
+<p>
+  <img src="docs/screenshots/world-cave.jpg" alt="Looking out from inside the cave over a hearth to the sea and the beach at golden hour" width="49%">
+  <img src="docs/screenshots/world-lookout.jpg" alt="The cliff-top lookout at sunset, the sun low over the sea" width="49%">
+</p>
+<p>
+  <img src="docs/screenshots/world-cove.jpg" alt="Sunset over the cove, the dunes in silhouette" width="49%">
+  <img src="docs/screenshots/world-storm.jpg" alt="A storm on the cove: rain slanting across the dunes under a dark sky" width="49%">
+</p>
+
+## The band
+
+A band of 20 to 30 people lives in the cave: your family, the families you marry into, the old and the newborn. Each one is
+modelled, rigged and dressed in code, from infant to elder, with around twenty animations: walking, carrying,
+sitting at the fire, sleeping, knapping, throwing. They have names, relationships and needs, they go about their day
+without you, and they remember what you taught them.
+
+<p align="center">
+  <img src="docs/screenshots/people-lineup.jpg" alt="A lineup of procedural people: a grandmother with a staff, a mother carrying an infant, a father with a spear, a girl, a boy, a young man and an old man" width="100%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/people-faces.jpg" alt="Four faces close up: a grandmother with white hair, a mother with her baby, a bearded father, an old man with a white beard; all wear shell beads and red ochre marks" width="100%">
+</p>
+
+The Family screen shows everyone you're related to and, in the ring around each face, how close you are.
+
+<p align="center">
+  <img src="docs/screenshots/family.jpg" alt="The Family screen: a tree of grandparents, parents, your generation and the next, then the rest of the band, each with their age, closeness and skills" width="100%">
+</p>
+
+## Learning by watching
+
+You can't do anything until you've seen someone do it. Stand near a person who is working and watch. A ring fills,
+and you learn the skill from them. Later in life, children learn from you the same way. Some skills open a hands-on
+minigame painted in the same style as the rest of the game.
+
+<p>
+  <img src="docs/screenshots/minigame-knapping.jpg" alt="The knapping minigame: a silcrete stone half shaped into a point on a hide by the fire, the sea behind" width="49%">
+  <img src="docs/screenshots/minigame-engraving.jpg" alt="The engraving minigame: a cross-hatched pattern scored into a piece of red ochre, like the Blombos Cave engravings" width="49%">
+</p>
+
+**Knapping:** press on the edge, pull the hammerstone back and let go. Square blows shape the edge, slanting blows
+thin the face, and Space turns the stone over. **Engraving:** drag a stone point across the ochre, and every line
+stays.
+
+## Field Notes
+
+Every activity in the game is something people really did, and the game shows you how we know. Doing something
+for the first time unlocks a Field Note. There are 24, each with a painting, a short account and the evidence behind
+it: the heat-treated silcrete, the Still Bay points, the three-part hafting glue, the engraved ochre of Blombos Cave.
+
+<p>
+  <img src="docs/screenshots/field-notes.jpg" alt="The Field Notes codex: a grid of painted cards such as Silcrete, Changed by fire, Still Bay points, Glue from three things, The eland, When a whale came ashore" width="49%">
+  <img src="docs/screenshots/field-note.jpg" alt="The Marks on ochre Field Note: a painting of engraved red ochre beside an account of the Blombos finds and how we know" width="49%">
+</p>
+
+## When you die
+
+At the end of a life you see what it added up to: your children, what you taught and to whom, the beads you gave,
+the story you told. Then you carry on as your grandchild, and the band goes on.
+
+<p align="center">
+  <img src="docs/screenshots/life-summary.jpg" alt="The life summary for Teni, 58 years beside the sea: children, what you taught, the beads you gave, the story you told, Field Notes found, and Continue as Rebal, your grandchild" width="100%">
+</p>
+
+## Controls
+
+| Key | Action |
+| --- | --- |
+| W A S D / arrows | Move |
+| Mouse | Look |
+| Shift | Run |
+| C | Crouch |
+| E | Do what the prompt says (hold it while the ring fills) |
+| Tab | Show the HUD, which fades out of the way on its own |
+| Esc | Pause: Field Notes, Family, Settings |
+
+## Run it locally
+
+You need [Bun](https://bun.sh) 1.3 and a Postgres database. The server's health check and accounts use Postgres;
+the game itself saves to the browser.
 
 ```bash
-git clone https://github.com/dested/sal-starter.git my-app && cd my-app
-git remote rename origin upstream   # keeps `bun run sync` working; add your own origin later
+git clone https://github.com/dested/ochre.git && cd ochre
 bun install
-bun run init my-app                 # web only; --mobile / --desktop keep those apps, --desktop-only keeps just Electron
-createdb my_app                     # or point .env's DATABASE_URL at any Postgres
-bun run db:migrate                  # apply prisma/migrations
-bun run dev                         # → http://localhost:<the port init printed>
+cp .env.example .env              # point DATABASE_URL at your Postgres
+createdb ochre
+bun run --cwd apps/web db:deploy  # apply the migrations
+bun run dev                       # → http://localhost:4080
 ```
 
-`init` renames everything, writes `project.json` (the project's identity: name, scheme, bundle id, surfaces, ports, db), picks per-project ports and writes a fresh `.env` (web only). Surfaces you didn't ask for are deleted in their own commit ("init: web-only", "init: desktop-only", …); `bun run add:mobile` / `add:desktop` bring one back any time. `--port <n>` picks the API port yourself (Metro gets n + 1, the desktop renderer n + 2). `--fresh-git` wipes history instead, which also cuts you off from `sync`.
+Use Bun 1.3 for installs. Bun 1.4 rewrites `bun.lock` into a format the deploy image can't read yet.
 
-**Ports:** every project gets its own distinct, uncommon pair and records it in `cliffnotes.md`. Never 3000/3001/5173/5174/8000/8080/4200/5000. The template uses 4080 (API) and 4081 (Metro).
+| Command | What it does |
+| --- | --- |
+| `bun run dev` | The game with hot reload on http://localhost:4080 |
+| `bun run typecheck` | `tsc` across every workspace (strict, `noUncheckedIndexedAccess`) |
+| `bun run test` | Unit tests, including the sim and world generation |
+| `bun run build` | Production build of the client and the SSR server |
+| `bun apps/web/src/sim/run-day.ts --seed 1 --days 2` | Run the band through two days headless and print what happened |
 
-**Pull template improvements later:**
+Each part of the game has its own lab page for working on it in isolation:
 
-```bash
-bun run sync                        # merges upstream/main, never commits
-git diff --cached && git commit
-```
+| Page | What it shows |
+| --- | --- |
+| http://localhost:4080/lab/world | The world at any hour, moon, weather and camera (`?view=cave&hour=17.5`) |
+| http://localhost:4080/lab/people | People of every age, every animation, face close-ups; `?animals=1` for the animals |
+| http://localhost:4080/lab/sim | The band from above, with time controls and the director's state |
+| http://localhost:4080/lab/ui | Every screen and HUD state, and the audio |
+| http://localhost:4080/lab/play | The controller and cameras |
 
-Your `project.json`, `drydock.yaml` and `bun.lock` stay yours; surfaces your fork dropped stay dropped. Real conflicts are listed for you to resolve.
+Add `?stats=1` to any page for frame time, draw calls and triangles.
 
-## Scripts
+## How it's built
 
-All run from the repo root.
+| Layer | Choice |
+| --- | --- |
+| Rendering | [three.js](https://threejs.org) 0.185 with a custom painted-light pipeline: painted shading on every material, then a post chain of aerial perspective, bloom, a filmic grade, a Kuwahara paint filter whose brush grows with distance (faces stay crisp, the far coast turns to brushwork), and strokes laid along the image's flow over canvas grain |
+| World | A procedural heightfield with surfaces, points of interest and a tide model; no three.js or DOM, so it runs under unit tests |
+| People and animals | Meshes, rigs, clothing and animation generated in code, with no model files |
+| Simulation | A deterministic sim of the band: needs, food and fire, daily routines, relationships, watch-to-learn skills, and a director that runs the chapters |
+| UI | React 19 and Tailwind 4 over the canvas: HUD, captions, chapter cards, Field Notes, Family, minigames |
+| Audio | Generated live with WebAudio: wind, surf, fire, birds, footsteps and music cues, no sound files |
+| Art | The painted title, intro, chapter, Field Note and minigame art was generated with GPT Image 2.5 |
+| App | A Bun workspace: Express 5 with Vite SSR, React Router 7, tRPC 11, Prisma 7 on Postgres, TypeScript 7 strict |
 
-| script                                   | what it does                                                              |
-| ---------------------------------------- | ------------------------------------------------------------------------- |
-| `bun run dev`                            | web (HMR + SSR on 4080) + Metro on 4081 if `apps/mobile` exists           |
-| `bun run dev web` / `mobile` / `desktop` | just one of them                                                          |
-| `bun run init <name>`                    | rename the template, write `project.json` + `.env` (`--mobile`, `--port`) |
-| `bun run sync`                           | merge `upstream/main` into this fork without committing                   |
-| `bun run add:mobile`                     | add the Expo app to a fork without it, from upstream                      |
-| `bun run add:desktop`                    | add the Electron app to a fork without it, from upstream                  |
-| `bun run release`                        | desktop: unpacked build in `release/win-unpacked/`                        |
-| `bun run build`                          | build client (`apps/web/dist/client`) + SSR bundle (`dist/server`)        |
-| `bun run start`                          | run the production server (`NODE_ENV=production`)                         |
-| `bun run typecheck`                      | `tsc --noEmit` in the root and every workspace                            |
-| `bun run test`                           | `bun:test` in every workspace                                             |
-| `bun run test:e2e`                       | Playwright e2e + screenshot comparison                                    |
-| `bun run test:e2e:update`                | regenerate screenshot baselines                                           |
-| `bun run db:migrate`                     | create + apply a migration, regenerate the client (dev)                   |
-| `bun run db:migrate:create`              | create a migration without applying (for raw SQL)                         |
-| `bun run db:deploy`                      | apply committed migrations (prod / CI)                                    |
-| `bun run db:generate`                    | regenerate the Prisma client (auto-runs on install)                       |
-| `bun run db:studio`                      | Prisma Studio                                                             |
-| `bun run prettier`                       | format the repo                                                           |
+The world generator and the sim never import three.js or the DOM. Everything that crosses between modules is typed
+in one contracts file (`apps/web/src/game/contracts.ts`), and the game talks to the React UI through a single bridge
+store. [`cliffnotes.md`](cliffnotes.md) maps every file, and [`decisions.md`](decisions.md) records why things are
+the way they are.
 
-Mobile-only scripts live in `apps/mobile/package.json`: `doctor`, `fingerprint`, `ios:prebuild`, `ios:device`, `ios:sim`, `add-device`, `build:dev|preview|prod`, `submit:prod`, `ota:preview|prod`.
+## Status
 
-## Layout
+OCHRE is a prototype, built to prove the idea out. Not done yet:
 
-```
-project.json             identity: name, scheme, bundleId, appId, surfaces, apiPort, metroPort, desktopPort, db, easProjectId, appleTeamId
-package.json             workspace root: catalog, overrides, proxy scripts
-drydock.yaml             deploy seed (web only)
-scripts/                 init, sync, add-surface, dev
-apps/web/                the SSR app and the API server
-├── server.ts            Express entry: logging, /healthz, auth + tRPC mounts, vite/SSR
-├── server/              env, logger, prisma, auth, trpc, router (exports AppRouter)
-├── src/                 client: routes, pages, shadcn primitives, lib, styles
-├── prisma/              schema + committed migrations
-└── e2e/                 Playwright specs + __screenshots__
-apps/mobile/             Expo app (optional)
-├── app.config.ts        reads project.json; APP_VARIANT picks dev/preview/prod identity
-├── eas.json             build profiles
-├── modules/app-native/  local Expo module (Swift)
-└── src/                 app/ (Expo Router), screens/, components/ui/, lib/
-packages/native-example/ shared Expo module + config plugin (the template's native demo)
-```
+- **Voice:** every line is a caption for now.
+- **Saves are local** to your browser. No accounts or cloud saves.
+- **Performance:** only measured on an integrated GPU. Busy scenes draw over a million triangles, and a dedicated GPU
+  pass hasn't happened.
+- **Mobile:** desktop browsers with a mouse and keyboard only.
+- **Rough edges:** some objectives don't yet point you to where you need to go. You can walk into bushes. A few props
+  and garments clip.
 
-## How it fits together
+## Credits
 
-**Auth.** Sign-in/up call `authClient` → POST `/api/auth/*` (mounted via `toNodeHandler(auth)`) → session cookie. On SSR, `entry-server.tsx` reads the session once per request and passes it to loaders, so the first paint already knows who you are. The app uses better-auth's Expo client: the cookie lives in SecureStore and the tRPC link sends it as a header.
+- Built on [sal-starter](https://github.com/dested/sal-starter).
+- The procedural mesh builder, walk gait and face-colour rules are adapted from celworld, Sal Aiello's own engine.
+- The game's subject is the work of the archaeologists who excavated and studied Blombos Cave, Pinnacle Point, Sibudu
+  and the other Middle Stone Age sites of the southern Cape. Each Field Note cites its sources.
 
-**tRPC.** Components call `useQuery(trpc.posts.list.queryOptions())` → `/api/trpc/*` → `appRouter`. `createContext` attaches the session; `protectedProcedure` 401s without one. Mobile imports only the `AppRouter` type from `@app/web/router`.
+## License
 
-**SSR + hydration.** Loaders prefetch tRPC queries into a per-request `QueryClient` (via a direct, no-HTTP options proxy). The cache is dehydrated into `window.__SSR_STATE__` through superjson and rehydrated on the client, so `useQuery` has data on first render and `Date`s are still `Date`s.
-
-**Migrations.** Schema changes are committed `prisma migrate` migrations, never `db push`. Postgres features Prisma can't model are hand-written SQL in a migration. See `CLAUDE.md` → "Raw SQL in a migration".
-
-**Styling.** One set of oklch tokens in `packages/tokens/tokens.css` (`@app/tokens`). Web and desktop import it from `app.css`; mobile imports it through NativeWind, which compiles the colors for native and follows the OS dark mode.
-
-## Mobile: Windows + Mac + iPad
-
-The app runs as a **development build** (a dev client), never Expo Go. The workflow splits across two machines:
-
-- **Windows** (daily): editor, Postgres, `bun run dev` (API on 4080 + Metro on 4081). Allow inbound TCP 4080–4081 on the private network in Windows Firewall so the iPad can reach both.
-- **Mac** (only when native code changes): `git pull`, `bun install`, then in `apps/mobile`: `bun run ios:prebuild` and `bun run ios:device` with the iPad plugged in. That compiles and installs the dev client; it does not start Metro.
-- **iPad**: open the dev client, scan the QR from Windows Metro (or pick the server from the list). JS changes hot-reload from Windows.
-
-When do you need a new build? When the native fingerprint changes: run `bun run fingerprint` in `apps/mobile` and compare with the fingerprint row at the bottom of the app's Home screen. Swift, native dependencies, config plugins and native `app.config.ts` fields change it; JS doesn't. Move code between machines on a branch, never `master` (pushing `master` deploys web).
-
-**First-time setup per project:** set `appleTeamId` in `project.json`, then in `apps/mobile`: `eas login`, `eas init` (put the id it prints in `project.json` `easProjectId`; `app.config.ts` derives `updates.url` from it, because `eas init` / `eas update:configure` can't write a dynamic config). Distribution builds: `bun run build:preview` (internal, iPad registered via `bun run add-device`), `bun run build:prod` + `bun run submit:prod`.
-
-**Run `eas` only inside `apps/mobile`.** Run at the repo root, it offers to create a new EAS project with a root `app.json`/`eas.json`; say no and `cd apps/mobile`. EAS uploads the whole git repo, so the workspace (root `bun.lock`, `packages/*`, `@app/web` types) comes along. With `EAS_NO_VCS=1` it uploads only the current directory: set `EAS_PROJECT_ROOT=../..` too, or Metro fails at "Bundle JavaScript" on missing workspace paths.
-
-**Ship a fix (OTA).** JS-only changes go out without a store build: in `apps/mobile`, `eas update --channel production --environment production` (`bun run ota:prod`; `ota:preview` for internal builds). Installed apps check on launch and on every return to the foreground, download, and reload at once (`src/lib/ota.ts`). An update only reaches builds with the same fingerprint `runtimeVersion`: check with `eas fingerprint:compare --build-id <id>` first. Native changes (fingerprint differs) need a new `build:prod`.
-
-## Testing
-
-Playwright e2e lives in `apps/web/e2e/`. `bun run test:e2e` boots the app on port 3100 against an **isolated test database** (`ochre_test`), applies the committed migrations and truncates it, and runs the smoke suite (home, sign-up → dashboard → create post → sign-out, the 404 page). Visual baselines are committed under `e2e/__screenshots__/`; update them with `bun run test:e2e:update`.
-
-```bash
-createdb ochre_test                       # once; global-setup migrates it
-bun run test:e2e                                 # or E2E_DATABASE_URL=postgres://…/x_test bun run test:e2e
-```
-
-The e2e DB name must end in `_test`. Screenshots are OS/font specific; regenerate on the platform your CI uses.
-
-Unit tests: `bun run test`. `ssr-state.test.ts` proves a `Date` survives SSR dehydrate → hydrate; `tokens.test.ts` keeps the native dark tokens equal to the web ones.
-
-Mobile has no device test runner in the template. `bunx expo export --platform ios` (in `apps/mobile`) proves the app bundles; `bun run doctor` checks the Expo setup. `verify.md` lists every check.
-
-## Deploy
-
-**Web: Drydock.** `drydock.yaml` at the root deploys `apps/web` (`kind: ssr`, `runtime: bun`, port from `project.json`). `predeploy` runs `prisma migrate deploy`, so committed migrations only; a failed migration fails the deploy. Drydock provides `DATABASE_URL`, `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL`. Every push to `master` redeploys. Not yet verified for the workspace layout: Drydock's Dockerfile generator needs a workspace-aware fix first.
-
-**App: EAS.** See "Mobile" above. Builds and OTA updates are separate from the web deploy.
-
-## Gotchas
-
-- **Express 5 is required.** The route patterns (`/api/auth/*splat`) use named wildcards.
-- **`.env` lives at the repo root.** `apps/web` scripts pass `--env-file=../../.env`, and `prisma.config.ts` loads it for the Prisma CLI.
-- **Server-only code lives in `apps/web/server/`.** Never import it from `src/*.tsx` or from mobile except as `import type`.
-- **Identity lives in `project.json`.** Don't hardcode the name, scheme, bundle id or ports anywhere else.
-- **Never edit `apps/mobile/ios/` or `android/`.** They're generated by prebuild and gitignored.
-
-For the deeper "how to extend this" briefing (hard rules, common tasks, architecture flows), read [`CLAUDE.md`](./CLAUDE.md) and [`cliffnotes.md`](./cliffnotes.md).
+[MIT](LICENSE) © 2026 Sal Aiello

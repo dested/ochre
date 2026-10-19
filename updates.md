@@ -2,6 +2,16 @@
 
 > Terse, newest-first log: what was asked → what was done. One entry per finished task.
 
+## 2026-10-18 — Public repo, README with screenshots, people's work committed
+
+Ask: make sure everything is pushed, make the repo public, and write a great README with lots of game screenshots.
+Done: people's eight uncommitted actors files committed on Sal's OK (bed808a whale, 01392a7 pose morphs/lids). New
+README (pitch, the five chapters, the coast, the band, learning by watching, Field Notes, death and heir, controls,
+run locally, labs, how it's built, status, credits) with 30 screenshots in `docs/screenshots/`, shot with bx from a
+production build of 01392a7 using the `?qa` handles and the world/people labs. MIT LICENSE. History scanned for secrets
+first (none). Repo flipped to public.
+Touched: README.md, LICENSE, docs/screenshots/, cliffnotes.md, decisions.md, updates.md, apps/web/src/game/actors/*
+
 ## 2026-10-17 — OCHRE overnight build (bosun, 5 agents)
 
 Ask: an 80,000-years-ago life sim, "live their lives… understand… look incredible", decided and demoed by morning.

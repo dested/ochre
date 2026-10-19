@@ -74,6 +74,9 @@ package.json             workspace root: catalog, overrides (lightningcss), prox
 bunfig.toml              linker = "hoisted"
 tsconfig.base.json       shared strict compiler options
 drydock.yaml             deploy seed (merge=ours with project.json, see .gitattributes)
+README.md                the public game page: pitch, chapters, controls, run locally, how it's built (images from docs/screenshots/)
+LICENSE                  MIT, © 2026 Sal Aiello
+docs/screenshots/        the README's 30 game screenshots (1344×840 JPEGs, shot from a production build with ?qa)
 scripts/
 ├── init.ts              clone → rename, project.json, per-project ports, drops unwanted surfaces (own commit)
 ├── sync.ts              merge upstream/main without committing; keeps identity, lockfile, dropped surfaces dropped

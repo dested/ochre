@@ -3,6 +3,14 @@
 > Append-only log of choices with rejected alternatives. Never reverse one silently — add a superseding entry.
 > Entries dated 2026-10-07 and earlier are inherited from sal-starter (plumbing); OCHRE's own start 2026-10-17.
 
+## 2026-10-18 — The repo is public under MIT
+
+**Why:** Sal asked for `dested/ochre` to be public with a screenshot-heavy README, and picked MIT over "all rights
+reserved" or code-MIT/art-reserved. A history scan found no secrets; the one AWS account id (the Drydock deploy role
+in `.github/workflows/drydock.yml`) already appears in other public dested repos, and the workflow only runs on push
+to main, so forks can't assume the role.
+**Rejected:** all rights reserved (source visible, not reusable); MIT code with the painted art reserved.
+
 ## 2026-10-17 — OCHRE: one life, by stage, on the Cape coast 80,000 years ago
 
 **Why:** Sal asked for a life simulator of someone 80k years ago ("same biologically as us… how do they navigate
